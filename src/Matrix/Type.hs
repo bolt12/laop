@@ -315,9 +315,9 @@ identity = matrixBuilder (bool 0 1 . uncurry (==))
 comp :: (Num e) => Matrix e cr rows -> Matrix e cols cr -> Matrix e cols rows
 comp Empty Empty            = Empty
 comp (One a) (One b)        = One (a * b)
-comp (Junc a b) (Split c d) = comp a c + comp b d
-comp (Split a b) c          = Split (comp a c) (comp b c)
-comp c (Junc a b)           = Junc (comp c a) (comp c b)
+comp (Junc a b) (Split c d) = comp a c + comp b d         -- Divide-and-conquer law
+comp (Split a b) c          = Split (comp a c) (comp b c) -- Split fusion law
+comp c (Junc a b)           = Junc (comp c a) (comp c b)  -- Junc fusion law
 
 -- Projections
 
@@ -433,7 +433,7 @@ infixl 4 ><
 -- Matrix abide Junc Split
 
 abideJS :: Matrix e cols rows -> Matrix e cols rows
-abideJS (Junc (Split a c) (Split b d)) = Split (Junc (abideJS a) (abideJS b)) (Junc (abideJS c) (abideJS d))
+abideJS (Junc (Split a c) (Split b d)) = Split (Junc (abideJS a) (abideJS b)) (Junc (abideJS c) (abideJS d)) -- Junc-Split abide law
 abideJS Empty                          = Empty
 abideJS (One e)                        = (One e)
 abideJS (Junc a b)                     = Junc (abideJS a) (abideJS b)
@@ -442,7 +442,7 @@ abideJS (Split a b)                    = Split (abideJS a) (abideJS b)
 -- Matrix abide Split Junc
 
 abideSJ :: Matrix e cols rows -> Matrix e cols rows
-abideSJ (Split (Junc a b) (Junc c d)) = Junc (Split (abideSJ a) (abideSJ c)) (Split (abideSJ b) (abideSJ d))
+abideSJ (Split (Junc a b) (Junc c d)) = Junc (Split (abideSJ a) (abideSJ c)) (Split (abideSJ b) (abideSJ d)) -- Split-Junc abide law
 abideSJ Empty                         = Empty
 abideSJ (One e)                       = (One e)
 abideSJ (Junc a b)                    = Junc (abideSJ a) (abideSJ b)
