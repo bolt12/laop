@@ -141,10 +141,11 @@ deriving instance (Show e) => Show (Matrix e cols rows)
 type family Count (d :: Type) where
   Count Void = 0
   Count () = 1
+  Count Bool = 2
+  Count (Natural n) = n
   Count (Either a b) = (+) (Count a) (Count b)
   Count (a, b) = (*) (Count a) (Count b)
   Count (a -> b) = (^) (Count b) (Count a)
-  Count (Natural n) = n
 
 -- | Type family that computes of a given type dimension from a fiven natural
 type family FromNat (n :: Nat) where
@@ -583,12 +584,12 @@ prettyAux [[e]] m   = "│ " ++ fill (show e) ++ " │\n"
    v  = fmap show m
    widest = maximum $ fmap length v
    fill str = replicate (widest - length str - 2) ' ' ++ str
-prettyAux [h] m     = "│ " ++ fill (head $ map show h) ++ " │\n"
+prettyAux [h] m     = "│ " ++ fill (unwords $ map show h) ++ " │\n"
   where
    v  = fmap show m
    widest = maximum $ fmap length v
    fill str = replicate (widest - length str - 2) ' ' ++ str
-prettyAux (h : t) l = "│ " ++ fill (head $ map show h) ++ " │\n" ++ 
+prettyAux (h : t) l = "│ " ++ fill (unwords $ map show h) ++ " │\n" ++ 
                       prettyAux t l
   where
    v  = fmap show l
@@ -596,9 +597,9 @@ prettyAux (h : t) l = "│ " ++ fill (head $ map show h) ++ " │\n" ++
    fill str = replicate (widest - length str - 2) ' ' ++ str
 
 pretty :: (KnownNat (Count cols), Show e) => Matrix e cols rows -> String
-pretty m = "┌ " ++ blank ++ " ┐\n" ++ 
+pretty m = "┌ " ++ unwords (replicate (columns m) blank) ++ " ┐\n" ++ 
             prettyAux (toLists m) (toLists m) ++
-            "└ " ++ blank ++ " ┘"
+            "└ " ++ unwords (replicate (columns m) blank) ++ " ┘"
   where
    v  = fmap show (toList m)
    widest = maximum $ fmap length v

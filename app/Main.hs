@@ -44,5 +44,4 @@ main = do
     prettyPrint (p1 @Double @1 `comp` secondChoice `comp` firstChoice)
     prettyPrint (sumSSM `comp` khatri die die)
     prettyPrint (bang `comp` sumSSM `comp` khatri die die)
-    prettyPrint firstPhase
 
