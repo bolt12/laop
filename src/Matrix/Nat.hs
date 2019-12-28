@@ -33,6 +33,12 @@ module Matrix.Nat
     -- * Type safe matrix representation
     Matrix (..),
 
+    -- * Primitives
+    empty,
+    one,
+    junc,
+    split,
+
     -- * Auxiliary type families
     I.FromNat,
     I.Count,
@@ -59,18 +65,24 @@ module Matrix.Nat
     -- ** Matrix Transposition
     tr,
 
+    -- ** Selective operator
+    select, 
+
+    -- ** McCarthy's Conditional
+    cond,
+
     -- ** Matrix "abiding"
     abideJS,
     abideSJ,
 
     -- * Biproduct approach
     -- ** Split
-    split,
+    (===),
     -- *** Projections
     p1,
     p2,
     -- ** Junc
-    junc,
+    (|||),
     -- *** Injections
     i1,
     i2,
@@ -129,12 +141,28 @@ junc ::
   Matrix e cols3 rows
 junc (M a) (M b) = M (I.Junc a b)
 
+infixl 3 |||
+(|||) ::
+  (I.FromNat cols3 ~ Either (I.FromNat cols1) (I.FromNat cols2)) =>
+  Matrix e cols1 rows ->
+  Matrix e cols2 rows ->
+  Matrix e cols3 rows
+(|||) = junc
+
 split ::
   (I.FromNat rows3 ~ Either (I.FromNat rows1) (I.FromNat rows2)) =>
   Matrix e cols rows1 ->
   Matrix e cols rows2 ->
   Matrix e cols rows3
 split (M a) (M b) = M (I.Split a b)
+
+infixl 2 ===
+(===) ::
+  (I.FromNat rows3 ~ Either (I.FromNat rows1) (I.FromNat rows2)) =>
+  Matrix e cols rows1 ->
+  Matrix e cols rows2 ->
+  Matrix e cols rows3
+(===) = split
 
 -- Construction
 
@@ -382,6 +410,22 @@ abideSJ (M m) = M (I.abideSJ m)
 
 tr :: Matrix e cols rows -> Matrix e rows cols
 tr (M m) = M (I.tr m)
+
+-- Selective 'select' operator
+
+select 
+  :: (Num e, Bounded a1, Bounded b, Enum a1, Enum b, Ord e,
+      KnownNat (I.Count a2), KnownNat (I.Count (I.FromNat rows1)),
+      I.FromLists e (I.FromNat rows1) a2,
+      I.FromLists e (I.FromNat rows1) (I.FromNat rows1), Eq b,
+      I.FromNat cols1 ~ I.FromNat cols2,
+      I.FromNat rows2 ~ Either a2 (I.FromNat rows1)) =>
+     Matrix e cols1 rows2 -> (a1 -> b) -> Matrix e cols2 rows1
+select (M m) y = M (I.select m y)
+
+-- McCarthy's Conditional
+
+cond p (M a) (M b) = M (I.cond p a b)
 
 -- Pretty print
 

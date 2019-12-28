@@ -33,6 +33,12 @@ module Matrix.Type
     -- * Type safe matrix representation
     Matrix (..),
 
+    -- * Primitives
+    empty,
+    one,
+    junc,
+    split,
+
     -- * Auxiliary type families
     FromNat,
     Count,
@@ -59,18 +65,24 @@ module Matrix.Type
     -- ** Matrix Transposition
     tr,
 
+    -- ** Selective operator
+    select, 
+
+    -- ** McCarthy's Conditional
+    cond,
+
     -- ** Matrix "abiding"
     abideJS,
     abideSJ,
 
     -- * Biproduct approach
     -- ** Split
-    split,
+    (===),
     -- *** Projections
     p1,
     p2,
     -- ** Junc
-    junc,
+    (|||),
     -- *** Injections
     i1,
     i2,
@@ -186,8 +198,16 @@ one = One
 junc :: Matrix e a rows -> Matrix e b rows -> Matrix e (Either a b) rows
 junc = Junc
 
+infixl 3 |||
+(|||) :: Matrix e a rows -> Matrix e b rows -> Matrix e (Either a b) rows
+(|||) = Junc
+
 split :: Matrix e cols a -> Matrix e cols b -> Matrix e cols (Either a b)
 split = Split
+
+infixl 2 ===
+(===) :: Matrix e cols a -> Matrix e cols b -> Matrix e cols (Either a b)
+(===) = Split
 
 -- Construction
 
@@ -455,6 +475,42 @@ tr Empty       = Empty
 tr (One e)     = One e
 tr (Junc a b)  = Split (tr a) (tr b)
 tr (Split a b) = Junc (tr a) (tr b)
+
+-- Selective 'select' operator
+
+select :: 
+    ( Num e,
+      Bounded a1,
+      Bounded b,
+      Enum a1,
+      Enum b,
+      Ord e,
+      KnownNat (Count a2), 
+      KnownNat (Count rows), 
+      FromLists e rows a2,
+      FromLists e rows rows, 
+      Eq b
+    ) => Matrix e cols (Either a2 rows) -> (a1 -> b) -> Matrix e cols rows
+select m y = (junc (fromF y) identity) `comp` m
+
+-- McCarthy's Conditional
+
+cond p f g = junc f g `comp` split (corr p) (corr (not . p))
+
+corr :: 
+    forall e a q . 
+    ( KhatriP1 e q q,
+      KhatriP2 e q q,
+      FromLists e q q,
+      KnownNat (Count q),
+      Bounded a,
+      Enum a,
+      Num e,
+      Ord e
+    ) 
+     => (a -> Bool) -> Matrix e (Normalize (q, q)) (Normalize (q, q))
+corr p = let f = fromF p :: Matrix e q q
+          in f >< (identity :: Matrix e q q)
 
 -- Pretty print
 
