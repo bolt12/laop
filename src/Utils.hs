@@ -1,7 +1,8 @@
 module Utils 
     ( Natural(..),
       nat,
-      coerceNat
+      coerceNat,
+      coerceNat2
     )
     where
 

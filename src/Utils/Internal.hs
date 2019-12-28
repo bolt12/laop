@@ -7,7 +7,8 @@
 module Utils.Internal
     ( Natural(..),
       nat,
-      coerceNat
+      coerceNat,
+      coerceNat2
     )
     where
 
@@ -26,6 +27,9 @@ nat i = let nat = fromInteger (natVal (Proxy :: Proxy n))
 
 coerceNat :: (Int -> Int -> Int) -> (Natural a -> Natural b -> Natural c)
 coerceNat = coerce
+
+coerceNat2 :: ((Int, Int) -> Int -> Int) -> ((Natural a, Natural b) -> Natural c -> Natural d)
+coerceNat2 = coerce
 
 instance KnownNat n => Bounded (Natural n) where
     minBound = Nat 0

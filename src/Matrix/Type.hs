@@ -226,8 +226,8 @@ instance {-# OVERLAPPING #-} FromLists e () () where
   fromLists _     = error "Wrong dimensions"
 
 instance (FromLists e cols ()) => FromLists e (Either () cols) () where
-  fromLists [(h : t)] = Junc (One h) (fromLists [t])
-  fromLists _         = error "Wrong dimensions"
+  fromLists [h : t] = Junc (One h) (fromLists [t])
+  fromLists _       = error "Wrong dimensions"
 
 instance (FromLists e () rows) => FromLists e () (Either () rows) where
   fromLists ([h] : t) = Split (One h) (fromLists t)
@@ -296,7 +296,7 @@ fromF f =
     buildList l r  = take r l : buildList (drop r l) r
 
 fromF' ::
-  forall a b cols rows e.
+  forall a b e.
   ( Bounded a,
     Bounded b,
     Enum a,
@@ -492,7 +492,7 @@ infixl 4 ><
 abideJS :: Matrix e cols rows -> Matrix e cols rows
 abideJS (Junc (Split a c) (Split b d)) = Split (Junc (abideJS a) (abideJS b)) (Junc (abideJS c) (abideJS d)) -- Junc-Split abide law
 abideJS Empty                          = Empty
-abideJS (One e)                        = (One e)
+abideJS (One e)                        = One e
 abideJS (Junc a b)                     = Junc (abideJS a) (abideJS b)
 abideJS (Split a b)                    = Split (abideJS a) (abideJS b)
 
@@ -501,7 +501,7 @@ abideJS (Split a b)                    = Split (abideJS a) (abideJS b)
 abideSJ :: Matrix e cols rows -> Matrix e cols rows
 abideSJ (Split (Junc a b) (Junc c d)) = Junc (Split (abideSJ a) (abideSJ c)) (Split (abideSJ b) (abideSJ d)) -- Split-Junc abide law
 abideSJ Empty                         = Empty
-abideSJ (One e)                       = (One e)
+abideSJ (One e)                       = One e
 abideSJ (Junc a b)                    = Junc (abideSJ a) (abideSJ b)
 abideSJ (Split a b)                   = Split (abideSJ a) (abideSJ b)
 
@@ -515,20 +515,13 @@ tr (Split a b) = Junc (tr a) (tr b)
 
 -- Selective 'select' operator
 
-select :: 
-    ( Num e,
-      Bounded a1,
-      Bounded b,
-      Enum a1,
-      Enum b,
-      Ord e,
-      KnownNat (Count a2), 
-      KnownNat (Count rows), 
-      FromLists e rows a2,
-      FromLists e rows rows, 
-      Eq b
-    ) => Matrix e cols (Either a2 rows) -> (a1 -> b) -> Matrix e cols rows
-select m y = (junc (fromF y) identity) `comp` m
+select :: (Bounded a1, Bounded b, Enum a1, Enum b, Num e, Ord e,
+                 KnownNat (Count a2), KnownNat (Count rows), FromLists e rows a2,
+                 FromLists e rows rows, Eq b) =>
+                Matrix e cols (Either a2 rows) -> (a1 -> b) -> Matrix e cols rows
+select m y = 
+    let f = fromF y
+     in junc f identity `comp` m
 
 -- McCarthy's Conditional
 

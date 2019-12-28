@@ -29,7 +29,12 @@ secondChoice = fromF switch
 sumSS :: Natural 6 -> Natural 6 -> Natural 12
 sumSS = coerceNat (+) 
 
+mulSS :: Natural 6 -> Natural 6 -> Natural 36
+mulSS = coerceNat (*)
+
 sumSSM = fromF' (uncurry sumSS)
+
+mulSSM3 = fromF' (mulSS (Nat 3))
 
 die :: Dist (Natural 6) 6
 die = uniform [nat @6 1 .. nat 6]
@@ -39,4 +44,5 @@ main = do
     prettyPrint (p1 @Double @1 `comp` secondChoice `comp` firstChoice)
     prettyPrint (sumSSM `comp` khatri die die)
     prettyPrint (bang `comp` sumSSM `comp` khatri die die)
+    prettyPrint firstPhase
 
