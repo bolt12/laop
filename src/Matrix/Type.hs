@@ -517,11 +517,19 @@ corr p = let f = fromF p :: Matrix e q q
 prettyAux :: Show e => [[e]] -> String
 prettyAux []      = ""
 prettyAux [[e]]   = show e
-prettyAux [h]     = concat $ intersperse " " (map show h)
-prettyAux (h : t) = concat (intersperse " " (map show h)) ++ "\n" ++ prettyAux t
+prettyAux [h]     = "│ " ++ unwords (map show h) ++ " │\n"
+prettyAux (h : t) = "│ " ++ unwords (map show h) ++ " │\n" ++ 
+                    prettyAux t
 
-pretty :: Show e => Matrix e cols rows -> String
-pretty = prettyAux . toLists
+pretty :: (KnownNat (Count cols), Show e) => Matrix e cols rows -> String
+pretty m = "┌ " ++ unwords (replicate (columns m) blank) ++ " ┐\n" ++ 
+            (prettyAux . toLists $ m) ++
+            "└ " ++ unwords (replicate (columns m) blank) ++ " ┘"
+  where
+   v  = fmap show (toList m)
+   widest = maximum $ fmap length v
+   fill str = replicate (widest - length str) ' ' ++ str
+   blank = fill ""
 
-prettyPrint :: Show e => Matrix e cols rows -> IO ()
+prettyPrint :: (KnownNat (Count cols), Show e) => Matrix e cols rows -> IO ()
 prettyPrint = putStrLn . pretty
