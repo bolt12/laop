@@ -166,20 +166,26 @@ instance Eq e => Eq (Matrix e cols rows) where
 
 instance Num e => Num (Matrix e cols rows) where
 
-  Empty + Empty             = Empty
-  (One a) + (One b)         = One (a + b)
-  (Junc a b) + (Junc c d)   = Junc (a + c) (b + d)
-  (Split a b) + (Split c d) = Split (a + c) (b + d)
+  Empty + Empty                = Empty
+  (One a) + (One b)            = One (a + b)
+  (Junc a b) + (Junc c d)      = Junc (a + c) (b + d)
+  (Split a b) + (Split c d)    = Split (a + c) (b + d)
+  x@(Split a b) + y@(Junc c d) = x + abideJS y
+  x@(Junc a b) + y@(Split c d) = abideJS x + y
 
   Empty - Empty             = Empty
   (One a) - (One b)         = One (a - b)
   (Junc a b) - (Junc c d)   = Junc (a - c) (b - d)
   (Split a b) - (Split c d) = Split (a - c) (b - d)
+  x@(Split a b) - y@(Junc c d) = x - abideJS y
+  x@(Junc a b) - y@(Split c d) = abideJS x - y
 
   Empty * Empty             = Empty
   (One a) * (One b)         = One (a * b)
   (Junc a b) * (Junc c d)   = Junc (a * c) (b * d)
   (Split a b) * (Split c d) = Split (a * c) (b * d)
+  x@(Split a b) * y@(Junc c d) = x * abideJS y
+  x@(Junc a b) * y@(Split c d) = abideJS x * y
 
   abs Empty       = Empty
   abs (One a)     = One (abs a)
