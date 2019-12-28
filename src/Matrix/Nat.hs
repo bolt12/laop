@@ -429,8 +429,8 @@ cond p (M a) (M b) = M (I.cond p a b)
 
 -- Pretty print
 
-pretty :: Show e => Matrix e cols rows -> String
+pretty :: (KnownNat (I.Count (I.FromNat cols)), Show e) => Matrix e cols rows -> String
 pretty (M m) = I.pretty m
 
-prettyPrint :: Show e => Matrix e cols rows -> IO ()
+prettyPrint :: (KnownNat (I.Count (I.FromNat cols)), Show e) => Matrix e cols rows -> IO ()
 prettyPrint (M m) = I.prettyPrint m

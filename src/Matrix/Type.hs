@@ -514,17 +514,29 @@ corr p = let f = fromF p :: Matrix e q q
 
 -- Pretty print
 
-prettyAux :: Show e => [[e]] -> String
-prettyAux []      = ""
-prettyAux [[e]]   = show e
-prettyAux [h]     = "│ " ++ unwords (map show h) ++ " │\n"
-prettyAux (h : t) = "│ " ++ unwords (map show h) ++ " │\n" ++ 
-                    prettyAux t
+prettyAux :: Show e => [[e]] -> [[e]] -> String
+prettyAux [] _     = ""
+prettyAux [[e]] m   = "│ " ++ fill (show e) ++ " │\n"
+  where
+   v  = fmap show m
+   widest = maximum $ fmap length v
+   fill str = replicate (widest - length str - 2) ' ' ++ str
+prettyAux [h] m     = "│ " ++ fill (head $ map show h) ++ " │\n"
+  where
+   v  = fmap show m
+   widest = maximum $ fmap length v
+   fill str = replicate (widest - length str - 2) ' ' ++ str
+prettyAux (h : t) l = "│ " ++ fill (head $ map show h) ++ " │\n" ++ 
+                      prettyAux t l
+  where
+   v  = fmap show l
+   widest = maximum $ fmap length v
+   fill str = replicate (widest - length str - 2) ' ' ++ str
 
 pretty :: (KnownNat (Count cols), Show e) => Matrix e cols rows -> String
-pretty m = "┌ " ++ unwords (replicate (columns m) blank) ++ " ┐\n" ++ 
-            (prettyAux . toLists $ m) ++
-            "└ " ++ unwords (replicate (columns m) blank) ++ " ┘"
+pretty m = "┌ " ++ blank ++ " ┐\n" ++ 
+            prettyAux (toLists m) (toLists m) ++
+            "└ " ++ blank ++ " ┘"
   where
    v  = fmap show (toList m)
    widest = maximum $ fmap length v
