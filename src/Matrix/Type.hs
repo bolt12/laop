@@ -112,6 +112,7 @@ module Matrix.Type
     identity,
     comp,
     fromF,
+    fromF',
 
     -- * Matrix printing
     pretty,
@@ -119,6 +120,7 @@ module Matrix.Type
   )
     where
 
+import Utils
 import Data.Bool
 import Data.Kind
 import Data.List
@@ -142,6 +144,7 @@ type family Count (d :: Type) where
   Count (Either a b) = (+) (Count a) (Count b)
   Count (a, b) = (*) (Count a) (Count b)
   Count (a -> b) = (^) (Count b) (Count a)
+  Count (Natural n) = n
 
 -- | Type family that computes of a given type dimension from a fiven natural
 type family FromNat (n :: Nat) where
@@ -280,6 +283,40 @@ fromF f =
       maxB         = maxBound @b
       ccols        = fromInteger $ natVal (Proxy :: Proxy (Count cols))
       rrows        = fromInteger $ natVal (Proxy :: Proxy (Count rows))
+      elementsA    = take ccols [minA .. maxA]
+      elementsB    = take rrows [minB .. maxB]
+      combinations = (,) <$> elementsA <*> elementsB
+      combAp       = map snd . sort . map (\(a, b) -> if f a == b 
+                                                         then ((fromEnum a, fromEnum b), 1) 
+                                                         else ((fromEnum a, fromEnum b), 0)) $ combinations
+      mList        = buildList combAp rrows
+   in tr $ fromLists mList
+  where
+    buildList [] _ = []
+    buildList l r  = take r l : buildList (drop r l) r
+
+fromF' ::
+  forall a b cols rows e.
+  ( Bounded a,
+    Bounded b,
+    Enum a,
+    Enum b,
+    Eq b,
+    Num e,
+    Ord e,
+    KnownNat (Count (Normalize a)),
+    KnownNat (Count (Normalize b)),
+    FromLists e (Normalize b) (Normalize a)
+  ) =>
+  (a -> b) ->
+  Matrix e (Normalize a) (Normalize b)
+fromF' f =
+  let minA         = minBound @a
+      maxA         = maxBound @a
+      minB         = minBound @b
+      maxB         = maxBound @b
+      ccols        = fromInteger $ natVal (Proxy :: Proxy (Count (Normalize a)))
+      rrows        = fromInteger $ natVal (Proxy :: Proxy (Count (Normalize b)))
       elementsA    = take ccols [minA .. maxA]
       elementsB    = take rrows [minB .. maxB]
       combinations = (,) <$> elementsA <*> elementsB
@@ -495,22 +532,54 @@ select m y = (junc (fromF y) identity) `comp` m
 
 -- McCarthy's Conditional
 
-cond p f g = junc f g `comp` split (corr p) (corr (not . p))
+cond ::
+     ( cols ~ FromNat (Count cols),
+       KnownNat (Count cols),
+       FromLists e () cols,
+       FromLists e cols (),
+       FromLists e cols cols,
+       KhatriP2 e () cols,
+       Bounded a,
+       Enum a,
+       Num e,
+       Ord e
+     )
+     =>
+     (a -> Bool) -> Matrix e cols rows -> Matrix e cols rows -> Matrix e cols rows
+cond p f g = junc f g `comp` grd p
+
+grd :: 
+    ( q ~ FromNat (Count q),
+      KnownNat (Count q),
+      FromLists e () q,
+      FromLists e q (),
+      FromLists e q q,
+      KhatriP2 e () q,
+      Bounded a,
+      Enum a,
+      Num e,
+      Ord e
+    )
+    =>
+    (a -> Bool) -> Matrix e q (Either q q)
+grd f = split (corr f) (corr (not . f))
 
 corr :: 
     forall e a q . 
-    ( KhatriP1 e q q,
-      KhatriP2 e q q,
-      FromLists e q q,
+    ( q ~ FromNat (Count q),
       KnownNat (Count q),
+      FromLists e () q,
+      FromLists e q (),
+      FromLists e q q,
+      KhatriP2 e () q,
       Bounded a,
       Enum a,
       Num e,
       Ord e
     ) 
-     => (a -> Bool) -> Matrix e (Normalize (q, q)) (Normalize (q, q))
-corr p = let f = fromF p :: Matrix e q q
-          in f >< (identity :: Matrix e q q)
+     => (a -> Bool) -> Matrix e q q
+corr p = let f = fromF p :: Matrix e q ()
+          in khatri f (identity :: Matrix e q q)
 
 -- Pretty print
 

@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE RankNTypes #-}
 
 module Dist.Internal
         ( 
@@ -20,7 +20,7 @@ import Utils
 type Prob = Double
 type Dist a m = (FromLists Prob () (FromNat m)) => Matrix Prob 1 m
 
-choose :: Prob -> Dist a m
+choose :: Prob -> Dist a 2
 choose prob = col [prob, 1 - prob]
 
 shape :: (Prob -> Prob) -> [a] -> Dist a m

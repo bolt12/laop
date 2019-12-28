@@ -112,6 +112,7 @@ module Matrix.Nat
     identity,
     comp,
     fromF,
+    fromF',
 
     -- * Matrix printing
     pretty,
@@ -196,6 +197,22 @@ fromF ::
   (a -> b) ->
   Matrix e cols rows
 fromF = M . I.fromF
+
+fromF' ::
+  ( Bounded a,
+    Bounded b,
+    Enum a,
+    Enum b,
+    Eq b,
+    Num e,
+    Ord e,
+    KnownNat (I.Count (I.Normalize a)),
+    KnownNat (I.Count (I.Normalize b)),
+    I.FromLists e (I.Normalize b) (I.Normalize a)
+  ) =>
+  (a -> b) ->
+  Matrix e (I.Count a) (I.Count b)
+fromF' = M . I.fromF'
 
 -- Conversion
 
@@ -425,6 +442,20 @@ select (M m) y = M (I.select m y)
 
 -- McCarthy's Conditional
 
+cond ::
+     ( I.FromNat (I.Count (I.FromNat cols)) ~ I.FromNat cols,
+       KnownNat (I.Count (I.FromNat cols)),
+       I.FromLists e () (I.FromNat cols),
+       I.FromLists e (I.FromNat cols) (),
+       I.FromLists e (I.FromNat cols) (I.FromNat cols),
+       I.KhatriP2 e () (I.FromNat cols),
+       Bounded a,
+       Enum a,
+       Num e,
+       Ord e
+     )
+     =>
+     (a -> Bool) -> Matrix e cols rows -> Matrix e cols rows -> Matrix e cols rows
 cond p (M a) (M b) = M (I.cond p a b)
 
 -- Pretty print
