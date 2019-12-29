@@ -140,10 +140,11 @@ where
 
 import Data.Proxy
 import GHC.TypeLits
+import Control.DeepSeq
 import qualified Matrix.Type as I
 
 newtype Matrix e (cols :: Nat) (rows :: Nat) = M (I.Matrix e (I.FromNat cols) (I.FromNat rows))
-  deriving (Show, Num, Eq) via (I.Matrix e (I.FromNat cols) (I.FromNat rows))
+  deriving (Show, Num, Eq, NFData) via (I.Matrix e (I.FromNat cols) (I.FromNat rows))
 
 -- Primitives
 

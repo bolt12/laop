@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE DataKinds #-}
@@ -10,8 +9,6 @@ import Utils
 import Dist
 import GHC.TypeLits
 import Data.Coerce
-import System.CPUTime
-import System.Random
 
 -- Monty Hall Problem
 data Outcome = Win | Lose
@@ -59,36 +56,15 @@ grass_wet = row [0,1] `comp` kp1 @Double @2 @4
 
 rainning = row [0,1] `comp` kp2 @Double @2 @2 `comp` kp2 @Double @2 @4
 
--- Random Matrix
-
-randomRow :: IO [Double]
-randomRow = mapM (const (randomRIO (0, 1000))) [0..2399]
-
-randomList :: IO [[Double]]
-randomList = mapM (const randomRow) [0..2399]
-
-randomMatrix :: IO (Matrix Double 2400 2400)
-randomMatrix = fromLists <$> randomList
-
 main :: IO ()
-main = do 
-    -- putStrLn "Monty Hall Problem solution:"
-    -- prettyPrint (p1 @Double @1 `comp` secondChoice `comp` firstChoice)
-    -- putStrLn "\n Sum of dices probability:"
-    -- prettyPrint (sumSSM `comp` khatri die die)
-    -- putStrLn "\n Checking that the last result is indeed a distribution: "
-    -- prettyPrint (bang `comp` sumSSM `comp` khatri die die)
-    -- putStrLn "\n Probability of grass being wet:"
-    -- prettyPrint (grass_wet `comp` state)
-    -- putStrLn "\n Probability of rain:"
-    -- prettyPrint (rainning `comp` state)
-
-    -- Random Matrix multiplication
-    !a <- randomMatrix
-    !b <- randomMatrix
-    !start <- getCPUTime
-    let !r = b `comp` a
-    !end <- getCPUTime
-    print "Time in milisseconds:"
-    print (fromInteger (end - start) / 1000000000)
-    print (r == a)
+main = do
+    putStrLn "Monty Hall Problem solution:"
+    prettyPrint (p1 @Double @1 `comp` secondChoice `comp` firstChoice)
+    putStrLn "\n Sum of dices probability:"
+    prettyPrint (sumSSM `comp` khatri die die)
+    putStrLn "\n Checking that the last result is indeed a distribution: "
+    prettyPrint (bang `comp` sumSSM `comp` khatri die die)
+    putStrLn "\n Probability of grass being wet:"
+    prettyPrint (grass_wet `comp` state)
+    putStrLn "\n Probability of rain:"
+    prettyPrint (rainning `comp` state)

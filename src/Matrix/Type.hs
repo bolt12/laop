@@ -139,6 +139,7 @@ import Data.Void
 import GHC.TypeLits
 import Data.Type.Equality
 import GHC.Generics
+import Control.DeepSeq
 
 -- | LAoP (Linear Algebra of Programming) Inductive Matrix definition.
 data Matrix e cols rows where
@@ -181,6 +182,12 @@ type family FromNat' (b :: Bool) (m :: Type) :: Type where
 -- structure
 type family Normalize (d :: Type) where
   Normalize d = FromNat (Count d)
+
+instance NFData e => NFData (Matrix e cols rows) where
+    rnf Empty = ()
+    rnf (One e) = rnf e
+    rnf (Junc a b) = rnf a `seq` rnf b
+    rnf (Split a b) = rnf a `seq` rnf b
 
 instance Eq e => Eq (Matrix e cols rows) where
   Empty == Empty                = True
