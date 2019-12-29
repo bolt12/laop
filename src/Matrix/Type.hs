@@ -13,22 +13,34 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 
+-----------------------------------------------------------------------------
+-- |
+-- Module     : Matrix.Type
+-- Copyright  : (c) Armando Santos 2019-2020
+-- Maintainer : armandoifsantos@gmail.com
+-- Stability  : experimental
+--
+-- The LAoP discipline generalises relations and functions treating them as
+-- Boolean matrices and in turn consider these as arrows.
+--
+-- __LAoP__ is a library for algebraic (inductive) construction and manipulation of matrices
+-- in Haskell. See <https://github.com/bolt12/master-thesis my Msc Thesis> for the
+-- motivation behind the library, the underlying theory, and implementation details.
+--
+-- This module offers many of the combinators mentioned in the work of
+-- Macedo (2012) and Oliveira (2012). 
+--
+-----------------------------------------------------------------------------
+
 module Matrix.Type
-  ( -- | LAoP (Linear Algebra of Programming) Inductive Matrix definition.
+  ( -- | This definition makes use of the fact that 'Void' is
+    -- isomorphic to 0 and '()' to 1 and captures matrix
+    -- dimensions as stacks of 'Either's.
     --
-    --         LAoP generalises relations and functions treating them as
-    --         Boolean matrices and in turn consider these as arrows.
-    --         This library offers many of the combinators mentioned in the work of
-    --         Macedo (2012) and Oliveira (2012).
-    --
-    --          This definition makes use of the fact that 'Void' is
-    --          isomorphic to 0 and '()' to 1 and captures matrix
-    --          dimensions as stacks of 'Either's.
-    --
-    --          There exists two type families that make it easier to write
-    --          matrix dimensions: 'FromNat' and 'Count'. This approach
-    --          leads to a very straightforward implementation 
-    --          of LAoP combinators. 
+    -- There exists two type families that make it easier to write
+    -- matrix dimensions: 'FromNat' and 'Count'. This approach
+    -- leads to a very straightforward implementation 
+    -- of LAoP combinators. 
 
     -- * Type safe matrix representation
     Matrix (..),
@@ -95,9 +107,7 @@ module Matrix.Type
     -- | Note that given the restrictions imposed it is not possible to
     -- implement the standard type classes present in standard Haskell.
     -- *** Matrix pairing projections
-    KhatriP1,
     kp1,
-    KhatriP2,
     kp2,
 
     -- *** Matrix pairing
@@ -127,8 +137,9 @@ import Data.List
 import Data.Proxy
 import Data.Void
 import GHC.TypeLits
+import GHC.Generics
 
--- | Matrix data type
+-- | LAoP (Linear Algebra of Programming) Inductive Matrix definition.
 data Matrix e cols rows where
   Empty :: Matrix e Void Void
   One :: e -> Matrix e () ()
@@ -137,17 +148,24 @@ data Matrix e cols rows where
 
 deriving instance (Show e) => Show (Matrix e cols rows)
 
--- | Type family that computes the cardinality of a given type dimension
+-- | Type family that computes the cardinality of a given type dimension.
+-- It can also count the cardinality of custom types that implement the
+-- 'Generic' instance.
 type family Count (d :: Type) where
-  Count Void = 0
-  Count () = 1
-  Count Bool = 2
   Count (Natural n) = n
   Count (Either a b) = (+) (Count a) (Count b)
   Count (a, b) = (*) (Count a) (Count b)
   Count (a -> b) = (^) (Count b) (Count a)
+  -- Generics
+  Count (M1 _ _ f p) = Count (f p)
+  Count (K1 _ _ _) = 1
+  Count (V1 _) = 0
+  Count (U1 _) = 1
+  Count ((:*:) a b p) = Count (a p) * Count (b p)
+  Count ((:+:) a b p) = Count (a p) + Count (b p)
+  Count d = Count (Rep d R)
 
--- | Type family that computes of a given type dimension from a fiven natural
+-- | Type family that computes of a given type dimension from a given natural
 type family FromNat (n :: Nat) where
   FromNat 0 = Void
   FromNat 1 = ()
@@ -199,47 +217,65 @@ instance Num e => Num (Matrix e cols rows) where
 
 -- Primitives
 
+-- | Empty matrix constructor
 empty :: Matrix e Void Void
 empty = Empty
 
+-- | Unit matrix constructor
 one :: e -> Matrix e () ()
 one = One
 
+-- | Matrix 'Junc' constructor
 junc :: Matrix e a rows -> Matrix e b rows -> Matrix e (Either a b) rows
 junc = Junc
 
 infixl 3 |||
+
+-- | Matrix 'Junc' constructor
 (|||) :: Matrix e a rows -> Matrix e b rows -> Matrix e (Either a b) rows
 (|||) = Junc
 
+-- | Matrix 'Split' constructor
 split :: Matrix e cols a -> Matrix e cols b -> Matrix e cols (Either a b)
 split = Split
 
 infixl 2 ===
+
+-- | Matrix 'Split' constructor
 (===) :: Matrix e cols a -> Matrix e cols b -> Matrix e cols (Either a b)
 (===) = Split
 
 -- Construction
 
+-- | Type class for defining the 'fromList' conversion function.
+-- Given that it is not possible to branch on types at the term level type
+-- classes are needed bery much like an inductive definition but on types.
 class FromLists e cols rows where
+  -- | Build a matrix out of a list of list of elements. Throws a runtime
+  -- error if the dimensions do not match.
   fromLists :: [[e]] -> Matrix e cols rows
 
+-- | Void base case
 instance FromLists e Void Void where
   fromLists [] = Empty
   fromLists _  = error "Wrong dimensions"
 
+-- | Unit base case
 instance {-# OVERLAPPING #-} FromLists e () () where
   fromLists [[e]] = One e
   fromLists _     = error "Wrong dimensions"
 
+-- | Row vector matrix definition
 instance (FromLists e cols ()) => FromLists e (Either () cols) () where
   fromLists [h : t] = Junc (One h) (fromLists [t])
   fromLists _       = error "Wrong dimensions"
 
+-- | Column vector matrix definition
 instance (FromLists e () rows) => FromLists e () (Either () rows) where
   fromLists ([h] : t) = Split (One h) (fromLists t)
   fromLists _         = error "Wrong dimensions"
 
+-- | Arbitrary matrix definition
 instance {-# OVERLAPPABLE #-} (FromLists e cols c, FromLists e cols d) => FromLists e cols (Either c d) where
   fromLists (h : t) =
     let lh        = length h
@@ -248,6 +284,8 @@ instance {-# OVERLAPPABLE #-} (FromLists e cols c, FromLists e cols d) => FromLi
           then Split (fromLists [h]) (fromLists t)
           else error "Not all rows have the same length"
 
+-- | Matrix builder function. Constructs a matrix provided with
+-- a construction function.
 matrixBuilder ::
   forall e cols rows.
   ( FromLists e cols rows,
@@ -262,12 +300,17 @@ matrixBuilder f =
       positions = [(a, b) | a <- [0 .. (r - 1)], b <- [0 .. (c - 1)]]
    in fromLists . map (map f) . groupBy (\(x, _) (w, _) -> x == w) $ positions
 
+-- | Constructs a column vector matrix
 col :: (FromLists e () rows) => [e] -> Matrix e () rows
 col = fromLists . map (: [])
 
+-- | Constructs a row vector matrix
 row :: (FromLists e cols ()) => [e] -> Matrix e cols ()
 row = fromLists . (: [])
 
+-- | Lifts functions to matrices with arbitrary dimensions.
+-- NOTE: Be careful to not ask for a matrix bigger than the cardinality of
+-- types @a@ or @b@ allows.
 fromF ::
   forall a b cols rows e.
   ( Bounded a,
@@ -302,6 +345,8 @@ fromF f =
     buildList [] _ = []
     buildList l r  = take r l : buildList (drop r l) r
 
+-- | Lifts functions to matrices with dimensions matching @a@ and @b@
+-- cardinality's.
 fromF' ::
   forall a b e.
   ( Bounded a,
@@ -338,32 +383,40 @@ fromF' f =
 
 -- Conversion
 
+-- | Converts a matrix to a list of lists of elements.
 toLists :: Matrix e cols rows -> [[e]]
 toLists Empty       = []
 toLists (One e)     = [[e]]
 toLists (Split l r) = toLists l ++ toLists r
 toLists (Junc l r)  = zipWith (++) (toLists l) (toLists r)
 
+-- | Converts a matrix to a list of elements.
 toList :: Matrix e cols rows -> [e]
 toList = concat . toLists
 
 -- Zeros Matrix
 
+-- | The zero matrix. A matrix wholly filled with zeros.
 zeros :: (Num e, FromLists e cols rows, KnownNat (Count cols), KnownNat (Count rows)) => Matrix e cols rows
 zeros = matrixBuilder (const 0)
 
 -- Ones Matrix
 
+-- | The ones matrix. A matrix wholly filled with ones.
+-- Also known as T (Top) matrix.
 ones :: (Num e, FromLists e cols rows, KnownNat (Count cols), KnownNat (Count rows)) => Matrix e cols rows
 ones = matrixBuilder (const 1)
 
 -- Const Matrix
 
+-- | The constant matrix constructor. A matrix wholly filled with a given
+-- value.
 constant :: (Num e, FromLists e cols rows, KnownNat (Count cols), KnownNat (Count rows)) => e -> Matrix e cols rows
 constant e = matrixBuilder (const e)
 
 -- Bang Matrix
 
+-- | The T (Top) row vector matrix.
 bang :: forall e cols. (Num e, Enum e, FromLists e cols (), KnownNat (Count cols)) => Matrix e cols ()
 bang =
   let c = fromInteger $ natVal (Proxy :: Proxy (Count cols))
@@ -371,11 +424,15 @@ bang =
 
 -- Identity Matrix
 
+-- | Identity matrix.
 identity :: (Num e, FromLists e cols cols, KnownNat (Count cols)) => Matrix e cols cols
 identity = matrixBuilder (bool 0 1 . uncurry (==))
 
 -- Matrix composition (MMM)
 
+-- | Matrix composition. Equivalent to matrix-matrix multiplication.
+-- This definition takes advantage of divide-and-conquer and fusion laws
+-- from LAoP.
 comp :: (Num e) => Matrix e cr rows -> Matrix e cols cr -> Matrix e cols rows
 comp Empty Empty            = Empty
 comp (One a) (One b)        = One (a * b)
@@ -385,12 +442,14 @@ comp c (Junc a b)           = Junc (comp c a) (comp c b)  -- Junc fusion law
 
 -- Projections
 
+-- | Biproduct first component projection
 p1 :: forall e m n. (Num e, KnownNat (Count n), KnownNat (Count m), FromLists e n m, FromLists e m m) => Matrix e (Either m n) m
 p1 =
   let iden = identity :: Matrix e m m
       zero = zeros :: Matrix e n m
    in junc iden zero
 
+-- | Biproduct second component projection
 p2 :: forall e m n. (Num e, KnownNat (Count n), KnownNat (Count m), FromLists e m n, FromLists e n n) => Matrix e (Either m n) n
 p2 =
   let iden = identity :: Matrix e n n
@@ -399,17 +458,29 @@ p2 =
 
 -- Injections
 
+-- | Biproduct first component injection
 i1 :: (Num e, KnownNat (Count n), KnownNat (Count m), FromLists e n m, FromLists e m m) => Matrix e m (Either m n)
 i1 = tr p1
 
+-- | Biproduct second component injection
 i2 :: (Num e, KnownNat (Count n), KnownNat (Count m), FromLists e m n, FromLists e n n) => Matrix e n (Either m n)
 i2 = tr p2
 
 -- Dimensions
 
+-- | Obtain the number of rows.
+-- NOTE: The 'KnownNat' constaint is needed in order to obtain the
+-- dimensions in constant time.
+-- TODO: A 'rows' function that does not need the 'KnownNat' constraint in
+-- exchange for performance.
 rows :: forall e cols rows. (KnownNat (Count rows)) => Matrix e cols rows -> Int
 rows _ = fromInteger $ natVal (Proxy :: Proxy (Count rows))
 
+-- | Obtain the number of columns.
+-- NOTE: The 'KnownNat' constaint is needed in order to obtain the
+-- dimensions in constant time.
+-- TODO: A 'columns' function that does not need the 'KnownNat' constraint in
+-- exchange for performance.
 columns :: forall e cols rows. (KnownNat (Count cols)) => Matrix e cols rows -> Int
 columns _ = fromInteger $ natVal (Proxy :: Proxy (Count cols))
 
@@ -417,6 +488,7 @@ columns _ = fromInteger $ natVal (Proxy :: Proxy (Count cols))
 
 infixl 5 -|-
 
+-- | Matrix coproduct functor also known as matrix direct sum.
 (-|-) ::
   forall e n k m j.
   ( Num e,
@@ -434,51 +506,57 @@ infixl 5 -|-
 
 -- Khatri Rao Product and projections
 
-class KhatriP1 e m k where
-  kp1 :: Matrix e (Normalize (m, k)) m
-
-instance KhatriP1 e Void k where
-  kp1 = Empty
-
-instance
+-- | Khatri Rao product first component projection matrix.
+kp1 :: 
+  forall e m k .
   ( Num e,
     KnownNat (Count k),
     FromLists e (FromNat (Count m * Count k)) m,
     KnownNat (Count m),
     KnownNat (Count (Normalize (m, k)))
-  ) =>
-  KhatriP1 e m k
+  ) => Matrix e (Normalize (m, k)) m
+kp1 = matrixBuilder f
   where
-  kp1 = matrixBuilder f
-    where
-      offset = fromInteger (natVal (Proxy :: Proxy (Count k)))
-      f (x, y)
-        | y >= (x * offset) && y <= (x * offset + offset - 1) = 1
-        | otherwise = 0
+    offset = fromInteger (natVal (Proxy :: Proxy (Count k)))
+    f (x, y)
+      | y >= (x * offset) && y <= (x * offset + offset - 1) = 1
+      | otherwise = 0
 
-class KhatriP2 e m k where
-  kp2 :: Matrix e (Normalize (m, k)) k
-
-instance KhatriP2 e m Void where
-  kp2 = Empty
-
-instance
-  ( Num e,
-    KnownNat (Count k),
-    FromLists e (FromNat (Count m * Count k)) k,
-    KnownNat (Count m),
-    KnownNat (Count (Normalize (m, k)))
-  ) =>
-  KhatriP2 e m k
+-- | Khatri Rao product second component projection matrix.
+kp2 :: 
+    forall e m k .
+    ( Num e,
+      KnownNat (Count k),
+      FromLists e (FromNat (Count m * Count k)) k,
+      KnownNat (Count m),
+      KnownNat (Count (Normalize (m, k)))
+    ) => Matrix e (Normalize (m, k)) k
+kp2 = matrixBuilder f
   where
-  kp2 = matrixBuilder f
-    where
-      offset = fromInteger (natVal (Proxy :: Proxy (Count k)))
-      f (x, y)
-        | x == y || mod (y - x) offset == 0 = 1
-        | otherwise                         = 0
+    offset = fromInteger (natVal (Proxy :: Proxy (Count k)))
+    f (x, y)
+      | x == y || mod (y - x) offset == 0 = 1
+      | otherwise                         = 0
 
-khatri :: forall e cols a b. (Num e, KhatriP1 e a b, KhatriP2 e a b) => Matrix e cols a -> Matrix e cols b -> Matrix e cols (Normalize (a, b))
+-- | Khatri Rao Matrix product also known as matrix pairing.
+-- NOTE: That this is not a true categorical product, see for instance:
+-- 
+-- @
+--                | kp1 `comp` khatri a b == a 
+-- khatri a b ==> |
+--                | kp2 `comp` khatri a b == b
+-- @
+--
+-- __Emphasis__ on the implication symbol.
+khatri :: 
+       forall e cols a b. 
+       ( Num e,
+         KnownNat (Count a),
+         KnownNat (Count b),
+         KnownNat (Count (Normalize (a, b))),
+         FromLists e (Normalize (a, b)) a,
+         FromLists e (Normalize (a, b)) b
+       ) => Matrix e cols a -> Matrix e cols b -> Matrix e cols (Normalize (a, b))
 khatri a b =
   let kp1' = kp1 @e @a @b
       kp2' = kp2 @e @a @b
@@ -488,7 +566,22 @@ khatri a b =
 
 infixl 4 ><
 
-(><) :: forall e m p n q. (Num e, KhatriP1 e m n, KhatriP2 e m n, KhatriP1 e p q, KhatriP2 e p q) => Matrix e m p -> Matrix e n q -> Matrix e (Normalize (m, n)) (Normalize (p, q))
+-- | Matrix product functor also known as kronecker product
+(><) :: 
+     forall e m p n q. 
+     ( Num e,
+       KnownNat (Count m),
+       KnownNat (Count n),
+       KnownNat (Count p),
+       KnownNat (Count q),
+       KnownNat (Count (Normalize (m, n))),
+       FromLists e (Normalize (m, n)) m,
+       FromLists e (Normalize (m, n)) n,
+       KnownNat (Count (Normalize (p, q))),
+       FromLists e (Normalize (p, q)) p,
+       FromLists e (Normalize (p, q)) q
+     ) 
+     => Matrix e m p -> Matrix e n q -> Matrix e (Normalize (m, n)) (Normalize (p, q))
 (><) a b =
   let kp1' = kp1 @e @m @n
       kp2' = kp2 @e @m @n
@@ -496,6 +589,11 @@ infixl 4 ><
 
 -- Matrix abide Junc Split
 
+-- | Matrix "abiding" followin the 'Junc'-'Split' abide law.
+-- 
+-- @
+-- 'Junc' ('Split' a c) ('Split' b d) == 'Split' ('Junc' a b) ('Junc' c d)
+-- @
 abideJS :: Matrix e cols rows -> Matrix e cols rows
 abideJS (Junc (Split a c) (Split b d)) = Split (Junc (abideJS a) (abideJS b)) (Junc (abideJS c) (abideJS d)) -- Junc-Split abide law
 abideJS Empty                          = Empty
@@ -505,6 +603,11 @@ abideJS (Split a b)                    = Split (abideJS a) (abideJS b)
 
 -- Matrix abide Split Junc
 
+-- | Matrix "abiding" followin the 'Split'-'Junc' abide law.
+-- 
+-- @
+-- 'Split' ('Junc' a b) ('Junc' c d) == 'Junc' ('Split' a c) ('Split' b d)
+-- @
 abideSJ :: Matrix e cols rows -> Matrix e cols rows
 abideSJ (Split (Junc a b) (Junc c d)) = Junc (Split (abideSJ a) (abideSJ c)) (Split (abideSJ b) (abideSJ d)) -- Split-Junc abide law
 abideSJ Empty                         = Empty
@@ -514,6 +617,7 @@ abideSJ (Split a b)                   = Split (abideSJ a) (abideSJ b)
 
 -- Matrix transposition
 
+-- | Matrix transposition.
 tr :: Matrix e cols rows -> Matrix e rows cols
 tr Empty       = Empty
 tr (One e)     = One e
@@ -522,6 +626,8 @@ tr (Split a b) = Junc (tr a) (tr b)
 
 -- Selective 'select' operator
 
+-- | Selective functors 'select' operator equivalent inspired by the
+-- ArrowMonad solution presented in the paper.
 select :: (Bounded a1, Bounded b, Enum a1, Enum b, Num e, Ord e,
                  KnownNat (Count a2), KnownNat (Count rows), FromLists e rows a2,
                  FromLists e rows rows, Eq b) =>
@@ -532,13 +638,13 @@ select m y =
 
 -- McCarthy's Conditional
 
+-- | McCarthy's Conditional expresses probabilistic choice.
 cond ::
      ( cols ~ FromNat (Count cols),
        KnownNat (Count cols),
        FromLists e () cols,
        FromLists e cols (),
        FromLists e cols cols,
-       KhatriP2 e () cols,
        Bounded a,
        Enum a,
        Num e,
@@ -554,7 +660,6 @@ grd ::
       FromLists e () q,
       FromLists e q (),
       FromLists e q q,
-      KhatriP2 e () q,
       Bounded a,
       Enum a,
       Num e,
@@ -571,7 +676,6 @@ corr ::
       FromLists e () q,
       FromLists e q (),
       FromLists e q q,
-      KhatriP2 e () q,
       Bounded a,
       Enum a,
       Num e,
@@ -602,6 +706,7 @@ prettyAux (h : t) l = "│ " ++ fill (unwords $ map show h) ++ " │\n" ++
    widest = maximum $ fmap length v
    fill str = replicate (widest - length str - 2) ' ' ++ str
 
+-- | Matrix pretty printer
 pretty :: (KnownNat (Count cols), Show e) => Matrix e cols rows -> String
 pretty m = "┌ " ++ unwords (replicate (columns m) blank) ++ " ┐\n" ++ 
             prettyAux (toLists m) (toLists m) ++
@@ -612,5 +717,6 @@ pretty m = "┌ " ++ unwords (replicate (columns m) blank) ++ " ┐\n" ++
    fill str = replicate (widest - length str) ' ' ++ str
    blank = fill ""
 
+-- | Matrix pretty printer
 prettyPrint :: (KnownNat (Count cols), Show e) => Matrix e cols rows -> IO ()
 prettyPrint = putStrLn . pretty

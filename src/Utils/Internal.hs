@@ -1,47 +1,136 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Utils.Internal
-    ( Natural(..),
-      nat,
-      coerceNat,
-      coerceNat2
-    )
-    where
+  ( -- | This is an internal module and it is not meant to be imported.
+    --
+    -- Utility module that provides the 'Natural' data type.
+    -- The semantic associated with this data type is that
+    -- it's meant to be a restricted 'Int' value. For example
+    -- the type @Natural 6@ can only be instanciated with @Nat n@
+    -- where @0 <= n <= 6@. Why, You might ask, because with normal
+    -- 'Int's it is not possible to have a decent @Enum (Int, Int)@
+    -- instance. See the following probabilistic programming model as and
+    -- example:
+    --
+    -- We want to calculate the probability of the sum of two dice throws.
+    -- To do this we start by defining the sample space:
+    --
+    -- @
+    -- type SampleSpace = Int -- We think 'Int' are enough
+    --
+    -- die :: Dist Int 6
+    -- die = unifrom [1..6]
+    --
+    -- -- Promote 'Int' addition to a matrix
+    -- addM = fromF (uncurry (+)) -- Impossible
+    -- @
+    --
+    -- The last line is impossible because @(Int, Int)@ does not have
+    -- a good 'Enum' instance: @[(0, 1), (0, 2), .. (0, maxBound), (1, 0),
+    -- ..]@. And we'd like the addition matrix to be of 36 columns by 12
+    -- rows but limited to integers up to @6@!
+    --
+    -- One way to solve this issue is by defining and auxilary data type to
+    -- represent the sample space:
+    --
+    -- @
+    -- data SampleSpace = S1 | S2 | S3 | S4 | S5 | S6
+    --   deriving (Show, Eq, Enum, Bounded) -- Enum and Bounded are
+    --   important
+    -- @
+    --
+    -- And write the sample space addition function:
+    --
+    -- @
+    -- ssAdd :: SampleSpace -> SampleSpace -> Int
+    -- ssAdd a b = (fromEnum a + 1) + (fromEnum b + 1)
+    -- @
+    --
+    -- And then promote that function to matrix and everything is alright:
+    --
+    -- @
+    -- ssAddM = fromF' (uncurry ssAdd)
+    --
+    -- dieSumProb = ssAddM `comp` (khatri die die)
+    -- @
+    --
+    -- This is a nice solution for small sample spaces. But for larger ones
+    -- it is not feasible to write a data type with hundreds of constructors
+    -- and then write manipulation functions that need to deal with them.
+    -- To mitigate this limitation the 'Natural' type comes a long way and
+    -- allows one to model the sample in an easier way. See for instance:
+    --
+    -- @
+    -- ssAdd :: Natural 6 -> Natural 6 -> Natural 12
+    -- ssAdd = coerceNat (+)
+    --
+    -- ssAddM = fromF' (uncurry sumSS)
+    --
+    -- die :: Dist (Natural 6) 6
+    -- die = uniform [nat @6 1 .. nat 6]
+    --
+    -- dieSumProb = ssAddM `comp` (khatri die die)
+    -- @
+    --
+    -- * 'Natural' data type
+    Natural,
+    nat,
 
-import GHC.TypeLits
-import Data.Proxy
+    -- * Coerce auxiliar functions to help promote 'Int' typed functions to
+    -- 'Natural' typed functions.
+    coerceNat,
+    coerceNat2,
+  )
+where
+
 import Data.Coerce
+import Data.Proxy
+import GHC.TypeLits
 
+-- | Wrapper around 'Int's that have a restrictive semantic associated.
+-- A value of type @'Natural' n@ can only be instanciated with some 'Int'
+-- @i@ that's @0 <= i <= n@.
 newtype Natural (nat :: Nat) = Nat Int
   deriving (Show, Read, Eq, Num)
 
-nat :: forall n . (KnownNat n) => Int -> Natural n
-nat i = let nat = fromInteger (natVal (Proxy :: Proxy n))
-         in if i <= nat
-               then Nat i
-               else error "Off limits"
+-- | Natural constructor function. Throws a runtime error if the 'Int'
+-- value is greater than the corresponding @n@ in the @'Natural' n@ type.
+nat :: forall n. (KnownNat n) => Int -> Natural n
+nat i =
+  let nat = fromInteger (natVal (Proxy :: Proxy n))
+   in if i <= nat
+        then Nat i
+        else error "Off limits"
 
+-- | Auxiliary function that promotes binary 'Int' functions to 'Natural'
+-- binary functions.
 coerceNat :: (Int -> Int -> Int) -> (Natural a -> Natural b -> Natural c)
 coerceNat = coerce
 
+-- | Auxiliary function that promotes ternary (binary) 'Int' functions to 'Natural'
+-- functions.
 coerceNat2 :: ((Int, Int) -> Int -> Int) -> ((Natural a, Natural b) -> Natural c -> Natural d)
 coerceNat2 = coerce
 
 instance KnownNat n => Bounded (Natural n) where
-    minBound = Nat 0
-    maxBound = Nat $ fromInteger (natVal (Proxy :: Proxy n))
+  minBound = Nat 0
+  maxBound = Nat $ fromInteger (natVal (Proxy :: Proxy n))
 
 instance KnownNat n => Enum (Natural n) where
-    toEnum = nat
-    fromEnum (Nat nat) = let val = fromInteger (natVal (Proxy :: Proxy n))
-                          in if nat > val
-                                then error "Off limits"
-                                else nat
+  toEnum = nat
+  -- | Throws a runtime error if the value is off limits
+  fromEnum (Nat nat) =
+    let val = fromInteger (natVal (Proxy :: Proxy n))
+     in if nat > val
+          then error "Off limits"
+          else nat
 
+-- | Optimized 'Enum' instance for tuples that comply with the given
+-- constraints.
 instance
   ( Enum a,
     Enum b,
@@ -49,12 +138,14 @@ instance
   ) =>
   Enum (a, b)
   where
+
   toEnum i =
     let (listB :: [b]) = [minBound .. maxBound]
         lengthB = length listB
         fstI = div i lengthB
         sndI = mod i lengthB
      in (toEnum fstI, toEnum sndI)
+
   fromEnum (a, b) =
     let (listB :: [b]) = [minBound .. maxBound]
         lengthB = length listB

@@ -34,7 +34,7 @@ mulSS = coerceNat (*)
 
 sumSSM = fromF' (uncurry sumSS)
 
-mulSSM3 = fromF' (mulSS (Nat 3))
+mulSSM3 = fromF' (mulSS (nat 3))
 
 die :: Dist (Natural 6) 6
 die = uniform [nat @6 1 .. nat 6]

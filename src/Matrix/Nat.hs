@@ -13,6 +13,26 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 
+-----------------------------------------------------------------------------
+-- |
+-- Module     : Matrix.Nat
+-- Copyright  : (c) Armando Santos 2019-2020
+-- Maintainer : armandoifsantos@gmail.com
+-- Stability  : experimental
+--
+-- The LAoP discipline generalises relations and functions treating them as
+-- Boolean matrices and in turn consider these as arrows.
+--
+-- __LAoP__ is a library for algebraic (inductive) construction and manipulation of matrices
+-- in Haskell. See <https://github.com/bolt12/master-thesis my Msc Thesis> for the
+-- motivation behind the library, the underlying theory, and implementation details.
+--
+-- This module offers a newtype wrapper around 'Matrix.Type.Matrix' that
+-- uses type level naturals instead of standard data types for the matrices
+-- dimensions.
+--
+-----------------------------------------------------------------------------
+
 module Matrix.Nat
   ( -- | LAoP (Linear Algebra of Programming) Inductive Matrix definition.
     --
@@ -95,9 +115,7 @@ module Matrix.Nat
     -- | Note that given the restrictions imposed it is not possible to
     -- implement the standard type classes present in standard Haskell.
     -- *** Matrix pairing projections
-    KhatriP1,
     kp1,
-    KhatriP2,
     kp2,
 
     -- *** Matrix pairing
@@ -340,59 +358,38 @@ infixl 5 -|-
 
 -- Khatri Rao Product and projections
 
-class KhatriP1 e (m :: Nat) (k :: Nat) where
-  kp1 :: Matrix e (m * k) m
-
-instance KhatriP1 e 0 k where
-  kp1 = empty
-
-instance
-  forall e m k.
+kp1 :: 
+  forall e m k .
   ( Num e,
-    KnownNat k,
-    I.FromLists e (I.FromNat (m * k)) (I.FromNat m),
     KnownNat (I.Count (I.FromNat m)),
-    KnownNat (I.Count (I.FromNat (m * k)))
-  ) =>
-  KhatriP1 e m k
-  where
-  kp1 = matrixBuilder f
-    where
-      offset = fromInteger (natVal (Proxy :: Proxy k))
-      f (x, y)
-        | y >= (x * offset) && y <= (x * offset + offset - 1) = 1
-        | otherwise = 0
-
-class KhatriP2 e (m :: Nat) (k :: Nat) where
-  kp2 :: Matrix e (m * k) k
-
-instance KhatriP2 e m 0 where
-  kp2 = empty
-
-instance
-  forall e m k.
-  ( Num e,
-    KnownNat k,
     KnownNat (I.Count (I.FromNat k)),
-    I.FromLists e (I.FromNat (m * k)) (I.FromNat k),
-    KnownNat (I.Count (I.FromNat m)),
-    KnownNat (I.Count (I.FromNat (m * k)))
-  ) =>
-  KhatriP2 e m k
-  where
-  kp2 = matrixBuilder f
-    where
-      offset = fromInteger (natVal (Proxy :: Proxy k))
-      f (x, y)
-        | x == y || mod (y - x) offset == 0 = 1
-        | otherwise = 0
+    KnownNat (I.Count (I.FromNat (m * k))),
+    I.FromLists e (I.FromNat (m * k)) (I.FromNat m),
+    I.FromNat (m * k) ~ I.FromNat (I.Count (I.FromNat m) * I.Count (I.FromNat k))
+  ) => Matrix e (m * k) m
+kp1 = M (I.kp1 @e @(I.FromNat m) @(I.FromNat k))
+
+kp2 :: 
+    forall e m k.
+    ( Num e,
+      KnownNat (I.Count (I.FromNat k)),
+      I.FromLists e (I.FromNat (m * k)) (I.FromNat k),
+      KnownNat (I.Count (I.FromNat m)),
+      KnownNat (I.Count (I.FromNat (m * k))),
+      I.FromNat (m * k) ~ I.FromNat (I.Count (I.FromNat m) * I.Count (I.FromNat k))
+    ) => Matrix e (m * k) k
+kp2 = M (I.kp2 @e @(I.FromNat m) @(I.FromNat k))
 
 khatri ::
   forall e cols a b.
-  (Num e, KhatriP1 e a b, KhatriP2 e a b) =>
-  Matrix e cols a ->
-  Matrix e cols b ->
-  Matrix e cols (a * b)
+  ( Num e,
+    KnownNat (I.Count (I.FromNat a)),
+    KnownNat (I.Count (I.FromNat b)),
+    KnownNat (I.Count (I.FromNat (a * b))),
+    I.FromLists e (I.FromNat (a * b)) (I.FromNat a),
+    I.FromLists e (I.FromNat (a * b)) (I.FromNat b),
+    I.FromNat (a * b) ~ I.FromNat (I.Count (I.FromNat a) * I.Count (I.FromNat b))
+  ) => Matrix e cols a -> Matrix e cols b -> Matrix e cols (a * b)
 khatri a b =
   let kp1' = kp1 @e @a @b
       kp2' = kp2 @e @a @b
@@ -404,10 +401,20 @@ infixl 4 ><
 
 (><) ::
   forall e m p n q.
-  (Num e, KhatriP1 e m n, KhatriP2 e m n, KhatriP1 e p q, KhatriP2 e p q) =>
-  Matrix e m p ->
-  Matrix e n q ->
-  Matrix e (m * n) (p * q)
+  ( Num e,
+    KnownNat (I.Count (I.FromNat m)),
+    KnownNat (I.Count (I.FromNat n)),
+    KnownNat (I.Count (I.FromNat p)),
+    KnownNat (I.Count (I.FromNat q)),
+    KnownNat (I.Count (I.FromNat (m * n))),
+    KnownNat (I.Count (I.FromNat (p * q))),
+    I.FromLists e (I.FromNat (m * n)) (I.FromNat m),
+    I.FromLists e (I.FromNat (m * n)) (I.FromNat n),
+    I.FromLists e (I.FromNat (p * q)) (I.FromNat p),
+    I.FromLists e (I.FromNat (p * q)) (I.FromNat q),
+    I.FromNat (m * n) ~ I.FromNat (I.Count (I.FromNat m) * I.Count (I.FromNat n)),
+    I.FromNat (p * q) ~ I.FromNat (I.Count (I.FromNat p) * I.Count (I.FromNat q))
+  ) => Matrix e m p -> Matrix e n q -> Matrix e (m * n) (p * q)
 (><) a b =
   let kp1' = kp1 @e @m @n
       kp2' = kp2 @e @m @n
@@ -430,13 +437,13 @@ tr (M m) = M (I.tr m)
 
 -- Selective 'select' operator
 
-select :: (Bounded a1, Bounded b, Enum a1, Enum b, Num e, Ord e,
-                 KnownNat (I.Count a2), KnownNat (I.Count (I.FromNat rows1)),
-                 I.FromLists e (I.FromNat rows1) a2,
-                 I.FromLists e (I.FromNat rows1) (I.FromNat rows1), Eq b,
-                 I.FromNat cols1 ~ I.FromNat cols2,
-                 I.FromNat rows2 ~ Either a2 (I.FromNat rows1)) =>
-                Matrix e cols1 rows2 -> (a1 -> b) -> Matrix e cols2 rows1
+select :: ( Bounded a1, Bounded b, Enum a1, Enum b, Num e, Ord e,
+            KnownNat (I.Count a2), KnownNat (I.Count (I.FromNat rows1)),
+            I.FromLists e (I.FromNat rows1) a2,
+            I.FromLists e (I.FromNat rows1) (I.FromNat rows1), Eq b,
+            I.FromNat cols1 ~ I.FromNat cols2,
+            I.FromNat rows2 ~ Either a2 (I.FromNat rows1)) =>
+           Matrix e cols1 rows2 -> (a1 -> b) -> Matrix e cols2 rows1
 select (M m) y = M (I.select m y)
 
 -- McCarthy's Conditional
@@ -447,7 +454,6 @@ cond ::
        I.FromLists e () (I.FromNat cols),
        I.FromLists e (I.FromNat cols) (),
        I.FromLists e (I.FromNat cols) (I.FromNat cols),
-       I.KhatriP2 e () (I.FromNat cols),
        Bounded a,
        Enum a,
        Num e,
