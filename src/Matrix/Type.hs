@@ -137,7 +137,6 @@ import Data.List
 import Data.Proxy
 import Data.Void
 import GHC.TypeLits
-import Data.Type.Bool
 import Data.Type.Equality
 import GHC.Generics
 
@@ -168,13 +167,15 @@ type family Count (d :: Type) where
   Count d = Count (Rep d R)
 
 -- | Type family that computes of a given type dimension from a given natural
+-- Thanks to Li-Yao Xia this type family is super fast.
 type family FromNat (n :: Nat) where
   FromNat 0 = Void
   FromNat 1 = ()
-  FromNat n = If (Mod n 2 == 0) 
-                 (Either (FromNat (Div n 2)) (FromNat (Div n 2))) 
-                 (Either () (FromNat (n - 1)))  
-                 -- Either () (FromNat (n - 1)) 
+  FromNat n = FromNat' (Mod n 2 == 0) (FromNat (Div n 2))
+
+type family FromNat' (b :: Bool) (m :: Type) :: Type where
+  FromNat' 'True m = Either m m
+  FromNat' 'False m = Either () (Either m m)
 
 -- | Type family that normalizes the representation of a given data
 -- structure
@@ -182,10 +183,12 @@ type family Normalize (d :: Type) where
   Normalize d = FromNat (Count d)
 
 instance Eq e => Eq (Matrix e cols rows) where
-  Empty == Empty             = True
-  (One a) == (One b)         = a == b
-  (Junc a b) == (Junc c d)   = a == c && b == d
-  (Split a b) == (Split c d) = a == c && b == d
+  Empty == Empty                = True
+  (One a) == (One b)            = a == b
+  (Junc a b) == (Junc c d)      = a == c && b == d
+  (Split a b) == (Split c d)    = a == c && b == d
+  x@(Split a b) == y@(Junc c d) = x == abideJS y
+  x@(Junc a b) == y@(Split c d) = abideJS x == y
 
 instance Num e => Num (Matrix e cols rows) where
 
@@ -268,7 +271,7 @@ instance {-# OVERLAPPING #-} FromLists e () () where
   fromLists [[e]] = One e
   fromLists _     = error "Wrong dimensions"
 
-instance (FromLists e cols ()) => FromLists e (Either () cols) () where
+instance {-# OVERLAPPING #-} (FromLists e cols ()) => FromLists e (Either () cols) () where
   fromLists [h : t] = Junc (One h) (fromLists [t])
   fromLists _       = error "Wrong dimensions"
 
@@ -278,7 +281,7 @@ instance {-# OVERLAPPABLE #-} (FromLists e a (), FromLists e b (), KnownNat (Cou
        in Junc (fromLists [take rowsA l]) (fromLists [drop rowsA l])
   fromLists _       = error "Wrong dimensions"
 
-instance (FromLists e () rows) => FromLists e () (Either () rows) where
+instance {-# OVERLAPPING #-} (FromLists e () rows) => FromLists e () (Either () rows) where
   fromLists ([h] : t) = Split (One h) (fromLists t)
   fromLists _         = error "Wrong dimensions"
 
