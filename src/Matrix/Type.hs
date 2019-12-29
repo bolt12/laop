@@ -137,6 +137,8 @@ import Data.List
 import Data.Proxy
 import Data.Void
 import GHC.TypeLits
+import Data.Type.Bool
+import Data.Type.Equality
 import GHC.Generics
 
 -- | LAoP (Linear Algebra of Programming) Inductive Matrix definition.
@@ -169,7 +171,10 @@ type family Count (d :: Type) where
 type family FromNat (n :: Nat) where
   FromNat 0 = Void
   FromNat 1 = ()
-  FromNat n = Either () (FromNat (n - 1)) 
+  FromNat n = If (Mod n 2 == 0) 
+                 (Either (FromNat (Div n 2)) (FromNat (Div n 2))) 
+                 (Either () (FromNat (n - 1)))  
+                 -- Either () (FromNat (n - 1)) 
 
 -- | Type family that normalizes the representation of a given data
 -- structure
@@ -255,33 +260,41 @@ class FromLists e cols rows where
   -- error if the dimensions do not match.
   fromLists :: [[e]] -> Matrix e cols rows
 
--- | Void base case
 instance FromLists e Void Void where
   fromLists [] = Empty
   fromLists _  = error "Wrong dimensions"
 
--- | Unit base case
 instance {-# OVERLAPPING #-} FromLists e () () where
   fromLists [[e]] = One e
   fromLists _     = error "Wrong dimensions"
 
--- | Row vector matrix definition
 instance (FromLists e cols ()) => FromLists e (Either () cols) () where
   fromLists [h : t] = Junc (One h) (fromLists [t])
   fromLists _       = error "Wrong dimensions"
 
--- | Column vector matrix definition
+instance {-# OVERLAPPABLE #-} (FromLists e a (), FromLists e b (), KnownNat (Count a)) => FromLists e (Either a b) () where
+  fromLists [l] = 
+      let rowsA = fromInteger (natVal (Proxy :: Proxy (Count a)))
+       in Junc (fromLists [take rowsA l]) (fromLists [drop rowsA l])
+  fromLists _       = error "Wrong dimensions"
+
 instance (FromLists e () rows) => FromLists e () (Either () rows) where
   fromLists ([h] : t) = Split (One h) (fromLists t)
   fromLists _         = error "Wrong dimensions"
 
--- | Arbitrary matrix definition
-instance {-# OVERLAPPABLE #-} (FromLists e cols c, FromLists e cols d) => FromLists e cols (Either c d) where
-  fromLists (h : t) =
+instance {-# OVERLAPPABLE #-} (FromLists e () a, FromLists e () b, KnownNat (Count a)) => FromLists e () (Either a b) where
+  fromLists l@([h] : t) = 
+      let rowsA = fromInteger (natVal (Proxy :: Proxy (Count a)))
+       in Split (fromLists (take rowsA l)) (fromLists (drop rowsA l))
+  fromLists _         = error "Wrong dimensions"
+
+instance {-# OVERLAPPABLE #-} (FromLists e (Either a b) c, FromLists e (Either a b) d, KnownNat (Count c)) => FromLists e (Either a b) (Either c d) where
+  fromLists l@(h : t) =
     let lh        = length h
+        rowsC     = fromInteger (natVal (Proxy :: Proxy (Count c)))
         condition = all (== lh) (map length t)
      in if lh > 0 && condition
-          then Split (fromLists [h]) (fromLists t)
+          then Split (fromLists (take rowsC l)) (fromLists (drop rowsC l))
           else error "Not all rows have the same length"
 
 -- | Matrix builder function. Constructs a matrix provided with
