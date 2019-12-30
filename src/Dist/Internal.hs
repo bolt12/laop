@@ -22,7 +22,7 @@ module Dist.Internal
         )
     where
 
-import Matrix.Nat
+import Matrix.Type
 import Utils
 import GHC.TypeLits
 import Data.Proxy
@@ -33,14 +33,14 @@ type Prob = Double
 
 -- | Type synonym for column vector matrices. This represents a probability
 -- distribution.
-type Dist a (m :: Nat) = (FromLists Prob () (FromNat m)) => Matrix Prob 1 m
+type Dist a = (FromLists Prob () (Normalize a)) => Matrix Prob () a
 
 -- | Constructs a Bernoulli distribution
-choose :: Prob -> Dist a 2
+choose :: Prob -> Dist a
 choose prob = col [prob, 1 - prob]
 
 -- | Creates a distribution given a shape function
-shape :: (Prob -> Prob) -> [a] -> Dist a m
+shape :: (Prob -> Prob) -> [a] -> Dist a
 shape _ [] = error "Probability.shape: empty list"
 shape f xs =
    let incr = 1 / fromIntegral (length xs - 1)
@@ -48,31 +48,31 @@ shape f xs =
    in  fromFreqs (zip xs ps)
 
 -- | Constructs a Linear distribution
-linear :: [a] -> Dist a m
+linear :: [a] -> Dist a
 linear = shape id
 
 -- | Constructs an Uniform distribution
-uniform :: [a] -> Dist a m
+uniform :: [a] -> Dist a
 uniform = shape (const 1)
 
 -- | Constructs an Negative Exponential distribution
-negExp :: [a] -> Dist a m
+negExp :: [a] -> Dist a
 negExp = shape (\x -> exp (-x))
 
 -- | Constructs an Normal distribution
-normal :: [a] -> Dist a m
+normal :: [a] -> Dist a
 normal = shape (normalCurve 0.5 0.5)
 
 -- | Transforms a 'Dist' into a list of pairs.
-toValues :: forall a m . (Enum a, KnownNat m, FromLists Prob () (FromNat m)) => Dist a m -> [(a, Prob)]
+toValues :: forall a . (Enum a, KnownNat (Count a), FromLists Prob () (Normalize a)) => Dist a -> [(a, Prob)]
 toValues d =
-    let rows = fromInteger (natVal (Proxy :: Proxy m))
+    let rows = fromInteger (natVal (Proxy :: Proxy (Count a)))
         probs = toList d
         res = zip (map toEnum [0..rows]) probs
      in res
 
 -- | Pretty a distribution
-prettyDist :: forall a m . (Show a, Enum a, KnownNat m, FromLists Prob () (FromNat m)) => Dist a m -> String
+prettyDist :: forall a. (Show a, Enum a, KnownNat (Count a), FromLists Prob () (Normalize a)) => Dist a -> String
 prettyDist d =
     let values = sortBy (\(a, p1) (b, p2) -> compare p2 p1) (toValues @a d)
         w = maximum (map (length . show . fst) values)
@@ -84,12 +84,12 @@ prettyDist d =
     showR n x = show x ++ " " 
 
 -- | Pretty Print a distribution
-prettyPrintDist :: forall a m . (Show a, Enum a, KnownNat m, FromLists Prob () (FromNat m)) => Dist a m -> IO ()
+prettyPrintDist :: forall a . (Show a, Enum a, KnownNat (Count a), FromLists Prob () (Normalize a)) => Dist a -> IO ()
 prettyPrintDist = putStrLn . prettyDist @a
 
 -- Auxiliary functions
 
-fromFreqs :: [(a,Prob)] -> Dist a m
+fromFreqs :: [(a,Prob)] -> Dist a
 fromFreqs xs = col (map (\(x,p) -> p/q) xs)
            where q = sum $ map snd xs
 

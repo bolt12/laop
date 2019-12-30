@@ -141,10 +141,20 @@ where
 import Data.Proxy
 import GHC.TypeLits
 import Control.DeepSeq
-import qualified Matrix.Type as I
+import qualified Control.Category as C
+import qualified Matrix.Internal as I
 
 newtype Matrix e (cols :: Nat) (rows :: Nat) = M (I.Matrix e (I.FromNat cols) (I.FromNat rows))
   deriving (Show, Num, Eq, NFData) via (I.Matrix e (I.FromNat cols) (I.FromNat rows))
+
+-- | It isn't possible to implement the 'id' function so it's
+-- implementation is 'undefined'. However 'comp' can be and this partial
+-- class implementation exists just to make the code more readable.
+--
+-- Please use 'identity' instead.
+instance (Num e) => C.Category (Matrix e) where
+    id = undefined
+    (.) = comp
 
 -- Primitives
 
@@ -437,14 +447,19 @@ tr :: Matrix e cols rows -> Matrix e rows cols
 tr (M m) = M (I.tr m)
 
 -- Selective 'select' operator
-
-select :: ( Bounded a1, Bounded b, Enum a1, Enum b, Num e, Ord e,
-            KnownNat (I.Count a2), KnownNat (I.Count (I.FromNat rows1)),
-            I.FromLists e (I.FromNat rows1) a2,
-            I.FromLists e (I.FromNat rows1) (I.FromNat rows1), Eq b,
-            I.FromNat cols1 ~ I.FromNat cols2,
-            I.FromNat rows2 ~ Either a2 (I.FromNat rows1)) =>
-           Matrix e cols1 rows2 -> (a1 -> b) -> Matrix e cols2 rows1
+--
+select :: (Bounded a, Bounded b, Enum a, Enum b, Num e, Ord e,
+                 KnownNat (I.Count (I.FromNat (I.Count a))),
+                 KnownNat (I.Count (I.FromNat (I.Count b))),
+                 KnownNat (I.Count (I.FromNat cols1)),
+                 I.FromLists e (I.FromNat (I.Count b)) (I.FromNat (I.Count a)),
+                 I.FromLists e (I.FromNat (I.Count b)) (I.FromNat (I.Count b)),
+                 Eq b,
+                 I.FromNat rows1
+                 ~ Either (I.FromNat (I.Count a)) (I.FromNat (I.Count b)),
+                 I.FromNat cols2 ~ I.FromNat cols1,
+                 I.FromNat (I.Count b) ~ I.FromNat rows2) =>
+                Matrix e cols1 rows1 -> (a -> b) -> Matrix e cols2 rows2
 select (M m) y = M (I.select m y)
 
 -- McCarthy's Conditional
