@@ -19,8 +19,8 @@ module Utils
   ( -- | Utility module that provides the 'Natural' data type.
     -- The semantic associated with this data type is that
     -- it's meant to be a restricted 'Int' value. For example
-    -- the type @Natural 6@ can only be instanciated with @Nat n@
-    -- where @0 <= n <= 6@. Why, You might ask, because with normal
+    -- the type @Natural 1 6@ can only be instanciated with @nat n@
+    -- where @1 <= n <= 6@. Why, You might ask, because with normal
     -- 'Int's it is not possible to have a decent @Enum (Int, Int)@
     -- instance. See the following probabilistic programming model as and
     -- example:
@@ -74,13 +74,13 @@ module Utils
     -- allows one to model the sample in an easier way. See for instance:
     --
     -- @
-    -- ssAdd :: Natural 6 -> Natural 6 -> Natural 12
+    -- ssAdd :: Natural 1 6 -> Natural 1 6 -> Natural 1 12
     -- ssAdd = coerceNat (+) 
     -- 
     -- ssAddM = fromF' (uncurry sumSS)
     -- 
-    -- die :: Dist (Natural 6) 6
-    -- die = uniform [nat @6 1 .. nat 6]
+    -- die :: Dist (Natural 1 6) 6
+    -- die = uniform [nat @1 @6 1 .. nat 6]
     --
     -- dieSumProb = ssAddM `comp` (khatri die die)
     -- @

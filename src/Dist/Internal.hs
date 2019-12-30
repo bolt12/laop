@@ -1,3 +1,7 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE RankNTypes #-}
@@ -11,19 +15,25 @@ module Dist.Internal
         linear,
         uniform,
         negExp,
-        normal
+        normal,
+        toValues,
+        prettyDist,
+        prettyPrintDist
         )
     where
 
 import Matrix.Nat
 import Utils
+import GHC.TypeLits
+import Data.Proxy
+import Data.List (sortBy)
 
 -- | Type synonym for probability value
 type Prob = Double
 
 -- | Type synonym for column vector matrices. This represents a probability
 -- distribution.
-type Dist a m = (FromLists Prob () (FromNat m)) => Matrix Prob 1 m
+type Dist a (m :: Nat) = (FromLists Prob () (FromNat m)) => Matrix Prob 1 m
 
 -- | Constructs a Bernoulli distribution
 choose :: Prob -> Dist a 2
@@ -52,6 +62,30 @@ negExp = shape (\x -> exp (-x))
 -- | Constructs an Normal distribution
 normal :: [a] -> Dist a m
 normal = shape (normalCurve 0.5 0.5)
+
+-- | Transforms a 'Dist' into a list of pairs.
+toValues :: forall a m . (Enum a, KnownNat m, FromLists Prob () (FromNat m)) => Dist a m -> [(a, Prob)]
+toValues d =
+    let rows = fromInteger (natVal (Proxy :: Proxy m))
+        probs = toList d
+        res = zip (map toEnum [0..rows]) probs
+     in res
+
+-- | Pretty a distribution
+prettyDist :: forall a m . (Show a, Enum a, KnownNat m, FromLists Prob () (FromNat m)) => Dist a m -> String
+prettyDist d =
+    let values = sortBy (\(a, p1) (b, p2) -> compare p2 p1) (toValues @a d)
+        w = maximum (map (length . show . fst) values)
+     in concatMap
+          (\(x,p) -> showR w x ++ ' ': showProb p ++ "\n")
+          values
+  where
+    showProb p = show (p * 100) ++ "%"
+    showR n x = show x ++ " " 
+
+-- | Pretty Print a distribution
+prettyPrintDist :: forall a m . (Show a, Enum a, KnownNat m, FromLists Prob () (FromNat m)) => Dist a m -> IO ()
+prettyPrintDist = putStrLn . prettyDist @a
 
 -- Auxiliary functions
 

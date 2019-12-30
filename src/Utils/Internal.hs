@@ -92,42 +92,46 @@ import Data.Proxy
 import GHC.TypeLits
 
 -- | Wrapper around 'Int's that have a restrictive semantic associated.
--- A value of type @'Natural' n@ can only be instanciated with some 'Int'
--- @i@ that's @0 <= i <= n@.
-newtype Natural (nat :: Nat) = Nat Int
+-- A value of type @'Natural' n m@ can only be instanciated with some 'Int'
+-- @i@ that's @n <= i <= m@.
+newtype Natural (start :: Nat) (end :: Nat) = Nat Int
   deriving (Show, Read, Eq, Num)
 
 -- | Natural constructor function. Throws a runtime error if the 'Int'
--- value is greater than the corresponding @n@ in the @'Natural' n@ type.
-nat :: forall n. (KnownNat n) => Int -> Natural n
+-- value is greater than the corresponding @m@ or lower than @n@ in the @'Natural' n m@ type.
+nat :: forall n m . (KnownNat n, KnownNat m) => Int -> Natural n m
 nat i =
-  let nat = fromInteger (natVal (Proxy :: Proxy n))
-   in if i <= nat
+  let start = fromInteger (natVal (Proxy :: Proxy n))
+      end   = fromInteger (natVal (Proxy :: Proxy m))
+   in if start <= i && i <= end
         then Nat i
         else error "Off limits"
 
 -- | Auxiliary function that promotes binary 'Int' functions to 'Natural'
 -- binary functions.
-coerceNat :: (Int -> Int -> Int) -> (Natural a -> Natural b -> Natural c)
+coerceNat :: (Int -> Int -> Int) -> (Natural a a' -> Natural b b' -> Natural c c')
 coerceNat = coerce
 
 -- | Auxiliary function that promotes ternary (binary) 'Int' functions to 'Natural'
 -- functions.
-coerceNat2 :: ((Int, Int) -> Int -> Int) -> ((Natural a, Natural b) -> Natural c -> Natural d)
+coerceNat2 :: ((Int, Int) -> Int -> Int) -> ((Natural a a', Natural b b') -> Natural c c' -> Natural d d')
 coerceNat2 = coerce
 
-instance KnownNat n => Bounded (Natural n) where
-  minBound = Nat 0
-  maxBound = Nat $ fromInteger (natVal (Proxy :: Proxy n))
+instance (KnownNat n, KnownNat m) => Bounded (Natural n m) where
+  minBound = Nat $ fromInteger (natVal (Proxy :: Proxy n))
+  maxBound = Nat $ fromInteger (natVal (Proxy :: Proxy m))
 
-instance KnownNat n => Enum (Natural n) where
-  toEnum = nat
+instance (KnownNat n, KnownNat m) => Enum (Natural n m) where
+  toEnum i = 
+      let start = fromInteger (natVal (Proxy :: Proxy n))
+       in nat (start + i)
   -- | Throws a runtime error if the value is off limits
   fromEnum (Nat nat) =
-    let val = fromInteger (natVal (Proxy :: Proxy n))
-     in if nat > val
-          then error "Off limits"
-          else nat
+    let start = fromInteger (natVal (Proxy :: Proxy n))
+        end   = fromInteger (natVal (Proxy :: Proxy m))
+     in if start <= nat && nat <= end
+          then nat - start
+          else error "Off limits"
 
 -- | Optimized 'Enum' instance for tuples that comply with the given
 -- constraints.

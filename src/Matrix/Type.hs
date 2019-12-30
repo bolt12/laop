@@ -154,7 +154,7 @@ deriving instance (Show e) => Show (Matrix e cols rows)
 -- It can also count the cardinality of custom types that implement the
 -- 'Generic' instance.
 type family Count (d :: Type) where
-  Count (Natural n) = n
+  Count (Natural n m) = (m - n) + 1
   Count (Either a b) = (+) (Count a) (Count b)
   Count (a, b) = (*) (Count a) (Count b)
   Count (a -> b) = (^) (Count b) (Count a)

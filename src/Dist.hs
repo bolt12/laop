@@ -42,6 +42,12 @@ module Dist
     uniform,
     negExp,
     normal,
+
+    -- * Converto to list of pairs
+    toValues,
+    -- * Pretty print distribution
+    prettyDist,
+    prettyPrintDist
   )
 where
 

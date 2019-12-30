@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE DataKinds #-}
 
@@ -26,18 +27,25 @@ secondChoice = fromF switch
 
 -- Dice sum
 
-sumSS :: Natural 6 -> Natural 6 -> Natural 12
-sumSS = coerceNat (+)
+type SS = Natural 1 6
 
-mulSS :: Natural 6 -> Natural 6 -> Natural 36
-mulSS = coerceNat (*)
+sumSS :: SS -> SS -> Natural 2 12
+sumSS = coerceNat (+)
 
 sumSSM = fromF' (uncurry sumSS)
 
-mulSSM3 = fromF' (mulSS (nat 3))
+condition :: (Int, Int) -> Int -> Int
+condition (fst, snd) thrd = if fst == snd
+                               then fst * 3
+                               else fst + snd + thrd
 
-die :: Dist (Natural 6) 6
-die = uniform [nat @6 1 .. nat 6]
+conditionSS :: (SS, SS) -> SS -> Natural 3 18
+conditionSS = coerceNat2 condition
+
+conditionalThrows = fromF' (uncurry conditionSS) `comp` khatri die (khatri die die)
+
+die :: Dist (Natural 1 6) 6
+die = uniform [nat @1 @6 1 .. nat 6]
 
 -- Sprinkler
 
@@ -62,6 +70,9 @@ main = do
     prettyPrint (p1 @Double @1 `comp` secondChoice `comp` firstChoice)
     putStrLn "\n Sum of dices probability:"
     prettyPrint (sumSSM `comp` khatri die die)
+    prettyPrintDist @(Natural 2 12) (sumSSM `comp` khatri die die)
+    putStrLn "\n Conditional dice throw:"
+    prettyPrintDist @(Natural 3 18) conditionalThrows
     putStrLn "\n Checking that the last result is indeed a distribution: "
     prettyPrint (bang `comp` sumSSM `comp` khatri die die)
     putStrLn "\n Probability of grass being wet:"
