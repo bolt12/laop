@@ -93,6 +93,7 @@ module Utils
     -- 'Natural' typed functions.
     coerceNat,
     coerceNat2,
+    coerceNat3,
   )
 where
 

@@ -153,7 +153,7 @@ import qualified Control.Category as C
 import qualified Matrix.Internal as I
 
 newtype Matrix e (cols :: Type) (rows :: Type) = M (I.Matrix e (I.Normalize cols) (I.Normalize rows))
-  deriving (Show, Num, Eq, NFData) via (I.Matrix e (I.Normalize cols) (I.Normalize rows))
+  deriving (Show, Num, Eq, Ord, NFData) via (I.Matrix e (I.Normalize cols) (I.Normalize rows))
 
 -- | It isn't possible to implement the 'id' function so it's
 -- implementation is 'undefined'. However 'comp' can be and this partial

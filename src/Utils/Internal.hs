@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -84,18 +85,30 @@ module Utils.Internal
     -- 'Natural' typed functions.
     coerceNat,
     coerceNat2,
+    coerceNat3,
   )
 where
 
 import Data.Coerce
 import Data.Proxy
 import GHC.TypeLits
+import Control.DeepSeq
 
 -- | Wrapper around 'Int's that have a restrictive semantic associated.
 -- A value of type @'Natural' n m@ can only be instanciated with some 'Int'
 -- @i@ that's @n <= i <= m@.
 newtype Natural (start :: Nat) (end :: Nat) = Nat Int
-  deriving (Show, Read, Eq, Num)
+  deriving (Show, Read, Eq, Ord, NFData)
+
+-- | Throws a runtime error if any of the operations overflows or
+-- underflows.
+instance (KnownNat n, KnownNat m) => Num (Natural n m) where
+    (Nat a) + (Nat b) = nat @n @m (a + b)
+    (Nat a) - (Nat b) = nat @n @m (a - b)
+    (Nat a) * (Nat b) = nat @n @m (a * b)
+    abs (Nat a) = nat @n @m (abs a)
+    signum (Nat a) = nat @n @m (signum a)
+    fromInteger i = nat @n @m (fromInteger i)
 
 -- | Natural constructor function. Throws a runtime error if the 'Int'
 -- value is greater than the corresponding @m@ or lower than @n@ in the @'Natural' n m@ type.
@@ -116,6 +129,11 @@ coerceNat = coerce
 -- functions.
 coerceNat2 :: ((Int, Int) -> Int -> Int) -> ((Natural a a', Natural b b') -> Natural c c' -> Natural d d')
 coerceNat2 = coerce
+
+-- | Auxiliary function that promotes ternary (binary) 'Int' functions to 'Natural'
+-- functions.
+coerceNat3 :: (Int -> Int -> a) -> (Natural b b' -> Natural c c' -> a) 
+coerceNat3 = coerce
 
 instance (KnownNat n, KnownNat m) => Bounded (Natural n m) where
   minBound = Nat $ fromInteger (natVal (Proxy :: Proxy n))

@@ -128,7 +128,17 @@ module Matrix.Internal
 
     -- * Matrix printing
     pretty,
-    prettyPrint
+    prettyPrint,
+
+    -- * Other
+    toBool,
+    fromBool,
+    compRel,
+    fromFRel,
+    fromFRel',
+    orM,
+    andM,
+    subM
   )
     where
 
@@ -244,6 +254,14 @@ instance Num e => Num (Matrix e cols rows) where
   signum (One a)     = One (signum a)
   signum (Junc a b)  = Junc (signum a) (signum b)
   signum (Split a b) = Split (signum a) (signum b)
+
+instance Ord e => Ord (Matrix e cols rows) where
+    Empty <= Empty                = True
+    (One a) <= (One b)            = a <= b
+    (Junc a b) <= (Junc c d)      = (a <= c) && (b <= d)
+    (Split a b) <= (Split c d)    = (a <= c) && (b <= d)
+    x@(Split _ _) <= y@(Junc _ _) = x <= abideJS y
+    x@(Junc _ _) <= y@(Split _ _) = abideJS x <= y
 
 -- Primitives
 
@@ -779,3 +797,121 @@ pretty m = "┌ " ++ unwords (replicate (columns m) blank) ++ " ┐\n" ++
 -- | Matrix pretty printer
 prettyPrint :: (KnownNat (Count cols), Show e) => Matrix e cols rows -> IO ()
 prettyPrint = putStrLn . pretty
+
+-- Relational operators functions
+
+-- | Helper conversion function
+toBool :: (Num e, Eq e) => e -> Bool
+toBool n
+  | n == 0 = False
+  | n == 1 = True
+
+-- | Helper conversion function
+fromBool :: Bool -> Natural 0 1
+fromBool True  = nat 1
+fromBool False = nat 0
+
+-- | Relational addition
+orM :: Matrix (Natural 0 1) cols rows -> Matrix (Natural 0 1) cols rows -> Matrix (Natural 0 1) cols rows
+orM Empty Empty                = Empty
+orM (One a) (One b)            = One (fromBool (toBool a || toBool b))
+orM (Junc a b) (Junc c d)      = Junc (orM a c) (orM b d)
+orM (Split a b) (Split c d)    = Split (orM a c) (orM b d)
+orM x@(Split _ _) y@(Junc _ _) = orM x (abideJS y)
+orM x@(Junc _ _) y@(Split _ _) = orM (abideJS x) y
+
+-- | Relational multiplication
+andM :: Matrix (Natural 0 1) cols rows -> Matrix (Natural 0 1) cols rows -> Matrix (Natural 0 1) cols rows
+andM Empty Empty                = Empty
+andM (One a) (One b)            = One (fromBool (toBool a && toBool b))
+andM (Junc a b) (Junc c d)      = Junc (andM a c) (andM b d)
+andM (Split a b) (Split c d)    = Split (andM a c) (andM b d)
+andM x@(Split _ _) y@(Junc _ _) = andM x (abideJS y)
+andM x@(Junc _ _) y@(Split _ _) = andM (abideJS x) y
+
+-- | Relational subtraction
+subM :: Matrix (Natural 0 1) cols rows -> Matrix (Natural 0 1) cols rows -> Matrix (Natural 0 1) cols rows
+subM Empty Empty                = Empty
+subM (One a) (One b)            = if a - b < nat 0 then One (nat 0) else One (a - b)
+subM (Junc a b) (Junc c d)      = Junc (subM a c) (subM b d)
+subM (Split a b) (Split c d)    = Split (subM a c) (subM b d)
+subM x@(Split _ _) y@(Junc _ _) = subM x (abideJS y)
+subM x@(Junc _ _) y@(Split _ _) = subM (abideJS x) y
+
+-- | Matrix relational composition.
+compRel :: Matrix (Natural 0 1) cr rows -> Matrix (Natural 0 1) cols cr -> Matrix (Natural 0 1) cols rows
+compRel Empty Empty            = Empty
+compRel (One a) (One b)        = One (fromBool (toBool a && toBool b))
+compRel (Junc a b) (Split c d) = orM (compRel a c) (compRel b d)         -- Divide-and-conquer law
+compRel (Split a b) c          = Split (compRel a c) (compRel b c) -- Split fusion law
+compRel c (Junc a b)           = Junc (compRel c a) (compRel c b)  -- Junc fusion law
+
+-- | Lifts functions to relations with arbitrary dimensions.
+--
+--   NOTE: Be careful to not ask for a relation bigger than the cardinality of
+-- types @a@ or @b@ allows.
+fromFRel ::
+  forall a b cols rows.
+  ( Bounded a,
+    Bounded b,
+    Enum a,
+    Enum b,
+    Eq b,
+    KnownNat (Count cols),
+    KnownNat (Count rows),
+    FromLists (Natural 0 1) rows cols
+  ) =>
+  (a -> b) ->
+  Matrix (Natural 0 1) cols rows
+fromFRel f =
+  let minA         = minBound @a
+      maxA         = maxBound @a
+      minB         = minBound @b
+      maxB         = maxBound @b
+      ccols        = fromInteger $ natVal (Proxy :: Proxy (Count cols))
+      rrows        = fromInteger $ natVal (Proxy :: Proxy (Count rows))
+      elementsA    = take ccols [minA .. maxA]
+      elementsB    = take rrows [minB .. maxB]
+      combinations = (,) <$> elementsA <*> elementsB
+      combAp       = map snd . sort . map (\(a, b) -> if f a == b 
+                                                         then ((fromEnum a, fromEnum b), nat 1) 
+                                                         else ((fromEnum a, fromEnum b), nat 0)) $ combinations
+      mList        = buildList combAp rrows
+   in tr $ fromLists mList
+  where
+    buildList [] _ = []
+    buildList l r  = take r l : buildList (drop r l) r
+
+-- | Lifts functions to relations with dimensions matching @a@ and @b@
+-- cardinality's.
+fromFRel' ::
+  forall a b.
+  ( Bounded a,
+    Bounded b,
+    Enum a,
+    Enum b,
+    Eq b,
+    KnownNat (Count (Normalize a)),
+    KnownNat (Count (Normalize b)),
+    FromLists (Natural 0 1) (Normalize b) (Normalize a)
+  ) =>
+  (a -> b) ->
+  Matrix (Natural 0 1) (Normalize a) (Normalize b)
+fromFRel' f =
+  let minA         = minBound @a
+      maxA         = maxBound @a
+      minB         = minBound @b
+      maxB         = maxBound @b
+      ccols        = fromInteger $ natVal (Proxy :: Proxy (Count (Normalize a)))
+      rrows        = fromInteger $ natVal (Proxy :: Proxy (Count (Normalize b)))
+      elementsA    = take ccols [minA .. maxA]
+      elementsB    = take rrows [minB .. maxB]
+      combinations = (,) <$> elementsA <*> elementsB
+      combAp       = map snd . sort . map (\(a, b) -> if f a == b 
+                                                         then ((fromEnum a, fromEnum b), nat 1) 
+                                                         else ((fromEnum a, fromEnum b), nat 0)) $ combinations
+      mList        = buildList combAp rrows
+   in tr $ fromLists mList
+  where
+    buildList [] _ = []
+    buildList l r  = take r l : buildList (drop r l) r
