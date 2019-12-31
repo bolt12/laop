@@ -209,8 +209,8 @@ instance Eq e => Eq (Matrix e cols rows) where
   (One a) == (One b)            = a == b
   (Junc a b) == (Junc c d)      = a == c && b == d
   (Split a b) == (Split c d)    = a == c && b == d
-  x@(Split a b) == y@(Junc c d) = x == abideJS y
-  x@(Junc a b) == y@(Split c d) = abideJS x == y
+  x@(Split _ _) == y@(Junc _ _) = x == abideJS y
+  x@(Junc _ _) == y@(Split _ _) = abideJS x == y
 
 instance Num e => Num (Matrix e cols rows) where
 
@@ -218,22 +218,22 @@ instance Num e => Num (Matrix e cols rows) where
   (One a) + (One b)            = One (a + b)
   (Junc a b) + (Junc c d)      = Junc (a + c) (b + d)
   (Split a b) + (Split c d)    = Split (a + c) (b + d)
-  x@(Split a b) + y@(Junc c d) = x + abideJS y
-  x@(Junc a b) + y@(Split c d) = abideJS x + y
+  x@(Split _ _) + y@(Junc _ _) = x + abideJS y
+  x@(Junc _ _) + y@(Split _ _) = abideJS x + y
 
   Empty - Empty             = Empty
   (One a) - (One b)         = One (a - b)
   (Junc a b) - (Junc c d)   = Junc (a - c) (b - d)
   (Split a b) - (Split c d) = Split (a - c) (b - d)
-  x@(Split a b) - y@(Junc c d) = x - abideJS y
-  x@(Junc a b) - y@(Split c d) = abideJS x - y
+  x@(Split _ _) - y@(Junc _ _) = x - abideJS y
+  x@(Junc _ _) - y@(Split _ _) = abideJS x - y
 
   Empty * Empty             = Empty
   (One a) * (One b)         = One (a * b)
   (Junc a b) * (Junc c d)   = Junc (a * c) (b * d)
   (Split a b) * (Split c d) = Split (a * c) (b * d)
-  x@(Split a b) * y@(Junc c d) = x * abideJS y
-  x@(Junc a b) * y@(Split c d) = abideJS x * y
+  x@(Split _ _) * y@(Junc _ _) = x * abideJS y
+  x@(Junc _ _) * y@(Split _ _) = abideJS x * y
 
   abs Empty       = Empty
   abs (One a)     = One (abs a)
@@ -309,7 +309,7 @@ instance {-# OVERLAPPING #-} (FromLists e () rows) => FromLists e () (Either () 
   fromLists _         = error "Wrong dimensions"
 
 instance {-# OVERLAPPABLE #-} (FromLists e () a, FromLists e () b, KnownNat (Count a)) => FromLists e () (Either a b) where
-  fromLists l@([h] : t) = 
+  fromLists l@([_] : _) = 
       let rowsA = fromInteger (natVal (Proxy :: Proxy (Count a)))
        in Split (fromLists (take rowsA l)) (fromLists (drop rowsA l))
   fromLists _         = error "Wrong dimensions"
