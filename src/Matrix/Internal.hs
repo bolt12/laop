@@ -695,23 +695,8 @@ tr (Split a b) = Junc (tr a) (tr b)
 
 -- | Selective functors 'select' operator equivalent inspired by the
 -- ArrowMonad solution presented in the paper.
-select :: 
-       ( Bounded a,
-         Bounded b,
-         Enum a,
-         Enum b,
-         Num e,
-         Ord e,
-         Eq b,
-         KnownNat (Count (Normalize a)),
-         KnownNat (Count (Normalize b)),
-         KnownNat (Count cols),
-         FromLists e (Normalize b) (Normalize a),
-         FromLists e (Normalize b) (Normalize b)
-       ) => Matrix e cols (Either (Normalize a) (Normalize b)) -> (a -> b) -> Matrix e cols (Normalize b)
-select m y = 
-    let f = fromF y
-     in junc f identity . m
+select :: (Num e, FromLists e b b, KnownNat (Count b)) => Matrix e cols (Either a b) -> Matrix e a b -> Matrix e cols b
+select m y = junc y identity . m
 
 -- McCarthy's Conditional
 

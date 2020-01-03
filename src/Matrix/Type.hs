@@ -545,22 +545,12 @@ tr (M m) = M (I.tr m)
 -- | Selective functors 'select' operator equivalent inspired by the
 -- ArrowMonad solution presented in the paper.
 select :: 
-       ( Bounded a,
-         Bounded b,
-         Enum a,
-         Eq b,
-         Enum b,
-         Num e,
-         Ord e,
-         KnownNat (I.Count (I.Normalize a)),
-         KnownNat (I.Count (I.Normalize b)),
-         KnownNat (I.Count (I.Normalize cols)),
-         I.FromLists e (I.Normalize b) (I.Normalize a),
+       ( Num e,
          I.FromLists e (I.Normalize b) (I.Normalize b),
+         KnownNat (I.Count (I.Normalize b)),
          I.Normalize (Either a b) ~ Either (I.Normalize a) (I.Normalize b)
-       ) 
-       => Matrix e cols (Either a b) -> (a -> b) -> Matrix e cols b
-select (M m) y = M (I.select m y)
+       ) => Matrix e cols (Either a b) -> Matrix e a b -> Matrix e cols b
+select (M m) (M y) = M (I.select m y)
 
 -- McCarthy's Conditional
 

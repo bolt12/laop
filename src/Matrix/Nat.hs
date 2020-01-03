@@ -447,20 +447,15 @@ tr :: Matrix e cols rows -> Matrix e rows cols
 tr (M m) = M (I.tr m)
 
 -- Selective 'select' operator
---
-select :: (Bounded a, Bounded b, Enum a, Enum b, Num e, Ord e,
-                 KnownNat (I.Count (I.FromNat (I.Count a))),
-                 KnownNat (I.Count (I.FromNat (I.Count b))),
-                 KnownNat (I.Count (I.FromNat cols1)),
-                 I.FromLists e (I.FromNat (I.Count b)) (I.FromNat (I.Count a)),
-                 I.FromLists e (I.FromNat (I.Count b)) (I.FromNat (I.Count b)),
-                 Eq b,
-                 I.FromNat rows1
-                 ~ Either (I.FromNat (I.Count a)) (I.FromNat (I.Count b)),
-                 I.FromNat cols2 ~ I.FromNat cols1,
-                 I.FromNat (I.Count b) ~ I.FromNat rows2) =>
-                Matrix e cols1 rows1 -> (a -> b) -> Matrix e cols2 rows2
-select (M m) y = M (I.select m y)
+select :: 
+       ( Num e,
+         I.FromLists e (I.FromNat rows1) (I.FromNat rows1),
+         KnownNat (I.Count (I.FromNat rows1)),
+         I.FromNat rows2 ~ I.FromNat rows1,
+         I.FromNat cols1 ~ I.FromNat cols2,
+         I.FromNat rows3 ~ Either (I.FromNat cols3) (I.FromNat rows1)
+       ) => Matrix e cols1 rows3 -> Matrix e cols3 rows1 -> Matrix e cols2 rows2
+select (M m) (M y) = M (I.select m y)
 
 -- McCarthy's Conditional
 
