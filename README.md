@@ -34,6 +34,10 @@ Given this, this new matrix formulation compared to other libraries one has much
         
 Unfortunately, this approach does not solve the issue of type dimensions being in some way constrainted making it impossible to write Arrow instances, for example. Type inference isn't perfect, when it comes to infer the types of matrices which dimensions are computed using type level naturals multiplication, the compiler needs type annotations in order to succeed.
 
+## Notes
+
+This is still a work in progress, any feedback is welcome!
+
 ## Example
 
 ```Haskell
