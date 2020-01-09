@@ -35,6 +35,21 @@ module Dist
     -- * 'Dist' and 'Prob' type synonyms
     Dist (..),
     Prob,
+
+    -- * Functor instance equivalent functions
+    fmapD,
+
+    -- * Applicative equivalent functions
+    unitD,
+    multD,
+
+    -- * Selective equivalent functions
+    selectD,
+
+    -- * Monad equivalent functions
+    returnD,
+    bindD,
+
     -- * Distribution construction functions
     choose,
     shape,

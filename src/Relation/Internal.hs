@@ -6,6 +6,24 @@
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE DataKinds #-}
 
+-----------------------------------------------------------------------------
+-- |
+-- Module     : Relation.Internal
+-- Copyright  : (c) Armando Santos 2019-2020
+-- Maintainer : armandoifsantos@gmail.com
+-- Stability  : experimental
+--
+-- The AoP discipline generalises functions to relations which are 
+-- Boolean matrices.
+--
+-- This module offers many of the combinators of the Algebra of
+-- Programming discipline. It is still under construction and very
+-- experimental.
+--
+-- This is an Internal module and it is no supposed to be imported.
+--
+-----------------------------------------------------------------------------
+
 module Relation.Internal
         ( 
         )

@@ -83,6 +83,20 @@ module Matrix.Type
     bang,
     constant,
 
+    -- * Functor instance equivalent function
+    fmapM,
+
+    -- * Applicative/Monoidal instance equivalent functions
+    unitM,
+    multM,
+
+    -- * Selective equivalent instance function
+    selectM, 
+    
+    -- * Monad equivalent instance function
+    returnM,
+    bindM,
+
     -- * Misc
     -- ** Get dimensions
     columns,
@@ -90,9 +104,6 @@ module Matrix.Type
 
     -- ** Matrix Transposition
     tr,
-
-    -- ** Selective operator
-    select, 
 
     -- ** McCarthy's Conditional
     cond,
@@ -213,6 +224,61 @@ infixl 2 ===
   Matrix e cols b ->
   Matrix e cols (Either a b)
 (===) = split
+
+-- Functor hierarchy
+
+-- | Functor instance equivalent function
+fmapM :: 
+     ( Bounded a,
+       Bounded b,
+       Enum a,
+       Enum b,
+       Eq b,
+       Num e,
+       Ord e,
+       KnownNat (I.Count (I.Normalize a)),
+       KnownNat (I.Count (I.Normalize b)),
+       I.FromLists e (I.Normalize b) (I.Normalize a)
+     )
+     =>
+     (a -> b) -> Matrix e c a -> Matrix e c b
+fmapM f m = fromF' f `comp` m
+
+-- | Applicative instance equivalent 'unit' function,
+unitM :: (Num e) => Matrix e () ()
+unitM = one 1
+
+-- | Applicative instance equivalent 'unit' function,
+multM :: 
+      ( KnownNat (I.Count (I.Normalize a)),
+        KnownNat (I.Count (I.Normalize b)),
+        KnownNat (I.Count (I.Normalize (a, b))),
+        Num e,
+        I.FromLists e (I.Normalize (a, b)) (I.Normalize a),
+        I.FromLists e (I.Normalize (a, b)) (I.Normalize b),
+        I.Normalize (a, b) ~ I.Normalize (I.Normalize a, I.Normalize b)
+      ) => Matrix e c a -> Matrix e c b -> Matrix e c (a, b)
+multM a b = khatri a b
+
+
+-- | Monad instance equivalent 'return' function,
+returnM :: 
+        forall e a . 
+        ( Num e, 
+          Enum e, 
+          Enum a, 
+          I.FromLists e () (I.Normalize a),
+          KnownNat (I.Count a)
+        ) => a -> Matrix e One a
+returnM a = col l
+    where
+        i = fromInteger $ natVal (Proxy :: Proxy (I.Count a))
+        x = fromEnum a
+        l = take x [0,0..] ++ [1] ++ take (i - x - 1) [0,0..]
+
+-- | Monad instance equivalent '(>>=)' function,
+bindM :: (Num e) => Matrix e a b -> Matrix e b c -> Matrix e a c
+bindM = flip comp
 
 -- Construction
 
@@ -544,13 +610,13 @@ tr (M m) = M (I.tr m)
 
 -- | Selective functors 'select' operator equivalent inspired by the
 -- ArrowMonad solution presented in the paper.
-select :: 
+selectM :: 
        ( Num e,
          I.FromLists e (I.Normalize b) (I.Normalize b),
          KnownNat (I.Count (I.Normalize b)),
          I.Normalize (Either a b) ~ Either (I.Normalize a) (I.Normalize b)
        ) => Matrix e cols (Either a b) -> Matrix e a b -> Matrix e cols b
-select (M m) (M y) = M (I.select m y)
+selectM (M m) (M y) = M (I.select m y)
 
 -- McCarthy's Conditional
 
