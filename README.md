@@ -4,7 +4,7 @@ The LAoP discipline generalises relations and functions treating them as
 Boolean matrices and in turn consider these as arrows.
 
 __LAoP__ is a library for algebraic (inductive) construction and manipulation of matrices
-in Haskell. See [https://github.com/bolt12/master-thesis](my Msc Thesis) for the
+in Haskell. See (https://github.com/bolt12/master-thesis)[my Msc Thesis] for the
 motivation behind the library, the underlying theory, and implementation details.
 
 This module offers many of the combinators mentioned in the work of
