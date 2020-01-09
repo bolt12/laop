@@ -8,7 +8,7 @@ in Haskell. See [my Msc Thesis](https://github.com/bolt12/master-thesis) for the
 motivation behind the library, the underlying theory, and implementation details.
 
 This module offers many of the combinators mentioned in the work of
-Macedo (2012) and Oliveira (2012). 
+[Macedo (2012)](https://repositorium.sdum.uminho.pt/handle/1822/22894) and [Oliveira (2012)](https://pdfs.semanticscholar.org/ccf5/27fa9179081223bffe8067edd81948644fc0.pdf). 
 
 ## Features
 
