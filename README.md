@@ -16,10 +16,12 @@ See the candidate package in hackage [here](https://hackage.haskell.org/package/
 
 This library offers:
 
-- One that uses normal datatypes (`Void`, `()`, `Either`) for matrix dimensions and two
+- An internal representation that uses normal datatypes (`Void`, `()`, `Either`) for matrix dimensions and two
   type families `FromNat` and `Count` to make it easier to work with these type of matrices.
+- A module that uses generalised types for the dimensions and is just a newtype wrapper
+  around the internal matrix data type.
 - Other that uses type level naturals for the dimensions and is just a newtype wrapper
-  around the other matrix data type.
+  around the internal matrix data type.
 - A very simple Probabilistic Programming module and several functions and data types to
   make it easier to deal with sample space.
 

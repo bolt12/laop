@@ -155,6 +155,26 @@ import Control.DeepSeq
 import Control.Category
 import Prelude hiding ((.))
 
+data Zero
+data Succ n
+
+type family Add x y where
+   Add x Zero     = x
+   Add x (Succ y) = Succ (Add x y)
+
+data Matrix' e cols rows where
+  Empty' :: Matrix' e Zero Zero
+  One' :: e -> Matrix' e (Succ Zero) (Succ Zero)
+  Junc' :: Matrix' e a rows -> Matrix' e b rows -> Matrix' e (Add a b) rows
+  Split' :: Matrix' e cols a -> Matrix' e cols b -> Matrix' e cols (Add a b)
+
+abideSJ' :: Matrix' e cols rows -> Matrix' e cols rows
+abideSJ' (Split' (Junc' a b) (Junc' c d)) = Junc' (Split' (abideSJ' a) (abideSJ' c)) (Split' (abideSJ' b) (abideSJ' d)) -- Split-Junc abide law
+abideSJ' Empty'                         = Empty'
+abideSJ' (One' e)                       = One' e
+abideSJ' (Junc' a b)                    = Junc' (abideSJ' a) (abideSJ' b)
+abideSJ' (Split' a b)                   = Split' (abideSJ' a) (abideSJ' b)
+
 -- | LAoP (Linear Algebra of Programming) Inductive Matrix definition.
 data Matrix e cols rows where
   Empty :: Matrix e Void Void
