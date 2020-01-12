@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 -- |
--- Module     : Utils
+-- Module     : LAoP.Utils
 -- Copyright  : (c) Armando Santos 2019-2020
 -- Maintainer : armandoifsantos@gmail.com
 -- Stability  : experimental
@@ -15,7 +15,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Utils
+module LAoP.Utils
   ( -- | Utility module that provides the 'Natural' data type.
     -- The semantic associated with this data type is that
     -- it's meant to be a restricted 'Int' value. For example
@@ -97,4 +97,4 @@ module Utils
   )
 where
 
-import Utils.Internal
+import LAoP.Utils.Internal

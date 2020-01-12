@@ -15,7 +15,7 @@
 
 -----------------------------------------------------------------------------
 -- |
--- Module     : Matrix.Type
+-- Module     : LAoP.Matrix.Type
 -- Copyright  : (c) Armando Santos 2019-2020
 -- Maintainer : armandoifsantos@gmail.com
 -- Stability  : experimental
@@ -36,7 +36,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Matrix.Type
+module LAoP.Matrix.Type
   ( -- | LAoP (Linear Algebra of Programming) Inductive Matrix definition.
     --
     --   LAoP generalises relations and functions treating them as
@@ -161,7 +161,7 @@ import Data.Kind
 import GHC.TypeLits 
 import Control.DeepSeq
 import qualified Control.Category as C
-import qualified Matrix.Internal as I
+import qualified LAoP.Matrix.Internal as I
 
 newtype Matrix e (cols :: Type) (rows :: Type) = M (I.Matrix e (I.Normalize cols) (I.Normalize rows))
   deriving (Show, Num, Eq, Ord, NFData) via (I.Matrix e (I.Normalize cols) (I.Normalize rows))

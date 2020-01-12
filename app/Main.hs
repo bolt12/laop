@@ -6,9 +6,9 @@
 
 module Main where
 
-import Matrix.Type
-import Utils
-import Dist
+import LAoP.Matrix.Type
+import LAoP.Utils
+import LAoP.Dist
 import GHC.TypeLits
 import Data.Coerce
 import GHC.Generics

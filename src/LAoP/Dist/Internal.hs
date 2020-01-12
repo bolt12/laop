@@ -7,7 +7,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE RankNTypes #-}
 
-module Dist.Internal
+module LAoP.Dist.Internal
         ( 
         Dist(..),
         Prob,
@@ -32,8 +32,8 @@ module Dist.Internal
         )
     where
 
-import Matrix.Type
-import Utils
+import LAoP.Matrix.Type
+import LAoP.Utils
 import GHC.TypeLits
 import Data.Proxy
 import Data.List (sortBy)

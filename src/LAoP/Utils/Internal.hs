@@ -5,7 +5,7 @@
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Utils.Internal
+module LAoP.Utils.Internal
   ( -- | This is an internal module and it is not meant to be imported.
     --
     -- Utility module that provides the 'Natural' data type.

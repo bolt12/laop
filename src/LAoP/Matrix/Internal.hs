@@ -15,7 +15,7 @@
 
 -----------------------------------------------------------------------------
 -- |
--- Module     : Matrix.Internal
+-- Module     : LAoP.Matrix.Internal
 -- Copyright  : (c) Armando Santos 2019-2020
 -- Maintainer : armandoifsantos@gmail.com
 -- Stability  : experimental
@@ -34,7 +34,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Matrix.Internal
+module LAoP.Matrix.Internal
   ( -- | This definition makes use of the fact that 'Void' is
     -- isomorphic to 0 and '()' to 1 and captures matrix
     -- dimensions as stacks of 'Either's.
@@ -142,7 +142,7 @@ module Matrix.Internal
   )
     where
 
-import Utils
+import LAoP.Utils
 import Data.Bool
 import Data.Kind
 import Data.List
@@ -154,26 +154,6 @@ import GHC.Generics
 import Control.DeepSeq
 import Control.Category
 import Prelude hiding ((.))
-
-data Zero
-data Succ n
-
-type family Add x y where
-   Add x Zero     = x
-   Add x (Succ y) = Succ (Add x y)
-
-data Matrix' e cols rows where
-  Empty' :: Matrix' e Zero Zero
-  One' :: e -> Matrix' e (Succ Zero) (Succ Zero)
-  Junc' :: Matrix' e a rows -> Matrix' e b rows -> Matrix' e (Add a b) rows
-  Split' :: Matrix' e cols a -> Matrix' e cols b -> Matrix' e cols (Add a b)
-
-abideSJ' :: Matrix' e cols rows -> Matrix' e cols rows
-abideSJ' (Split' (Junc' a b) (Junc' c d)) = Junc' (Split' (abideSJ' a) (abideSJ' c)) (Split' (abideSJ' b) (abideSJ' d)) -- Split-Junc abide law
-abideSJ' Empty'                         = Empty'
-abideSJ' (One' e)                       = One' e
-abideSJ' (Junc' a b)                    = Junc' (abideSJ' a) (abideSJ' b)
-abideSJ' (Split' a b)                   = Split' (abideSJ' a) (abideSJ' b)
 
 -- | LAoP (Linear Algebra of Programming) Inductive Matrix definition.
 data Matrix e cols rows where

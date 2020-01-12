@@ -8,7 +8,7 @@
 
 -----------------------------------------------------------------------------
 -- |
--- Module     : Relation.Internal
+-- Module     : LAoP.Relation.Internal
 -- Copyright  : (c) Armando Santos 2019-2020
 -- Maintainer : armandoifsantos@gmail.com
 -- Stability  : experimental
@@ -24,7 +24,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Relation.Internal
+module LAoP.Relation.Internal
   ( -- | This definition makes use of the fact that 'Void' is
     -- isomorphic to 0 and '()' to 1 and captures matrix
     -- dimensions as stacks of 'Either's.
@@ -45,12 +45,12 @@ module Relation.Internal
     split,
 
     -- * Auxiliary type families
-    FromNat,
-    Count,
-    Normalize,
+    I.FromNat,
+    I.Count,
+    I.Normalize,
 
     -- * Matrix construction and conversion
-    FromLists,
+    I.FromLists,
     fromLists,
     toLists,
     toList,
@@ -97,11 +97,12 @@ module Relation.Internal
     where
 
 import Data.Void
-import qualified Matrix.Internal as I
-import Utils
+import qualified LAoP.Matrix.Internal as I
+import LAoP.Utils
 import Control.DeepSeq
 import qualified Control.Category as C
 import Data.Coerce
+import Data.Bool
 import GHC.TypeLits
 
 -- | Boolean type synonym for working with boolean matrices
@@ -123,11 +124,14 @@ instance C.Category Relation where
     (.) = comp
 
 instance Num (Relation a b) where
-    (R a) + (R b) = R (I.orM a b) --^ Matrix addition becomes Boolean matrix disjunction
+    -- | Matrix addition becomes Boolean matrix disjunction
+    (R a) + (R b) = R (I.orM a b)
 
-    (R a) - (R b) = R (I.subM a b) --^ Matrix subtraction becomes Relational subtraction
+    -- | Matrix subtraction becomes Relational subtraction
+    (R a) - (R b) = R (I.subM a b)
 
-    (R a) * (R b) = R (I.andM a b) --^ Matrix multiplication becomes Boolean matrix conjunction
+    -- | Matrix multiplication becomes Boolean matrix conjunction
+    (R a) * (R b) = R (I.andM a b)
 
 -- Type alias
 type Zero = Void
@@ -181,8 +185,8 @@ fromLists = R . I.fromLists
 -- | Matrix builder function. Constructs a matrix provided with
 -- a construction function.
 matrixBuilder ::
-  (I.FromLists e (I.Normalize a) (I.Normalize b), KnownNat (I.Count (I.Normalize a)), KnownNat (I.Count (I.Normalize b))) =>
-  ((Int, Int) -> e) ->
+  (I.FromLists Boolean (I.Normalize a) (I.Normalize b), KnownNat (I.Count (I.Normalize a)), KnownNat (I.Count (I.Normalize b))) =>
+  ((Int, Int) -> Boolean) ->
   Relation a b
 matrixBuilder = R . I.matrixBuilder
 
@@ -221,12 +225,12 @@ fromF' f = R (I.fromFRel' f)
 -- Conversion
 
 -- | Converts a matrix to a list of lists of elements.
-toLists :: Relation a b -> [[e]]
-toLists (R m) = R $ I.toLists m
+toLists :: Relation a b -> [[Boolean]]
+toLists (R m) = I.toLists m
 
 -- | Converts a matrix to a list of elements.
-toList :: Relation a b -> [e]
-toList (R m) = R $ I.toList m
+toList :: Relation a b -> [Boolean]
+toList (R m) = I.toList m
 
 -- Zeros Matrix
 
@@ -318,47 +322,47 @@ entire :: (KnownNat (I.Count (I.Normalize a)), I.FromLists Boolean (I.Normalize 
 entire = reflexive . ker
 
 -- | A 'Relation' @r@ is surjective iff @'reflexive' ('img' r)@
-surjective :: (KnownNat (I.Count (I.Normalize a)), I.FromLists Boolean (I.Normalize a) (I.Normalize a)) => Relation a b -> Bool
+surjective :: (KnownNat (I.Count (I.Normalize b)), I.FromLists Boolean (I.Normalize b) (I.Normalize b)) => Relation a b -> Bool
 surjective = reflexive . img
 
--- | A 'Relation' @r@ is transitive iff @r . r `'sse'` r@
-transitive :: Relation a b -> Bool
-transitive r = r . r `sse` r
+-- | A 'Relation' @r@ is transitive iff @(r `'comp'` r) `'sse'` r@
+transitive :: Relation a a -> Bool
+transitive r = (r `comp` r) `sse` r
 
 -- | A 'Relation' @r@ is symmetric iff @r == r@
-symmetric :: Relation a b -> Bool
+symmetric :: Relation a a -> Bool
 symmetric r = r == r
 
 -- | A 'Relation' @r@ is anti-symmetric iff @(r `'intersection'` 'conv' r) `'sse'` 'identity'@
-antiSymmetric :: Relation a b -> Bool
+antiSymmetric :: (KnownNat (I.Count (I.Normalize a)), I.FromLists Boolean (I.Normalize a) (I.Normalize a)) => Relation a a -> Bool
 antiSymmetric r = (r `intersection` conv r) `sse` identity
 
 -- | A 'Relation' @r@ is irreflexive iff @(r `'intersection'` identity) == 'zeros'@
-irreflexive :: Relation a b -> Bool
+irreflexive :: (KnownNat (I.Count (I.Normalize a)), I.FromLists Boolean (I.Normalize a) (I.Normalize a)) => Relation a a -> Bool
 irreflexive r = (r `intersection` identity) == zeros
 
 -- | A 'Relation' @r@ is connected iff @(r `'union'` 'conv' r) == 'ones'@
-connected :: () => Relation a b -> Bool
+connected :: (KnownNat (I.Count (I.Normalize a)), I.FromLists Boolean (I.Normalize a) (I.Normalize a)) => Relation a a -> Bool
 connected r = (r `union` conv r) == ones
 
 -- | A 'Relation @r@ is a preorder iff @'reflexive' r && 'transitive' r@
-preorder :: () => Relation a b -> Bool
+preorder :: (KnownNat (I.Count (I.Normalize a)), I.FromLists Boolean (I.Normalize a) (I.Normalize a)) => Relation a a -> Bool
 preorder r = reflexive r && transitive r
 
 -- | A 'Relation @r@ is a partial order iff @'antiSymmetric' r && 'preorder' r@
-partialOrder :: () => Relation a b -> Bool
+partialOrder :: (KnownNat (I.Count (I.Normalize a)), I.FromLists Boolean (I.Normalize a) (I.Normalize a)) => Relation a a -> Bool
 partialOrder r = antiSymmetric r && preorder r
 
 -- | A 'Relation @r@ is a linear order iff @'connected' r && 'partialOrder' r@
-linearOrder :: () => Relation a b -> Bool
+linearOrder :: (KnownNat (I.Count (I.Normalize a)), I.FromLists Boolean (I.Normalize a) (I.Normalize a)) => Relation a a -> Bool
 linearOrder r = connected r && partialOrder r
 
 -- | A 'Relation @r@ is an equivalence iff @'symmetric' r && 'preorder' r@
-equivalence :: () => Relation a b -> Bool
+equivalence :: (KnownNat (I.Count (I.Normalize a)), I.FromLists Boolean (I.Normalize a) (I.Normalize a)) => Relation a a -> Bool
 equivalence r = symmetric r && preorder r
 
 -- | A 'Relation @r@ is a partial equivalence iff @'partialOrder' r && 'equivalence' r@
-partialEquivalence :: () => Relation a b -> Bool
+partialEquivalence :: (KnownNat (I.Count (I.Normalize a)), I.FromLists Boolean (I.Normalize a) (I.Normalize a)) => Relation a a -> Bool
 partialEquivalence r = partialOrder r && equivalence r
 
 -- Relation pretty print
