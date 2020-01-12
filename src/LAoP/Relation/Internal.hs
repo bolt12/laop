@@ -52,6 +52,9 @@ module LAoP.Relation.Internal
     -- * Matrix construction and conversion
     I.FromLists,
     fromLists,
+    fromF,
+    fromF',
+    toRel,
     toLists,
     toList,
     matrixBuilder,
@@ -228,6 +231,20 @@ fromF' ::
       )
       => (a -> b) -> Relation a b
 fromF' f = R (I.fromFRel' f)
+
+-- | Lifts relation functions to 'Relation'
+toRel ::
+      ( Bounded b,
+        Bounded a,
+        Enum a,
+        Enum b,
+        Eq b,
+        KnownNat (I.Count (I.Normalize a)),
+        KnownNat (I.Count (I.Normalize b)),
+        I.FromLists Boolean (I.Normalize b) (I.Normalize a)
+      )
+ => (a -> b -> Bool) -> Relation a b
+toRel = R . I.toRel
 
 -- Conversion
 

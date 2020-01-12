@@ -136,6 +136,7 @@ module LAoP.Matrix.Internal
     compRel,
     fromFRel,
     fromFRel',
+    toRel,
     orM,
     andM,
     subM
@@ -893,6 +894,38 @@ fromFRel' f =
       elementsB    = take rrows [minB .. maxB]
       combinations = (,) <$> elementsA <*> elementsB
       combAp       = map snd . sort . map (\(a, b) -> if f a == b 
+                                                         then ((fromEnum a, fromEnum b), nat 1) 
+                                                         else ((fromEnum a, fromEnum b), nat 0)) $ combinations
+      mList        = buildList combAp rrows
+   in tr $ fromLists mList
+  where
+    buildList [] _ = []
+    buildList l r  = take r l : buildList (drop r l) r
+
+-- | Lifts a relation function to a Boolean Matrix
+toRel :: 
+      forall a b.
+      ( Bounded a,
+        Bounded b,
+        Enum a,
+        Enum b,
+        Eq b,
+        KnownNat (Count (Normalize a)),
+        KnownNat (Count (Normalize b)),
+        FromLists (Natural 0 1) (Normalize b) (Normalize a)
+      ) 
+      => (a -> b -> Bool) -> Matrix (Natural 0 1) (Normalize a) (Normalize b)
+toRel f =
+  let minA         = minBound @a
+      maxA         = maxBound @a
+      minB         = minBound @b
+      maxB         = maxBound @b
+      ccols        = fromInteger $ natVal (Proxy :: Proxy (Count (Normalize a)))
+      rrows        = fromInteger $ natVal (Proxy :: Proxy (Count (Normalize b)))
+      elementsA    = take ccols [minA .. maxA]
+      elementsB    = take rrows [minB .. maxB]
+      combinations = (,) <$> elementsA <*> elementsB
+      combAp       = map snd . sort . map (\(a, b) -> if uncurry f (a, b) 
                                                          then ((fromEnum a, fromEnum b), nat 1) 
                                                          else ((fromEnum a, fromEnum b), nat 0)) $ combinations
       mList        = buildList combAp rrows
