@@ -149,6 +149,9 @@ module LAoP.Matrix.Type
     fromF,
     fromF',
 
+    -- * Relation
+    toRel,
+
     -- * Matrix printing
     pretty,
     prettyPrint
@@ -160,6 +163,7 @@ import Data.Proxy
 import Data.Kind
 import GHC.TypeLits 
 import Control.DeepSeq
+import LAoP.Utils
 import qualified Control.Category as C
 import qualified LAoP.Matrix.Internal as I
 
@@ -340,6 +344,19 @@ fromF' ::
   (a -> b) ->
   Matrix e a b
 fromF' = M . I.fromF'
+
+-- | Lifts relation functions to Boolean Matrix
+toRel ::
+  ( Bounded a,
+    Bounded b,
+    Enum a,
+    Enum b,
+    Eq b,
+    KnownNat (I.Count (I.Normalize a)),
+    KnownNat (I.Count (I.Normalize b)),
+    I.FromLists (Natural 0 1) (I.Normalize b) (I.Normalize a)
+  ) => (a -> b -> Bool) -> Matrix (Natural 0 1) a b
+toRel = M . I.toRel
 
 -- Conversion
 
