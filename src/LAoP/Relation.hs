@@ -59,6 +59,13 @@ module LAoP.Relation
     ker,
     img,
 
+    -- * Taxonomy of binary relations
+    entire,
+    injective,
+    surjective,
+    simple,
+    bijective,
+
     -- * (Endo-)Relational properties
     reflexive,
     coreflexive,

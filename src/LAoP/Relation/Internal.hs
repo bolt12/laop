@@ -67,6 +67,13 @@ module LAoP.Relation.Internal
     ker,
     img,
 
+    -- * Taxonomy of binary relations
+    entire,
+    injective,
+    surjective,
+    simple,
+    bijective,
+
     -- * (Endo-)Relational properties
     reflexive,
     coreflexive,
@@ -324,6 +331,15 @@ entire = reflexive . ker
 -- | A 'Relation' @r@ is surjective iff @'reflexive' ('img' r)@
 surjective :: (KnownNat (I.Count (I.Normalize b)), I.FromLists Boolean (I.Normalize b) (I.Normalize b)) => Relation a b -> Bool
 surjective = reflexive . img
+
+-- | A 'Relation' @r@ is bijective iff @'injective' r && 'surjective' r@
+bijective :: 
+          ( KnownNat (I.Count (I.Normalize b)), 
+            KnownNat (I.Count (I.Normalize a)), 
+            I.FromLists Boolean (I.Normalize b) (I.Normalize b),
+            I.FromLists Boolean (I.Normalize a) (I.Normalize a)
+          ) => Relation a b -> Bool
+bijective r = injective r && surjective r
 
 -- | A 'Relation' @r@ is transitive iff @(r `'comp'` r) `'sse'` r@
 transitive :: Relation a a -> Bool
