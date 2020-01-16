@@ -362,9 +362,9 @@ bijective r = injective r && surjective r
 transitive :: Relation a a -> Bool
 transitive r = (r `comp` r) `sse` r
 
--- | A 'Relation' @r@ is symmetric iff @r == r@
+-- | A 'Relation' @r@ is symmetric iff @r == conv r@
 symmetric :: Relation a a -> Bool
-symmetric r = r == r
+symmetric r = r == conv r
 
 -- | A 'Relation' @r@ is anti-symmetric iff @(r `'intersection'` 'conv' r) `'sse'` 'identity'@
 antiSymmetric :: (KnownNat (I.Count (I.Normalize a)), I.FromLists Boolean (I.Normalize a) (I.Normalize a)) => Relation a a -> Bool
