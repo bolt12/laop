@@ -174,3 +174,26 @@ instance
         fstI = fromEnum a
         sndI = fromEnum b
      in fstI * lengthB + sndI
+
+instance
+  ( Bounded a,
+    Bounded b
+  ) => Bounded (Either a b)
+  where
+  minBound = Left (minBound :: a)
+  maxBound = Right (maxBound :: b)
+
+instance
+  ( Enum a,
+    Bounded a,
+    Enum b,
+    Bounded b
+  ) => Enum (Either a b)
+  where
+  toEnum i =
+      let la = fmap Left ([minBound..maxBound] :: [a])
+          lb = fmap Right ([minBound..maxBound] :: [b])
+       in (la ++ lb) !! i
+
+  fromEnum (Left a) = fromEnum a
+  fromEnum (Right b) = fromEnum (maxBound :: a) + fromEnum b + 1

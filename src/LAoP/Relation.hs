@@ -34,19 +34,24 @@ module LAoP.Relation
     empty,
     one,
     junc,
+    (|||),
     split,
+    (===),
 
     -- * Auxiliary type families
-    FromNat,
-    Count,
-    Normalize,
+    I.FromNat,
+    I.Count,
+    I.Normalize,
 
     -- * Matrix construction and conversion
-    FromLists,
+    I.FromLists,
     fromLists,
+    fromF,
+    fromF',
+    toRel,
     toLists,
     toList,
-    matrixBuilder,
+    relationBuilder,
     zeros,
     ones,
     bang,
@@ -60,11 +65,34 @@ module LAoP.Relation
     img,
 
     -- * Taxonomy of binary relations
-    entire,
     injective,
-    surjective,
+    entire,
     simple,
-    bijective,
+    surjective,
+    representation,
+    function,
+    abstraction,
+    injection,
+    surjection,
+    bijection,
+
+    -- * Function division
+    divisionF,
+
+    -- * Relational pairing
+    splitR,
+    -- ** Projections
+    p1,
+    p2,
+    -- ** Bifunctor
+    (><),
+    -- * Relational coproduct
+    eitherR,
+    -- ** Injections
+    i1,
+    i2,
+    -- ** Bifunctor
+    (-|-),
 
     -- * (Endo-)Relational properties
     reflexive,
