@@ -39,12 +39,12 @@ module LAoP.Relation
     (===),
 
     -- * Auxiliary type families
-    I.FromNat,
-    I.Count,
-    I.Normalize,
+    FromNat,
+    Count,
+    Normalize,
 
     -- * Matrix construction and conversion
-    I.FromLists,
+    FromLists,
     fromLists,
     fromF,
     fromF',

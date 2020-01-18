@@ -7,6 +7,7 @@
 module Main where
 
 import LAoP.Matrix.Type
+import qualified LAoP.Relation as R
 import LAoP.Utils
 import LAoP.Dist
 import GHC.TypeLits
@@ -71,6 +72,72 @@ grass_wet = row [0,1] . kp1
 rainning :: Matrix Double (Bool, (Bool, Bool)) One
 rainning = row [0,1] . kp2 . kp2 
 
+-- Alcuin Puzzle
+
+data Being = Farmer | Fox | Goose | Beans
+  deriving (Bounded, Enum, Eq, Show, Generic)
+
+data Bank = LeftB | RightB
+  deriving (Bounded, Enum, Eq, Show, Generic)
+
+eats :: Being -> Being -> Bool
+eats Fox Goose   = True
+eats Goose Beans = True
+eats _ _         = False
+
+eatsR :: R.Relation Being Being
+eatsR = R.toRel eats
+
+cross :: Bank -> Bank
+cross LeftB = RightB
+cross RightB = LeftB
+
+crossR :: R.Relation Bank Bank
+crossR = R.fromF' cross
+
+-- | Initial state, everyone in the left bank
+locationLeft :: Being -> Bank
+locationLeft _ = LeftB
+
+locationLeftR :: R.Relation Being Bank
+locationLeftR = R.fromF' locationLeft
+
+-- | Initial state, everyone in the right bank
+locationRight :: Being -> Bank
+locationRight _ = RightB
+
+locationRightR :: R.Relation Being Bank
+locationRightR = R.fromF' locationRight
+
+-- Properties
+
+-- Being at the same bank
+sameBank :: R.Relation Being Bank -> R.Relation Being Being
+sameBank = R.ker 
+
+-- Risk of somebody eating somebody else
+canEat :: R.Relation Being Bank -> R.Relation Being Being
+canEat w = sameBank w `R.intersection` eatsR
+
+-- "Starvation" property.
+inv :: R.Relation Being Bank -> Bool
+inv w = (w `R.comp` canEat w) `R.sse` (w `R.comp` farmer)
+  where
+    farmer :: R.Relation Being Being
+    farmer = R.fromF' (const Farmer)
+
+-- Arbitrary state
+bankState :: Being -> Bank -> Bool
+bankState Farmer LeftB = True
+bankState Fox LeftB = True
+bankState Goose RightB = True
+bankState Beans RightB = True
+bankState _ _ = False
+
+bankStateR :: R.Relation Being Bank
+bankStateR = R.toRel bankState
+
+-- Main
 main :: IO ()
 main = do
     putStrLn "Monty Hall Problem solution:"
@@ -85,3 +152,5 @@ main = do
     prettyPrint (grass_wet . state)
     putStrLn "\n Probability of rain:"
     prettyPrint (rainning . state)
+    putStrLn "\n Is the arbitrary state a valid state? (Alcuin Puzzle)"
+    print (inv bankStateR)
