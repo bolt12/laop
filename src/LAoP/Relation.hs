@@ -61,6 +61,8 @@ module LAoP.Relation
     intersection,
     union,
     sse,
+    implies,
+    iff,
     ker,
     img,
 
@@ -93,6 +95,10 @@ module LAoP.Relation
     i2,
     -- ** Bifunctor
     (-|-),
+
+    -- * Relational "currying"
+    trans,
+    untrans,
 
     -- * (Endo-)Relational properties
     reflexive,

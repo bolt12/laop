@@ -70,6 +70,8 @@ module LAoP.Relation.Internal
     intersection,
     union,
     sse,
+    implies,
+    iff,
     ker,
     img,
 
@@ -102,6 +104,10 @@ module LAoP.Relation.Internal
     i2,
     -- ** Bifunctor
     (-|-),
+
+    -- * Relational "currying"
+    trans,
+    untrans,
 
     -- * (Endo-)Relational properties
     reflexive,
@@ -329,6 +335,14 @@ conv (R a) = R (I.tr a)
 -- | Relational inclusion (subset or equal)
 sse :: Relation a b -> Relation a b -> Bool
 sse a b = a <= b
+
+-- | Relational implication (the same as @'sse'@)
+implies :: Relation a b -> Relation a b -> Bool
+implies = sse
+
+-- | Relational bi-implication
+iff :: Relation a b -> Relation a b -> Bool
+iff r s = (r `implies` s) && (s `implies` r)
 
 -- | Relational intersection
 --
@@ -605,6 +619,45 @@ infixl 5 -|-
   => Relation a b -> Relation c d -> Relation (Either a c) (Either b d)
 (-|-) (R a) (R b) = R ((I.-|-) a b)
 
+-- Relational "Currying"
+
+-- | Relational 'trans'
+trans :: 
+      ( KnownNat (I.Count (I.Normalize (a, b))),
+        KnownNat (I.Count (I.Normalize a)),
+        KnownNat (I.Count (I.Normalize (c, b))),
+        KnownNat (I.Count (I.Normalize b)),
+        KnownNat (I.Count (I.Normalize c)),
+        I.FromLists Boolean (I.Normalize (c, b)) (I.FromNat (I.Count c)),
+        I.FromLists Boolean (I.Normalize (c, b)) (I.FromNat (I.Count b)),
+        I.FromLists Boolean (I.Normalize (a, b)) (I.FromNat (I.Count b)),
+        I.FromLists Boolean (I.Normalize (a, b)) (I.FromNat (I.Count a)),
+        I.Normalize (a, b) ~ I.Normalize (I.Normalize (a, b)),
+        I.Normalize (c, b) ~ I.Normalize (I.Normalize (c, b)),
+        I.Normalize (I.Normalize a, I.Normalize b) ~ I.FromNat (I.Count (I.Normalize (a, b))),
+        I.Normalize (I.Normalize c, I.Normalize b) ~ I.FromNat (I.Count (I.Normalize (c, b)))
+      )
+      => Relation (a, b) c -> Relation a (c, b)
+trans r = splitR r p2 `comp` conv p1
+
+-- | Relational 'untrans'
+untrans ::
+        ( KnownNat (I.Count (I.Normalize (a, b))),
+          KnownNat (I.Count (I.Normalize a)),
+          KnownNat (I.Count (I.Normalize (c, b))),
+          KnownNat (I.Count (I.Normalize b)),
+          KnownNat (I.Count (I.Normalize c)),
+          I.FromLists Boolean (I.Normalize (c, b)) (I.FromNat (I.Count c)),
+          I.FromLists Boolean (I.Normalize (c, b)) (I.FromNat (I.Count b)),
+          I.FromLists Boolean (I.Normalize (a, b)) (I.FromNat (I.Count b)),
+          I.FromLists Boolean (I.Normalize (a, b)) (I.FromNat (I.Count a)),
+          I.Normalize (a, b) ~ I.Normalize (I.Normalize (a, b)),
+          I.Normalize (c, b) ~ I.Normalize (I.Normalize (c, b)),
+          I.Normalize (I.Normalize a, I.Normalize b) ~ I.FromNat (I.Count (I.Normalize (a, b))),
+          I.Normalize (I.Normalize c, I.Normalize b) ~ I.FromNat (I.Count (I.Normalize (c, b)))
+        )
+         => Relation a (c, b) -> Relation (a, b) c
+untrans s = p1 `comp` conv (splitR (conv s) p2)
 
 -- Relation pretty print
 
