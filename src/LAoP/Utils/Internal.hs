@@ -78,7 +78,7 @@ module LAoP.Utils.Internal
     -- @
     --
     -- * 'Natural' data type
-    Natural,
+    Natural(..),
     nat,
 
     -- * Coerce auxiliar functions to help promote 'Int' typed functions to

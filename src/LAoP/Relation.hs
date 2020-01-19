@@ -51,10 +51,13 @@ module LAoP.Relation
     toRel,
     toLists,
     toList,
+    toBool,
+    pt,
     relationBuilder,
     zeros,
     ones,
     bang,
+    point,
 
     -- * Relational operations
     conv,
@@ -122,6 +125,9 @@ module LAoP.Relation
     comp,
     fromF,
     fromF',
+
+    -- ** Relational application
+    pointAp,
 
     -- * Matrix printing
     pretty,

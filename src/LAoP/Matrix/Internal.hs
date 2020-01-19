@@ -137,13 +137,14 @@ module LAoP.Matrix.Internal
     fromFRel,
     fromFRel',
     toRel,
+    negateM,
     orM,
     andM,
     subM
   )
     where
 
-import LAoP.Utils
+import LAoP.Utils.Internal
 import Data.Bool
 import Data.Kind
 import Data.List
@@ -796,6 +797,14 @@ toBool n
 fromBool :: Bool -> Natural 0 1
 fromBool True  = nat 1
 fromBool False = nat 0
+
+-- | Relational negation
+negateM :: Matrix (Natural 0 1) cols rows -> Matrix (Natural 0 1) cols rows
+negateM Empty         = Empty
+negateM (One (Nat 0)) = One (Nat 1)
+negateM (One (Nat 1)) = One (Nat 0)
+negateM (Junc a b)    = Junc (negateM a) (negateM b)
+negateM (Split a b)   = Split (negateM a) (negateM b)
 
 -- | Relational addition
 orM :: Matrix (Natural 0 1) cols rows -> Matrix (Natural 0 1) cols rows -> Matrix (Natural 0 1) cols rows

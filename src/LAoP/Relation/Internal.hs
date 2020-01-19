@@ -27,7 +27,7 @@
 
 module LAoP.Relation.Internal
   ( -- | This definition makes use of the fact that 'Void' is
-    -- isomorphic to 0 and '()' to 1 and captures matrix
+    -- isomorphic to 0 and 'One' to 1 and captures matrix
     -- dimensions as stacks of 'Either's.
     --
     -- There exists two type families that make it easier to write
@@ -60,10 +60,13 @@ module LAoP.Relation.Internal
     toRel,
     toLists,
     toList,
+    toBool,
+    pt,
     relationBuilder,
     zeros,
     ones,
     bang,
+    point,
 
     -- * Relational operations
     conv,
@@ -132,6 +135,9 @@ module LAoP.Relation.Internal
     fromF,
     fromF',
 
+    -- ** Relational application
+    pointAp,
+
     -- * Matrix printing
     pretty,
     prettyPrint
@@ -140,7 +146,7 @@ module LAoP.Relation.Internal
 
 import Data.Void
 import qualified LAoP.Matrix.Internal as I
-import LAoP.Utils
+import LAoP.Utils.Internal
 import Control.DeepSeq
 import qualified Control.Category as C
 import Data.Bool
@@ -173,6 +179,8 @@ instance Num (Relation a b) where
 
     -- | Matrix multiplication becomes Boolean matrix conjunction
     (R a) * (R b) = R (I.andM a b)
+
+    negate (R a) = R (I.negateM a) 
 
 -- Type alias
 type Zero = Void
@@ -289,6 +297,30 @@ toLists (R m) = I.toLists m
 toList :: Relation a b -> [Boolean]
 toList (R m) = I.toList m
 
+-- | Converts a well typed @'Relation'@ to @'Bool'@.
+toBool :: Relation One One -> Bool
+toBool r = case toList r of
+  [Nat 0] -> False
+  _       -> True
+
+-- | Power transpose
+pt :: 
+   ( Bounded a,
+     Bounded b,
+     Enum a,
+     Enum b,
+     Eq a,
+     Eq b,
+     KnownNat (I.Count (I.Normalize a)),
+     KnownNat (I.Count (I.Normalize b)),
+     I.FromLists Boolean (I.Normalize a) One,
+     I.FromLists Boolean (I.Normalize b) One
+   )
+   => Relation a b -> (a -> [b])
+pt r a =
+  let lb = [minBound .. maxBound]
+   in [ b | b <- lb, toBool (pointAp a b r) ]
+
 -- Zeros Matrix
 
 -- | The zero matrix. A matrix wholly filled with zeros.
@@ -311,10 +343,19 @@ ones = relationBuilder (const (nat 1))
 
 -- | The T (Top) row vector matrix.
 bang ::
-  forall a.
-  (I.FromLists Boolean (I.Normalize a) (), KnownNat (I.Count (I.Normalize a))) =>
+  (I.FromLists Boolean (I.Normalize a) One, KnownNat (I.Count (I.Normalize a))) =>
   Relation a One
 bang = ones
+
+-- | Point constant relation
+point :: 
+      ( Bounded a,
+        Enum a,
+        Eq a,
+        KnownNat (I.Count (I.Normalize a)),
+        I.FromLists Boolean (I.Normalize a) One
+      ) => a -> Relation One a
+point a = fromF' (const a)
 
 -- Identity Matrix
 
@@ -325,8 +366,23 @@ identity ::
 identity = relationBuilder (bool (nat 0) (nat 1) . uncurry (==))
 
 -- | Relational composition
-comp :: forall a b c . Relation b c -> Relation a b -> Relation a c
+comp :: Relation b c -> Relation a b -> Relation a c
 comp (R a) (R b) = R (I.compRel a b)
+
+-- | Relational application
+pointAp ::
+        ( Bounded a,
+          Bounded b,
+          Enum a,
+          Enum b,
+          Eq a,
+          Eq b,
+          KnownNat (I.Count (I.Normalize a)),
+          KnownNat (I.Count (I.Normalize b)),
+          I.FromLists Boolean (I.Normalize a) One,
+          I.FromLists Boolean (I.Normalize b) One
+        ) => a -> b -> Relation a b -> Relation One One
+pointAp a b r = conv (point b) `comp` r `comp` point a
 
 -- | Relational converse
 conv :: Relation a b -> Relation b a
@@ -337,12 +393,12 @@ sse :: Relation a b -> Relation a b -> Bool
 sse a b = a <= b
 
 -- | Relational implication (the same as @'sse'@)
-implies :: Relation a b -> Relation a b -> Bool
-implies = sse
+implies :: Relation a b -> Relation a b -> Relation a b
+implies r s = negate r `union` s
 
 -- | Relational bi-implication
 iff :: Relation a b -> Relation a b -> Bool
-iff r s = (r `implies` s) && (s `implies` r)
+iff r s = r == s
 
 -- | Relational intersection
 --
