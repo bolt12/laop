@@ -134,6 +134,9 @@ module LAoP.Matrix.Internal
     toBool,
     fromBool,
     compRel,
+    divR,
+    divL,
+    divS,
     fromFRel,
     fromFRel',
     toRel,
@@ -787,6 +790,9 @@ prettyPrint = putStrLn . pretty
 
 -- Relational operators functions
 
+type Boolean = Natural 0 1
+type Relation a b = Matrix Boolean a b
+
 -- | Helper conversion function
 toBool :: (Num e, Eq e) => e -> Bool
 toBool n
@@ -799,7 +805,7 @@ fromBool True  = nat 1
 fromBool False = nat 0
 
 -- | Relational negation
-negateM :: Matrix (Natural 0 1) cols rows -> Matrix (Natural 0 1) cols rows
+negateM :: Relation cols rows -> Relation cols rows
 negateM Empty         = Empty
 negateM (One (Nat 0)) = One (Nat 1)
 negateM (One (Nat 1)) = One (Nat 0)
@@ -807,7 +813,7 @@ negateM (Junc a b)    = Junc (negateM a) (negateM b)
 negateM (Split a b)   = Split (negateM a) (negateM b)
 
 -- | Relational addition
-orM :: Matrix (Natural 0 1) cols rows -> Matrix (Natural 0 1) cols rows -> Matrix (Natural 0 1) cols rows
+orM :: Relation cols rows -> Relation cols rows -> Relation cols rows
 orM Empty Empty                = Empty
 orM (One a) (One b)            = One (fromBool (toBool a || toBool b))
 orM (Junc a b) (Junc c d)      = Junc (orM a c) (orM b d)
@@ -816,7 +822,7 @@ orM x@(Split _ _) y@(Junc _ _) = orM x (abideJS y)
 orM x@(Junc _ _) y@(Split _ _) = orM (abideJS x) y
 
 -- | Relational multiplication
-andM :: Matrix (Natural 0 1) cols rows -> Matrix (Natural 0 1) cols rows -> Matrix (Natural 0 1) cols rows
+andM :: Relation cols rows -> Relation cols rows -> Relation cols rows
 andM Empty Empty                = Empty
 andM (One a) (One b)            = One (fromBool (toBool a && toBool b))
 andM (Junc a b) (Junc c d)      = Junc (andM a c) (andM b d)
@@ -825,7 +831,7 @@ andM x@(Split _ _) y@(Junc _ _) = andM x (abideJS y)
 andM x@(Junc _ _) y@(Split _ _) = andM (abideJS x) y
 
 -- | Relational subtraction
-subM :: Matrix (Natural 0 1) cols rows -> Matrix (Natural 0 1) cols rows -> Matrix (Natural 0 1) cols rows
+subM :: Relation cols rows -> Relation cols rows -> Relation cols rows
 subM Empty Empty                = Empty
 subM (One a) (One b)            = if a - b < nat 0 then One (nat 0) else One (a - b)
 subM (Junc a b) (Junc c d)      = Junc (subM a c) (subM b d)
@@ -834,12 +840,30 @@ subM x@(Split _ _) y@(Junc _ _) = subM x (abideJS y)
 subM x@(Junc _ _) y@(Split _ _) = subM (abideJS x) y
 
 -- | Matrix relational composition.
-compRel :: Matrix (Natural 0 1) cr rows -> Matrix (Natural 0 1) cols cr -> Matrix (Natural 0 1) cols rows
+compRel :: Relation cr rows -> Relation cols cr -> Relation cols rows
 compRel Empty Empty            = Empty
 compRel (One a) (One b)        = One (fromBool (toBool a && toBool b))
-compRel (Junc a b) (Split c d) = orM (compRel a c) (compRel b d)         -- Divide-and-conquer law
+compRel (Junc a b) (Split c d) = orM (compRel a c) (compRel b d)   -- Divide-and-conquer law
 compRel (Split a b) c          = Split (compRel a c) (compRel b c) -- Split fusion law
 compRel c (Junc a b)           = Junc (compRel c a) (compRel c b)  -- Junc fusion law
+
+-- | Matrix relational right division
+divR :: Relation b c -> Relation b a -> Relation a c
+divR Empty Empty           = Empty
+divR (One a) (One b)       = One (fromBool (not (toBool b) || toBool a)) -- b implies a
+divR (Junc a b) (Junc c d) = andM (divR a c) (divR b d)
+divR (Split a b) c         = Split (divR a c) (divR b c)
+divR c (Split a b)         = Junc (divR c a) (divR c b)
+
+-- | Matrix relational left division
+divL :: Relation c b -> Relation a b -> Relation a c
+divL x y = tr (divR (tr y) (tr x))
+
+-- | Matrix relational symmetric division
+divS :: Relation c a -> Relation b a -> Relation c b
+divS s r = divL r s `intersection` divR (tr r) (tr s)
+  where
+    intersection = andM
 
 -- | Lifts functions to relations with arbitrary dimensions.
 --
@@ -857,7 +881,7 @@ fromFRel ::
     FromLists (Natural 0 1) rows cols
   ) =>
   (a -> b) ->
-  Matrix (Natural 0 1) cols rows
+  Relation cols rows
 fromFRel f =
   let minA         = minBound @a
       maxA         = maxBound @a
@@ -891,7 +915,7 @@ fromFRel' ::
     FromLists (Natural 0 1) (Normalize b) (Normalize a)
   ) =>
   (a -> b) ->
-  Matrix (Natural 0 1) (Normalize a) (Normalize b)
+  Relation (Normalize a) (Normalize b)
 fromFRel' f =
   let minA         = minBound @a
       maxA         = maxBound @a
@@ -923,7 +947,7 @@ toRel ::
         KnownNat (Count (Normalize b)),
         FromLists (Natural 0 1) (Normalize b) (Normalize a)
       ) 
-      => (a -> b -> Bool) -> Matrix (Natural 0 1) (Normalize a) (Normalize b)
+      => (a -> b -> Bool) -> Relation (Normalize a) (Normalize b)
 toRel f =
   let minA         = minBound @a
       maxA         = maxBound @a

@@ -93,8 +93,14 @@ module LAoP.Relation.Internal
     -- * Function division
     divisionF,
 
+    -- * Relation division
+    divR,
+    divL,
+    divS,
+
     -- * Relational pairing
     splitR,
+
     -- ** Projections
     p1,
     p2,
@@ -355,7 +361,7 @@ point ::
         KnownNat (I.Count (I.Normalize a)),
         I.FromLists Boolean (I.Normalize a) One
       ) => a -> Relation One a
-point a = fromF' (const a)
+point = fromF' . const
 
 -- Identity Matrix
 
@@ -368,6 +374,18 @@ identity = relationBuilder (bool (nat 0) (nat 1) . uncurry (==))
 -- | Relational composition
 comp :: Relation b c -> Relation a b -> Relation a c
 comp (R a) (R b) = R (I.compRel a b)
+
+-- | Relational right division
+divR :: Relation b c -> Relation b a -> Relation a c
+divR (R x) (R y) = R (I.divR x y)
+
+-- | Relational left division
+divL :: Relation c b -> Relation a b -> Relation a c
+divL (R x) (R y) = R (I.divL x y)
+
+-- | Relational symmetric division
+divS :: Relation c a -> Relation b a -> Relation c b
+divS (R x) (R y) = R (I.divS x y)
 
 -- | Relational application
 pointAp ::
