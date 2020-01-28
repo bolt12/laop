@@ -89,6 +89,8 @@ module LAoP.Relation.Internal
     injection,
     surjection,
     bijection,
+    domain,
+    range,
 
     -- * Function division
     divisionF,
@@ -133,6 +135,7 @@ module LAoP.Relation.Internal
     linearOrder,
     equivalence,
     partialEquivalence,
+    difunctional,
 
     -- * Conditionals
     equalizer,
@@ -606,25 +609,30 @@ irreflexive r = (r `intersection` identity) == zeros
 connected :: (KnownNat (I.Count (I.Normalize a)), I.FromLists Boolean (I.Normalize a) (I.Normalize a)) => Relation a a -> Bool
 connected r = (r `union` conv r) == ones
 
--- | A 'Relation @r@ is a preorder iff @'reflexive' r && 'transitive' r@
+-- | A 'Relation' @r@ is a preorder iff @'reflexive' r && 'transitive' r@
 preorder :: (KnownNat (I.Count (I.Normalize a)), I.FromLists Boolean (I.Normalize a) (I.Normalize a)) => Relation a a -> Bool
 preorder r = reflexive r && transitive r
 
--- | A 'Relation @r@ is a partial order iff @'antiSymmetric' r && 'preorder' r@
+-- | A 'Relation' @r@ is a partial order iff @'antiSymmetric' r && 'preorder' r@
 partialOrder :: (KnownNat (I.Count (I.Normalize a)), I.FromLists Boolean (I.Normalize a) (I.Normalize a)) => Relation a a -> Bool
 partialOrder r = antiSymmetric r && preorder r
 
--- | A 'Relation @r@ is a linear order iff @'connected' r && 'partialOrder' r@
+-- | A 'Relation' @r@ is a linear order iff @'connected' r && 'partialOrder' r@
 linearOrder :: (KnownNat (I.Count (I.Normalize a)), I.FromLists Boolean (I.Normalize a) (I.Normalize a)) => Relation a a -> Bool
 linearOrder r = connected r && partialOrder r
 
--- | A 'Relation @r@ is an equivalence iff @'symmetric' r && 'preorder' r@
+-- | A 'Relation' @r@ is an equivalence iff @'symmetric' r && 'preorder' r@
 equivalence :: (KnownNat (I.Count (I.Normalize a)), I.FromLists Boolean (I.Normalize a) (I.Normalize a)) => Relation a a -> Bool
 equivalence r = symmetric r && preorder r
 
--- | A 'Relation @r@ is a partial equivalence iff @'partialOrder' r && 'equivalence' r@
+-- | A 'Relation' @r@ is a partial equivalence iff @'partialOrder' r && 'equivalence' r@
 partialEquivalence :: (KnownNat (I.Count (I.Normalize a)), I.FromLists Boolean (I.Normalize a) (I.Normalize a)) => Relation a a -> Bool
 partialEquivalence r = partialOrder r && equivalence r
+
+-- | A 'Relation' @r@ is 'difunctional' or regular wherever @r `comp`
+-- 'conv' r `comp` r == r@
+difunctional :: Relation a b -> Bool
+difunctional r = r `comp` conv r `comp` r == r
 
 -- Relational pairing
 
@@ -827,6 +835,20 @@ cond ::
      ) 
      => (b -> Bool) -> Relation b c -> Relation b c -> Relation b c
 cond p r s = eitherR r s `comp` guard p
+
+-- | Relational domain.
+domain :: 
+       ( KnownNat (I.Count (I.Normalize a)),
+         I.FromLists Boolean (I.Normalize a) (I.Normalize a)
+       ) => Relation a b -> Relation a a
+domain r = ker r `intersection` identity
+
+-- | Relational range.
+range :: 
+      ( I.FromLists Boolean (I.Normalize b) (I.Normalize b),
+        KnownNat (I.Count (I.Normalize b))
+      ) => Relation a b -> Relation b b
+range r = img r `intersection` identity
 
 -- Relation pretty print
 
