@@ -97,6 +97,8 @@ module LAoP.Relation.Internal
     divR,
     divL,
     divS,
+    shrunkBy,
+    overriddenBy,
 
     -- * Relational pairing
     splitR,
@@ -132,8 +134,13 @@ module LAoP.Relation.Internal
     equivalence,
     partialEquivalence,
 
+    -- * Conditionals
+    equalizer,
+
     -- ** McCarthy's Conditional
-    -- cond,
+    predR,
+    guard,
+    cond,
 
     -- * Relational composition and lifting
     identity,
@@ -143,6 +150,7 @@ module LAoP.Relation.Internal
 
     -- ** Relational application
     pointAp,
+    pointApBool,
 
     -- * Matrix printing
     pretty,
@@ -387,6 +395,30 @@ divL (R x) (R y) = R (I.divL x y)
 divS :: Relation c a -> Relation b a -> Relation c b
 divS (R x) (R y) = R (I.divS x y)
 
+-- | Relational shrinking.
+--
+-- @r `'shrunkBy'` s@ is the largest part of @r@ such that,
+-- if it yields an output for an input @x@, it must be a maximum,
+-- with respect to @s@, among all possible outputs of @x@ by @r@.
+shrunkBy :: Relation b a -> Relation a a -> Relation b a
+shrunkBy r s = r `intersection` divR s (conv r)
+
+-- | Relational overriding.
+--
+-- @r `'overriddenBy'` s@ yields the relation which contains the
+-- whole of @s@ and that part of @r@ where @s@ is undefined.
+--
+-- @
+-- 'zeros' `'overriddenBy'` s == s
+-- r `'overriddenBy'` 'zeros' == r
+-- r `'overriddenBy'` r       == r
+-- @
+overriddenBy :: 
+             ( I.FromLists Boolean (I.Normalize b) (I.Normalize b),
+               KnownNat (I.Count (I.Normalize b))
+             ) => Relation a b -> Relation a b -> Relation a b
+overriddenBy r s = s `union` r `intersection` divR zeros (conv s)
+
 -- | Relational application
 pointAp ::
         ( Bounded a,
@@ -401,6 +433,21 @@ pointAp ::
           I.FromLists Boolean (I.Normalize b) One
         ) => a -> b -> Relation a b -> Relation One One
 pointAp a b r = conv (point b) `comp` r `comp` point a
+
+-- | Relational application
+pointApBool ::
+        ( Bounded a,
+          Bounded b,
+          Enum a,
+          Enum b,
+          Eq a,
+          Eq b,
+          KnownNat (I.Count (I.Normalize a)),
+          KnownNat (I.Count (I.Normalize b)),
+          I.FromLists Boolean (I.Normalize a) One,
+          I.FromLists Boolean (I.Normalize b) One
+        ) => a -> b -> Relation a b -> Bool
+pointApBool a b r = toBool $ conv (point b) `comp` r `comp` point a
 
 -- | Relational converse
 conv :: Relation a b -> Relation b a
@@ -732,6 +779,54 @@ untrans ::
         )
          => Relation a (c, b) -> Relation (a, b) c
 untrans s = p1 `comp` conv (splitR (conv s) p2)
+
+-- | Transforms predicate @p@ into a correflexive relation.
+predR :: 
+      ( Bounded a,
+        Enum a,
+        KnownNat (I.Count (I.Normalize a)),
+        I.FromLists Boolean (I.Normalize a) (I.Normalize a),
+        I.FromLists Boolean (I.Normalize Bool) (I.Normalize a)
+      )
+      => (a -> Bool) -> Relation a a
+predR p = identity `intersection` divisionF (fromF' (const True)) (fromF' p)
+
+-- | Equalizes functions @f@ and @g@. 
+-- That is, @'equalizer' f g@ is the largest coreflexive
+-- that restricts @g@ so that @f@ and @g@ yield the same outputs.
+equalizer ::
+          ( KnownNat (I.Count (I.Normalize a)),
+            I.FromLists Boolean (I.Normalize a) (I.Normalize a)
+          )
+          => Relation a b -> Relation a b -> Relation a a
+equalizer f g = identity `intersection` divisionF f g
+
+-- | Relational conditional guard.
+--
+-- @
+-- 'guard' p = 'i2' `'overriddenBy'` 'i1' `'comp'` 'predR' p
+-- @
+guard :: 
+     ( Bounded b,
+       Enum b,
+       KnownNat (I.Count (I.Normalize b)),
+       I.FromLists Boolean (I.Normalize b) (I.Normalize b),
+       I.FromLists Boolean (I.Normalize Bool) (I.Normalize b),
+       I.Normalize (Either b b) ~ Either (I.Normalize b) (I.Normalize b)
+     ) => (b -> Bool) -> Relation b (Either b b)
+guard p = conv (eitherR (predR p) (predR (not . p)))
+
+-- | Relational McCarthy's conditional.
+cond :: 
+     ( Bounded b,
+       Enum b,
+       KnownNat (I.Count (I.Normalize b)),
+       I.FromLists Boolean (I.Normalize b) (I.Normalize b),
+       I.FromLists Boolean (I.Normalize Bool) (I.Normalize b),
+       I.Normalize (Either b b) ~ Either (I.Normalize b) (I.Normalize b)
+     ) 
+     => (b -> Bool) -> Relation b c -> Relation b c -> Relation b c
+cond p r s = eitherR r s `comp` guard p
 
 -- Relation pretty print
 

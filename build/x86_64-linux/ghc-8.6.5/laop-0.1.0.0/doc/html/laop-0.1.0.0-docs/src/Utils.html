@@ -1,0 +1,101 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-comment">-----------------------------------------------------------------------------</span><span>
+</span><a name="line-2"></a><span class="hs-comment">-- |</span><span>
+</span><a name="line-3"></a><span class="hs-comment">-- Module     : Utils</span><span>
+</span><a name="line-4"></a><span class="hs-comment">-- Copyright  : (c) Armando Santos 2019-2020</span><span>
+</span><a name="line-5"></a><span class="hs-comment">-- Maintainer : armandoifsantos@gmail.com</span><span>
+</span><a name="line-6"></a><span class="hs-comment">-- Stability  : experimental</span><span>
+</span><a name="line-7"></a><span class="hs-comment">--</span><span>
+</span><a name="line-8"></a><span class="hs-comment">-- __LAoP__ is a library for algebraic (inductive) construction and manipulation of matrices</span><span>
+</span><a name="line-9"></a><span class="hs-comment">-- in Haskell. See &lt;https://github.com/bolt12/master-thesis my Msc Thesis&gt; for the</span><span>
+</span><a name="line-10"></a><span class="hs-comment">-- motivation behind the library, the underlying theory, and implementation details.</span><span>
+</span><a name="line-11"></a><span class="hs-comment">--</span><span>
+</span><a name="line-12"></a><span class="hs-comment">-- This module provides the 'Natural' data type.</span><span>
+</span><a name="line-13"></a><span class="hs-comment">-- The semantic associated with this data type is that</span><span>
+</span><a name="line-14"></a><span class="hs-comment">-- it's meant to be a restricted 'Int' value.</span><span>
+</span><a name="line-15"></a><span class="hs-comment">--</span><span>
+</span><a name="line-16"></a><span class="hs-comment">-----------------------------------------------------------------------------</span><span>
+</span><a name="line-17"></a><span>
+</span><a name="line-18"></a><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Utils</span><span>
+</span><a name="line-19"></a><span>  </span><span class="hs-special">(</span><span> </span><span class="hs-comment">-- | Utility module that provides the 'Natural' data type.</span><span>
+</span><a name="line-20"></a><span>    </span><span class="hs-comment">-- The semantic associated with this data type is that</span><span>
+</span><a name="line-21"></a><span>    </span><span class="hs-comment">-- it's meant to be a restricted 'Int' value. For example</span><span>
+</span><a name="line-22"></a><span>    </span><span class="hs-comment">-- the type @Natural 1 6@ can only be instanciated with @nat n@</span><span>
+</span><a name="line-23"></a><span>    </span><span class="hs-comment">-- where @1 &lt;= n &lt;= 6@. Why, You might ask, because with normal</span><span>
+</span><a name="line-24"></a><span>    </span><span class="hs-comment">-- 'Int's it is not possible to have a decent @Enum (Int, Int)@</span><span>
+</span><a name="line-25"></a><span>    </span><span class="hs-comment">-- instance. See the following probabilistic programming model as and</span><span>
+</span><a name="line-26"></a><span>    </span><span class="hs-comment">-- example:</span><span>
+</span><a name="line-27"></a><span>    </span><span class="hs-comment">--</span><span>
+</span><a name="line-28"></a><span>    </span><span class="hs-comment">-- We want to calculate the probability of the sum of two dice throws.</span><span>
+</span><a name="line-29"></a><span>    </span><span class="hs-comment">-- To do this we start by defining the sample space: </span><span>
+</span><a name="line-30"></a><span>    </span><span class="hs-comment">--</span><span>
+</span><a name="line-31"></a><span>    </span><span class="hs-comment">-- @</span><span>
+</span><a name="line-32"></a><span>    </span><span class="hs-comment">-- type SampleSpace = Int -- We think 'Int' are enough</span><span>
+</span><a name="line-33"></a><span>    </span><span class="hs-comment">--</span><span>
+</span><a name="line-34"></a><span>    </span><span class="hs-comment">-- die :: Dist Int 6</span><span>
+</span><a name="line-35"></a><span>    </span><span class="hs-comment">-- die = unifrom [1..6] </span><span>
+</span><a name="line-36"></a><span>    </span><span class="hs-comment">--</span><span>
+</span><a name="line-37"></a><span>    </span><span class="hs-comment">-- -- Promote 'Int' addition to a matrix</span><span>
+</span><a name="line-38"></a><span>    </span><span class="hs-comment">-- addM = fromF (uncurry (+)) -- Impossible</span><span>
+</span><a name="line-39"></a><span>    </span><span class="hs-comment">-- @</span><span>
+</span><a name="line-40"></a><span>    </span><span class="hs-comment">--</span><span>
+</span><a name="line-41"></a><span>    </span><span class="hs-comment">-- The last line is impossible because @(Int, Int)@ does not have</span><span>
+</span><a name="line-42"></a><span>    </span><span class="hs-comment">-- a good 'Enum' instance: @[(0, 1), (0, 2), .. (0, maxBound), (1, 0),</span><span>
+</span><a name="line-43"></a><span>    </span><span class="hs-comment">-- ..]@. And we'd like the addition matrix to be of 36 columns by 12</span><span>
+</span><a name="line-44"></a><span>    </span><span class="hs-comment">-- rows but limited to integers up to @6@!</span><span>
+</span><a name="line-45"></a><span>    </span><span class="hs-comment">--</span><span>
+</span><a name="line-46"></a><span>    </span><span class="hs-comment">-- One way to solve this issue is by defining and auxilary data type to</span><span>
+</span><a name="line-47"></a><span>    </span><span class="hs-comment">-- represent the sample space:</span><span>
+</span><a name="line-48"></a><span>    </span><span class="hs-comment">--</span><span>
+</span><a name="line-49"></a><span>    </span><span class="hs-comment">-- @</span><span>
+</span><a name="line-50"></a><span>    </span><span class="hs-comment">-- data SampleSpace = S1 | S2 | S3 | S4 | S5 | S6</span><span>
+</span><a name="line-51"></a><span>    </span><span class="hs-comment">--   deriving (Show, Eq, Enum, Bounded) -- Enum and Bounded are</span><span>
+</span><a name="line-52"></a><span>    </span><span class="hs-comment">--   important</span><span>
+</span><a name="line-53"></a><span>    </span><span class="hs-comment">-- @</span><span>
+</span><a name="line-54"></a><span>    </span><span class="hs-comment">--</span><span>
+</span><a name="line-55"></a><span>    </span><span class="hs-comment">-- And write the sample space addition function:</span><span>
+</span><a name="line-56"></a><span>    </span><span class="hs-comment">--</span><span>
+</span><a name="line-57"></a><span>    </span><span class="hs-comment">-- @</span><span>
+</span><a name="line-58"></a><span>    </span><span class="hs-comment">-- ssAdd :: SampleSpace -&gt; SampleSpace -&gt; Int</span><span>
+</span><a name="line-59"></a><span>    </span><span class="hs-comment">-- ssAdd a b = (fromEnum a + 1) + (fromEnum b + 1)</span><span>
+</span><a name="line-60"></a><span>    </span><span class="hs-comment">-- @</span><span>
+</span><a name="line-61"></a><span>    </span><span class="hs-comment">--</span><span>
+</span><a name="line-62"></a><span>    </span><span class="hs-comment">-- And then promote that function to matrix and everything is alright:</span><span>
+</span><a name="line-63"></a><span>    </span><span class="hs-comment">--</span><span>
+</span><a name="line-64"></a><span>    </span><span class="hs-comment">-- @</span><span>
+</span><a name="line-65"></a><span>    </span><span class="hs-comment">-- ssAddM = fromF' (uncurry ssAdd)</span><span>
+</span><a name="line-66"></a><span>    </span><span class="hs-comment">--</span><span>
+</span><a name="line-67"></a><span>    </span><span class="hs-comment">-- dieSumProb = ssAddM `comp` (khatri die die)</span><span>
+</span><a name="line-68"></a><span>    </span><span class="hs-comment">-- @</span><span>
+</span><a name="line-69"></a><span>    </span><span class="hs-comment">--</span><span>
+</span><a name="line-70"></a><span>    </span><span class="hs-comment">-- This is a nice solution for small sample spaces. But for larger ones </span><span>
+</span><a name="line-71"></a><span>    </span><span class="hs-comment">-- it is not feasible to write a data type with hundreds of constructors</span><span>
+</span><a name="line-72"></a><span>    </span><span class="hs-comment">-- and then write manipulation functions that need to deal with them.</span><span>
+</span><a name="line-73"></a><span>    </span><span class="hs-comment">-- To mitigate this limitation the 'Natural' type comes a long way and</span><span>
+</span><a name="line-74"></a><span>    </span><span class="hs-comment">-- allows one to model the sample in an easier way. See for instance:</span><span>
+</span><a name="line-75"></a><span>    </span><span class="hs-comment">--</span><span>
+</span><a name="line-76"></a><span>    </span><span class="hs-comment">-- @</span><span>
+</span><a name="line-77"></a><span>    </span><span class="hs-comment">-- ssAdd :: Natural 1 6 -&gt; Natural 1 6 -&gt; Natural 1 12</span><span>
+</span><a name="line-78"></a><span>    </span><span class="hs-comment">-- ssAdd = coerceNat (+) </span><span>
+</span><a name="line-79"></a><span>    </span><span class="hs-comment">-- </span><span>
+</span><a name="line-80"></a><span>    </span><span class="hs-comment">-- ssAddM = fromF' (uncurry sumSS)</span><span>
+</span><a name="line-81"></a><span>    </span><span class="hs-comment">-- </span><span>
+</span><a name="line-82"></a><span>    </span><span class="hs-comment">-- die :: Dist (Natural 1 6) 6</span><span>
+</span><a name="line-83"></a><span>    </span><span class="hs-comment">-- die = uniform [nat @1 @6 1 .. nat 6]</span><span>
+</span><a name="line-84"></a><span>    </span><span class="hs-comment">--</span><span>
+</span><a name="line-85"></a><span>    </span><span class="hs-comment">-- dieSumProb = ssAddM `comp` (khatri die die)</span><span>
+</span><a name="line-86"></a><span>    </span><span class="hs-comment">-- @</span><span>
+</span><a name="line-87"></a><span>    </span><span class="hs-comment">--</span><span>
+</span><a name="line-88"></a><span>    </span><span class="hs-comment">-- * 'Natural' data type</span><span>
+</span><a name="line-89"></a><span>    </span><a href="Utils.Internal.html#Natural"><span class="hs-identifier hs-type">Natural</span></a><span class="hs-special">,</span><span>
+</span><a name="line-90"></a><span>    </span><a href="Utils.Internal.html#nat"><span class="hs-identifier hs-var">nat</span></a><span class="hs-special">,</span><span>
+</span><a name="line-91"></a><span>
+</span><a name="line-92"></a><span>    </span><span class="hs-comment">-- * Coerce auxiliar functions to help promote 'Int' typed functions to</span><span>
+</span><a name="line-93"></a><span>    </span><span class="hs-comment">-- 'Natural' typed functions.</span><span>
+</span><a name="line-94"></a><span>    </span><a href="Utils.Internal.html#coerceNat"><span class="hs-identifier hs-var">coerceNat</span></a><span class="hs-special">,</span><span>
+</span><a name="line-95"></a><span>    </span><a href="Utils.Internal.html#coerceNat2"><span class="hs-identifier hs-var">coerceNat2</span></a><span class="hs-special">,</span><span>
+</span><a name="line-96"></a><span>    </span><a href="Utils.Internal.html#coerceNat3"><span class="hs-identifier hs-var">coerceNat3</span></a><span class="hs-special">,</span><span>
+</span><a name="line-97"></a><span>  </span><span class="hs-special">)</span><span>
+</span><a name="line-98"></a><span class="hs-keyword">where</span><span>
+</span><a name="line-99"></a><span>
+</span><a name="line-100"></a><span class="hs-keyword">import</span><span> </span><a href="Utils.Internal.html"><span class="hs-identifier">Utils.Internal</span></a><span>
+</span><a name="line-101"></a></pre></body></html>
