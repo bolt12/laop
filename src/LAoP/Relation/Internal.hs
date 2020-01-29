@@ -62,6 +62,7 @@ module LAoP.Relation.Internal
     toList,
     toBool,
     pt,
+    belongs,
     relationBuilder,
     zeros,
     ones,
@@ -197,6 +198,7 @@ instance Num (Relation a b) where
     -- | Matrix multiplication becomes Boolean matrix conjunction
     (R a) * (R b) = R (I.andM a b)
 
+    -- | Matrix negation becomes Boolean matrix negation
     negate (R a) = R (I.negateM a) 
 
 -- Type alias
@@ -222,6 +224,8 @@ junc (R a) (R b) = R (I.Junc a b)
 
 infixl 3 |||
 -- | Boolean Matrix 'Junc' constructor
+--
+-- See 'eitherR'.
 (|||) ::
   (I.Normalize (Either a b) ~ Either (I.Normalize a) (I.Normalize b)) =>
   Relation a c ->
@@ -304,6 +308,22 @@ toRel ::
  => (a -> b -> Bool) -> Relation a b
 toRel = R . I.toRel
 
+-- | Lowers a 'Relation' to a function
+fromRel ::
+        ( Bounded a,
+          Bounded b,
+          Enum a,
+          Enum b,
+          Eq a,
+          Eq b,
+          KnownNat (I.Count (I.Normalize a)),
+          KnownNat (I.Count (I.Normalize b)),
+          I.FromLists Boolean (I.Normalize a) One,
+          I.FromLists Boolean (I.Normalize b) One
+        )
+        => Relation a b -> (a -> b -> Bool)
+fromRel r a b = pointApBool a b r
+
 -- Conversion
 
 -- | Converts a matrix to a list of lists of elements.
@@ -314,13 +334,15 @@ toLists (R m) = I.toLists m
 toList :: Relation a b -> [Boolean]
 toList (R m) = I.toList m
 
--- | Converts a well typed @'Relation'@ to @'Bool'@.
+-- | Converts a well typed 'Relation' to 'Bool'.
 toBool :: Relation One One -> Bool
 toBool r = case toList r of
   [Nat 0] -> False
   _       -> True
 
--- | Power transpose
+-- | Power transpose.
+--
+--  Maps a relation to a set valued function.
 pt :: 
    ( Bounded a,
      Bounded b,
@@ -333,14 +355,36 @@ pt ::
      I.FromLists Boolean (I.Normalize a) One,
      I.FromLists Boolean (I.Normalize b) One
    )
-   => Relation a b -> (a -> [b])
+   => Relation a b -> (a -> Powerset b)
 pt r a =
-  let lb = [minBound .. maxBound]
-   in [ b | b <- lb, toBool (pointAp a b r) ]
+  let (PS lb) = maxBound
+   in PS [ b | b <- lb, toBool (pointAp a b r) ]
+
+-- | Belongs relation
+belongs ::
+        ( Bounded a,
+          Enum a,
+          Eq a,
+          KnownNat (I.Count (I.Normalize (Powerset a))),
+          KnownNat (I.Count (I.Normalize a)),
+          I.FromLists Boolean (I.Normalize a) (I.Normalize (Powerset a))
+        )
+        => Relation (Powerset a) a
+belongs = toRel (flip elemR)
+  where
+    elemR x (PS l) = x `elem` l
 
 -- Zeros Matrix
 
--- | The zero matrix. A matrix wholly filled with zeros.
+-- | The zero relation. A relation where no element of type @a@ relates
+-- with elements of type @b@.
+--
+--   Also known as ⊥ (Bottom) Relation or empty Relation.
+--
+--   @
+--   r `'comp'` ⊥ == ⊥ `'comp'` r == ⊥
+--   ⊥ `'sse'` R && R `'sse'` T == True
+--   @
 zeros ::
   (I.FromLists Boolean (I.Normalize a) (I.Normalize b), KnownNat (I.Count (I.Normalize a)), KnownNat (I.Count (I.Normalize b))) =>
   Relation a b
@@ -348,9 +392,14 @@ zeros = relationBuilder (const (nat 0))
 
 -- Ones Matrix
 
--- | The ones matrix. A matrix wholly filled with ones.
+-- | The ones relation. A relation where every element of type @a@ relates
+-- with every element of type @b@.
 --
---   Also known as T (Top) matrix.
+--   Also known as T (Top) Relation or universal Relation.
+--
+--   @
+--   ⊥ `'sse'` R && R `'sse'` T == True
+--   @
 ones ::
   (I.FromLists Boolean (I.Normalize a) (I.Normalize b), KnownNat (I.Count (I.Normalize a)), KnownNat (I.Count (I.Normalize b))) =>
   Relation a b
@@ -358,7 +407,7 @@ ones = relationBuilder (const (nat 1))
 
 -- Bang Matrix
 
--- | The T (Top) row vector matrix.
+-- | The T (Top) row vector relation.
 bang ::
   (I.FromLists Boolean (I.Normalize a) One, KnownNat (I.Count (I.Normalize a))) =>
   Relation a One
@@ -377,24 +426,44 @@ point = fromF' . const
 -- Identity Matrix
 
 -- | Identity matrix
+--
+-- @
+-- 'identity' `'comp'` r == r == r `'comp'` 'identity'
+-- @
 identity ::
   (I.FromLists Boolean (I.Normalize a) (I.Normalize a), KnownNat (I.Count (I.Normalize a))) =>
   Relation a a
 identity = relationBuilder (bool (nat 0) (nat 1) . uncurry (==))
 
 -- | Relational composition
+--
+-- @
+-- r `'comp'` (s `'comp'` p) = (r `'comp'` s) `'comp'` p
+-- @
 comp :: Relation b c -> Relation a b -> Relation a c
 comp (R a) (R b) = R (I.compRel a b)
 
 -- | Relational right division
+--
+-- @'divR' x y@ is the largest relation @z@ which, 
+-- pre-composed with @y@, approximates @x@.
 divR :: Relation b c -> Relation b a -> Relation a c
 divR (R x) (R y) = R (I.divR x y)
 
 -- | Relational left division
+--
+-- The dual division operator:
+--
+-- @
+-- 'divL' y x == 'conv' ('divR' ('conv' x) ('conv' y)
+-- @
 divL :: Relation c b -> Relation a b -> Relation a c
 divL (R x) (R y) = R (I.divL x y)
 
 -- | Relational symmetric division
+--
+-- @'pointAp' c b ('divS' s r)@ means that @b@ and @c@ 
+-- are related to exactly the same outputs by @r@ and by @s@.
 divS :: Relation c a -> Relation b a -> Relation c b
 divS (R x) (R y) = R (I.divS x y)
 
@@ -422,7 +491,10 @@ overriddenBy ::
              ) => Relation a b -> Relation a b -> Relation a b
 overriddenBy r s = s `union` r `intersection` divR zeros (conv s)
 
--- | Relational application
+-- | Relational application.
+--
+-- If @a@ and @b@ are related by 'Relation' @r@
+-- then @'pointAp' a b r == 'one' ('Nat' 1)@
 pointAp ::
         ( Bounded a,
           Bounded b,
@@ -438,6 +510,8 @@ pointAp ::
 pointAp a b r = conv (point b) `comp` r `comp` point a
 
 -- | Relational application
+--
+-- The same as 'pointAp' but converts 'Boolean' to 'Bool'
 pointApBool ::
         ( Bounded a,
           Bounded b,
@@ -453,6 +527,12 @@ pointApBool ::
 pointApBool a b r = toBool $ conv (point b) `comp` r `comp` point a
 
 -- | Relational converse
+--
+-- Given binary 'Relation' r, writing @'pointAp' a b r@
+-- (read: “@b@ is related to @a@ by @r@”) means the same as
+-- @'pointAp' b a ('conv' r)@, where @'conv' r@ is said to be 
+-- the converse of @r@. 
+-- In terms of grammar, @'conv' r@ corresponds to the passive voice
 conv :: Relation a b -> Relation b a
 conv (R a) = R (I.tr a)
 
@@ -471,24 +551,46 @@ iff r s = r == s
 -- | Relational intersection
 --
 -- Lifts pointwise conjunction.
+--
+-- @
+-- (r `'intersection'` s) `'intersection'` t == r `'intersection' (s `'intersection'` t)
+-- x `'sse'` r `'intersection'` s == x `'intersection'` r && x `'intersection'` s
+-- @
 intersection :: Relation a b -> Relation a b -> Relation a b
 intersection a b = a * b
 
 -- | Relational union
 --
 -- Lifts pointwise disjunction.
+--
+-- @
+-- (r `'union'` s) `'union'` t == r `'union' (s `'union'` t)
+-- r `'union'` s `'sse'` x == r `'sse'` x && s `'sse'` x
+-- r `'comp'` (s `'union'` t) == (r `'comp'` s) `'union'` (r `'comp'` t)
+-- (s `'union'` t) `'comp'` r ==  (s `'comp'` r) `'union'` (t `'comp'` r)
+-- @
 union :: Relation a b -> Relation a b -> Relation a b
 union a b = a + b
 
 -- | Relation Kernel
+--
+-- @
+-- 'ker' r == 'conv' r `'comp'` r
+-- 'ker' r == 'img' ('conv' r)
+-- @
 ker :: Relation a b -> Relation a a
 ker r = conv r `comp` r
 
 -- | Relation Image
+--
+-- @
+-- 'img' r == r `'comp'` conv r
+-- 'img' r == 'ker' ('conv' r)
+-- @
 img :: Relation a b -> Relation b b
 img r = r `comp` conv r
 
--- | Function division.
+-- | Function division. Special case of 'divS'.
 --
 -- NOTE: _This is only valid_ if @f@ and @g@ are 'function's, i.e. 'simple' and
 -- 'entire'.
@@ -499,23 +601,23 @@ divisionF f g = conv g `comp` f
 
 -- Taxonomy of binary relations
 
--- | A 'Relation' @r@ is simple iff @'coreflexive' ('img' r)@
+-- | A 'Relation' @r@ is 'simple' 'iff' @'coreflexive' ('img' r)@
 simple :: (KnownNat (I.Count (I.Normalize b)), I.FromLists Boolean (I.Normalize b) (I.Normalize b)) => Relation a b -> Bool
 simple = coreflexive . img
 
--- | A 'Relation' @r@ is injective iff @'coreflexive' ('ker' r)@
+-- | A 'Relation' @r@ is 'injective' 'iff' @'coreflexive' ('ker' r)@
 injective :: (KnownNat (I.Count (I.Normalize a)), I.FromLists Boolean (I.Normalize a) (I.Normalize a)) => Relation a b -> Bool
 injective = coreflexive . ker
 
--- | A 'Relation' @r@ is entire iff @'reflexive' ('ker' r)@
+-- | A 'Relation' @r@ is 'entire' 'iff' @'reflexive' ('ker' r)@
 entire :: (KnownNat (I.Count (I.Normalize a)), I.FromLists Boolean (I.Normalize a) (I.Normalize a)) => Relation a b -> Bool
 entire = reflexive . ker
 
--- | A 'Relation' @r@ is surjective iff @'reflexive' ('img' r)@
+-- | A 'Relation' @r@ is 'surjective' 'iff' @'reflexive' ('img' r)@
 surjective :: (KnownNat (I.Count (I.Normalize b)), I.FromLists Boolean (I.Normalize b) (I.Normalize b)) => Relation a b -> Bool
 surjective = reflexive . img
 
--- | A 'Relation' @r@ is a function iff @'simple' r && 'entire' r@
+-- | A 'Relation' @r@ is a 'function' 'iff' @'simple' r && 'entire' r@
 --
 -- A 'function' @f@ enjoys the following properties, where @r@ and @s@ are binary
 -- relations:
@@ -533,7 +635,7 @@ function ::
          => Relation a b -> Bool
 function r = simple r && entire r
 
--- | A 'Relation' @r@ is a representation iff @'injective' r && 'entire' r@
+-- | A 'Relation' @r@ is a 'representation' 'iff' @'injective' r && 'entire' r@
 representation ::
                ( KnownNat (I.Count (I.Normalize a)),
                  I.FromLists Boolean (I.Normalize a) (I.Normalize a)
@@ -541,7 +643,7 @@ representation ::
                => Relation a b -> Bool
 representation r = injective r && entire r
 
--- | A 'Relation' @r@ is an abstraction iff @'surjective' r && 'simple' r@
+-- | A 'Relation' @r@ is an 'abstraction' 'iff' @'surjective' r && 'simple' r@
 abstraction ::
             ( KnownNat (I.Count (I.Normalize b)),
               I.FromLists Boolean (I.Normalize b) (I.Normalize b)
@@ -549,7 +651,7 @@ abstraction ::
             => Relation a b -> Bool
 abstraction r = surjective r && simple r
 
--- | A 'Relation' @r@ is a surjection iff @'function' r && 'abstraction' r@
+-- | A 'Relation' @r@ is a 'surjection' 'iff' @'function' r && 'abstraction' r@
 surjection ::
            ( KnownNat (I.Count (I.Normalize b)),
              KnownNat (I.Count (I.Normalize a)),
@@ -559,7 +661,7 @@ surjection ::
            => Relation a b -> Bool
 surjection r = function r && abstraction r
 
--- | A 'Relation' @r@ is a injection iff @'function' r && 'representation' r@
+-- | A 'Relation' @r@ is a 'injection' 'iff' @'function' r && 'representation' r@
 injection ::
            ( KnownNat (I.Count (I.Normalize b)),
              KnownNat (I.Count (I.Normalize a)),
@@ -569,7 +671,7 @@ injection ::
            => Relation a b -> Bool
 injection r = function r && representation r
 
--- | A 'Relation' @r@ is an bijection iff @'injection' r && 'surjection' r@
+-- | A 'Relation' @r@ is an 'bijection' 'iff' @'injection' r && 'surjection' r@
 bijection :: 
           ( KnownNat (I.Count (I.Normalize b)), 
             KnownNat (I.Count (I.Normalize a)), 
@@ -581,56 +683,56 @@ bijection r = injection r && surjection r
 
 -- Properties of relations
 
--- | A 'Relation' @r@ is reflexive iff @'identity' `'sse'` r@
+-- | A 'Relation' @r@ is 'reflexive' 'iff' @'identity' `'sse'` r@
 reflexive :: (KnownNat (I.Count (I.Normalize a)), I.FromLists Boolean (I.Normalize a) (I.Normalize a)) => Relation a a -> Bool
 reflexive r = identity <= r
 
--- | A 'Relation' @r@ is coreflexive iff @r `'sse'` 'identity'@
+-- | A 'Relation' @r@ is 'coreflexive' 'iff' @r `'sse'` 'identity'@
 coreflexive :: (KnownNat (I.Count (I.Normalize a)), I.FromLists Boolean (I.Normalize a) (I.Normalize a)) => Relation a a -> Bool
 coreflexive r = r <= identity
 
--- | A 'Relation' @r@ is transitive iff @(r `'comp'` r) `'sse'` r@
+-- | A 'Relation' @r@ is 'transitive' 'iff' @(r `'comp'` r) `'sse'` r@
 transitive :: Relation a a -> Bool
 transitive r = (r `comp` r) `sse` r
 
--- | A 'Relation' @r@ is symmetric iff @r == conv r@
+-- | A 'Relation' @r@ is 'symmetric' 'iff' @r == 'conv' r@
 symmetric :: Relation a a -> Bool
 symmetric r = r == conv r
 
--- | A 'Relation' @r@ is anti-symmetric iff @(r `'intersection'` 'conv' r) `'sse'` 'identity'@
+-- | A 'Relation' @r@ is anti-symmetric 'iff' @(r `'intersection'` 'conv' r) `'sse'` 'identity'@
 antiSymmetric :: (KnownNat (I.Count (I.Normalize a)), I.FromLists Boolean (I.Normalize a) (I.Normalize a)) => Relation a a -> Bool
 antiSymmetric r = (r `intersection` conv r) `sse` identity
 
--- | A 'Relation' @r@ is irreflexive iff @(r `'intersection'` identity) == 'zeros'@
+-- | A 'Relation' @r@ is 'irreflexive' 'iff' @(r `'intersection'` 'identity') == 'zeros'@
 irreflexive :: (KnownNat (I.Count (I.Normalize a)), I.FromLists Boolean (I.Normalize a) (I.Normalize a)) => Relation a a -> Bool
 irreflexive r = (r `intersection` identity) == zeros
 
--- | A 'Relation' @r@ is connected iff @(r `'union'` 'conv' r) == 'ones'@
+-- | A 'Relation' @r@ is 'connected' 'iff' @(r `'union'` 'conv' r) == 'ones'@
 connected :: (KnownNat (I.Count (I.Normalize a)), I.FromLists Boolean (I.Normalize a) (I.Normalize a)) => Relation a a -> Bool
 connected r = (r `union` conv r) == ones
 
--- | A 'Relation' @r@ is a preorder iff @'reflexive' r && 'transitive' r@
+-- | A 'Relation' @r@ is a 'preorder' 'iff' @'reflexive' r && 'transitive' r@
 preorder :: (KnownNat (I.Count (I.Normalize a)), I.FromLists Boolean (I.Normalize a) (I.Normalize a)) => Relation a a -> Bool
 preorder r = reflexive r && transitive r
 
--- | A 'Relation' @r@ is a partial order iff @'antiSymmetric' r && 'preorder' r@
+-- | A 'Relation' @r@ is a partial-order 'iff' @'antiSymmetric' r && 'preorder' r@
 partialOrder :: (KnownNat (I.Count (I.Normalize a)), I.FromLists Boolean (I.Normalize a) (I.Normalize a)) => Relation a a -> Bool
 partialOrder r = antiSymmetric r && preorder r
 
--- | A 'Relation' @r@ is a linear order iff @'connected' r && 'partialOrder' r@
+-- | A 'Relation' @r@ is a linear-order 'iff' @'connected' r && 'partialOrder' r@
 linearOrder :: (KnownNat (I.Count (I.Normalize a)), I.FromLists Boolean (I.Normalize a) (I.Normalize a)) => Relation a a -> Bool
 linearOrder r = connected r && partialOrder r
 
--- | A 'Relation' @r@ is an equivalence iff @'symmetric' r && 'preorder' r@
+-- | A 'Relation' @r@ is an 'equivalence' 'iff' @'symmetric' r && 'preorder' r@
 equivalence :: (KnownNat (I.Count (I.Normalize a)), I.FromLists Boolean (I.Normalize a) (I.Normalize a)) => Relation a a -> Bool
 equivalence r = symmetric r && preorder r
 
--- | A 'Relation' @r@ is a partial equivalence iff @'partialOrder' r && 'equivalence' r@
+-- | A 'Relation' @r@ is a partial-equivalence 'iff' @'partialOrder' r && 'equivalence' r@
 partialEquivalence :: (KnownNat (I.Count (I.Normalize a)), I.FromLists Boolean (I.Normalize a) (I.Normalize a)) => Relation a a -> Bool
 partialEquivalence r = partialOrder r && equivalence r
 
--- | A 'Relation' @r@ is 'difunctional' or regular wherever @r `comp`
--- 'conv' r `comp` r == r@
+-- | A 'Relation' @r@ is 'difunctional' or regular wherever 
+-- @r `comp` 'conv' r `comp` r == r@
 difunctional :: Relation a b -> Bool
 difunctional r = r `comp` conv r `comp` r == r
 
@@ -647,6 +749,16 @@ difunctional r = r `comp` conv r `comp` r == r
 -- @
 --
 -- __Emphasis__ on the 'sse'.
+--
+-- @
+-- 'splitR' r s `'comp'` f == 'splitR' (r `'comp'` f) (s `'comp'` f)
+-- (R '><' S) `'comp'` 'splitR' p q == 'splitR' (r `'comp'` p) (s `'comp'` q)
+-- 'conv' ('splitR' r s) `'comp'` 'splitR' x y == ('conv' r `'comp'` x) `'intersection'` ('conv' s `'comp'` y)
+-- @
+--
+-- @
+-- 'eitherR' ('splitR' r s) ('splitR' t v) == 'splitR' ('eitherR' r t) ('eitherR' s v)
+-- @
 splitR :: 
        ( KnownNat (I.Count (I.Normalize a)),
          KnownNat (I.Count (I.Normalize b)),
@@ -659,6 +771,10 @@ splitR ::
 splitR (R f) (R g) = R (I.khatri f g)
 
 -- | Relational pairing first component projection
+--
+-- @
+-- 'p1' `'comp'` 'splitR' r s `'sse'` r
+-- @
 p1 ::
    forall a b .
    ( KnownNat (I.Count (I.Normalize a)),
@@ -671,6 +787,10 @@ p1 ::
 p1 = R (I.kp1 @Boolean @(I.Normalize a) @(I.Normalize b))
 
 -- | Relational pairing second component projection
+--
+-- @
+-- 'p2' `'comp'` 'splitR' r s `'sse'` s
+-- @
 p2 ::
    forall a b .
    ( KnownNat (I.Count (I.Normalize b)),
@@ -686,6 +806,11 @@ p2 = R (I.kp2 @Boolean @(I.Normalize a) @(I.Normalize b))
 
 infixl 4 ><
 -- | Relational pairing functor
+--
+-- @
+-- r '><' s == 'splitR' (r `'comp'` p1) (s `'comp'` p2)
+-- (r '><' s) `'comp'` (p '><' q) == (r `'comp'` p) '><' (s `'comp'` q)
+-- @
 (><) ::
      ( KnownNat (I.Count (I.Normalize a)),
        KnownNat (I.Count (I.Normalize b)),
@@ -706,11 +831,31 @@ infixl 4 ><
 -- Relational co-products
 
 -- | Relational coproduct.
+--
+-- @
+--                | 'eitherR' a b `'comp'` 'i1' == a
+-- 'eitherR' a b <=> |
+--                | 'eitherR' a b `'comp'` 'i2' == b
+-- @
+--
+-- @
+-- [R,S]·[T,U]◦=  (R·T◦)∪(S·U◦)
+-- 'eitherR' r s `'comp'` 'conv' ('eitherR' t u) == (r `'comp'` 'conv' t) `'union'` (s `'comp'` 'conv' u)
+-- @
+--
+-- @
+-- 'eitherR' ('splitR' r s) ('splitR' t v) == 'splitR' ('eitherR' r t) ('eitherR' s v)
+-- @
 eitherR :: (I.Normalize (Either a b) ~ Either (I.Normalize a) (I.Normalize b)) 
      => Relation a c -> Relation b c -> Relation (Either a b) c
 eitherR = junc
 
 -- | Relational coproduct first component injection
+--
+-- @
+-- 'img' 'i1' `union` 'img' 'i2' == 'identity'
+-- 'i1' `'comp'` 'i2' = 'zeros'
+-- @
 i1 :: 
    ( KnownNat (I.Count (I.Normalize b)),
      KnownNat (I.Count (I.Normalize a)),
@@ -722,6 +867,11 @@ i1 ::
 i1 = R I.i1
 
 -- | Relational coproduct second component injection
+--
+-- @
+-- 'img' 'i1' `union` 'img' 'i2' == 'identity'
+-- 'i1' `'comp'` 'i2' = 'zeros'
+-- @
 i2 :: 
    ( KnownNat (I.Count (I.Normalize b)),
      KnownNat (I.Count (I.Normalize a)),
@@ -735,6 +885,10 @@ i2 = R I.i2
 infixl 5 -|-
 
 -- | Relational coproduct functor.
+--
+-- @
+-- r '-|-' s == 'eitherR' ('i1' `'comp'` r) ('i2' `'comp'` s)
+-- @
 (-|-) ::
   ( KnownNat (I.Count (I.Normalize d)),
     KnownNat (I.Count (I.Normalize b)),
@@ -751,6 +905,10 @@ infixl 5 -|-
 -- Relational "Currying"
 
 -- | Relational 'trans'
+--
+-- Every n-ary relation can be expressed as a binary relation through
+-- 'trans'/'untrans';
+-- more-over, where each particular attribute is placed (input/output) is irrelevant.
 trans :: 
       ( KnownNat (I.Count (I.Normalize (a, b))),
         KnownNat (I.Count (I.Normalize a)),
@@ -770,6 +928,10 @@ trans ::
 trans r = splitR r p2 `comp` conv p1
 
 -- | Relational 'untrans'
+--
+-- Every n-ary relation can be expressed as a binary relation through
+-- 'trans'/'untrans';
+-- more-over, where each particular attribute is placed (input/output) is irrelevant.
 untrans ::
         ( KnownNat (I.Count (I.Normalize (a, b))),
           KnownNat (I.Count (I.Normalize a)),
@@ -789,6 +951,15 @@ untrans ::
 untrans s = p1 `comp` conv (splitR (conv s) p2)
 
 -- | Transforms predicate @p@ into a correflexive relation.
+--
+-- @
+-- 'predR' ('const' True) == 'identity'
+-- 'predR' ('const' False) == 'zeros'
+-- @
+--
+-- @
+-- 'predR' q `'comp'` 'predR' p == 'predR' q `'union'` 'predR' p
+-- @
 predR :: 
       ( Bounded a,
         Enum a,
@@ -799,9 +970,14 @@ predR ::
       => (a -> Bool) -> Relation a a
 predR p = identity `intersection` divisionF (fromF' (const True)) (fromF' p)
 
--- | Equalizes functions @f@ and @g@. 
+-- | Equalizes functions @f@ and @g@.
 -- That is, @'equalizer' f g@ is the largest coreflexive
 -- that restricts @g@ so that @f@ and @g@ yield the same outputs.
+--
+-- @
+-- 'equalizer' r r == 'identity'
+-- 'equalizer' ('point' True) ('point' False) == 'zeros'
+-- @
 equalizer ::
           ( KnownNat (I.Count (I.Normalize a)),
             I.FromLists Boolean (I.Normalize a) (I.Normalize a)
@@ -837,6 +1013,9 @@ cond ::
 cond p r s = eitherR r s `comp` guard p
 
 -- | Relational domain.
+--
+-- For injective relations, 'domain' and 'ker'nel coincide,
+-- since @'ker' r `'sse'` 'identity'@ in such situations.
 domain :: 
        ( KnownNat (I.Count (I.Normalize a)),
          I.FromLists Boolean (I.Normalize a) (I.Normalize a)
@@ -844,6 +1023,9 @@ domain ::
 domain r = ker r `intersection` identity
 
 -- | Relational range.
+--
+-- For functions, 'range' and 'img' (image) coincide,
+-- since@'img' f `'sse'` 'identity'@ for any @f@.
 range :: 
       ( I.FromLists Boolean (I.Normalize b) (I.Normalize b),
         KnownNat (I.Count (I.Normalize b))

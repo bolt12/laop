@@ -175,17 +175,18 @@ deriving instance (Show e) => Show (Matrix e cols rows)
 -- 'Generic' instance.
 type family Count (d :: Type) :: Nat where
   Count (Natural n m) = (m - n) + 1
-  Count (Either a b) = (+) (Count a) (Count b)
-  Count (a, b) = (*) (Count a) (Count b)
-  Count (a -> b) = (^) (Count b) (Count a)
+  Count (Powerset a)  = (^) (Count a) (Count a)
+  Count (Either a b)  = (+) (Count a) (Count b)
+  Count (a, b)        = (*) (Count a) (Count b)
+  Count (a -> b)      = (^) (Count b) (Count a)
   -- Generics
-  Count (M1 _ _ f p) = Count (f p)
-  Count (K1 _ _ _) = 1
-  Count (V1 _) = 0
-  Count (U1 _) = 1
+  Count (M1 _ _ f p)  = Count (f p)
+  Count (K1 _ _ _)    = 1
+  Count (V1 _)        = 0
+  Count (U1 _)        = 1
   Count ((:*:) a b p) = Count (a p) * Count (b p)
   Count ((:+:) a b p) = Count (a p) + Count (b p)
-  Count d = Count (Rep d R)
+  Count d             = Count (Rep d R)
 
 -- | Type family that computes of a given type dimension from a given natural
 --

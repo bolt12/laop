@@ -80,12 +80,22 @@ module LAoP.Relation
     injection,
     surjection,
     bijection,
+    domain,
+    range,
 
     -- * Function division
     divisionF,
 
+    -- * Relation division
+    divR,
+    divL,
+    divS,
+    shrunkBy,
+    overriddenBy,
+
     -- * Relational pairing
     splitR,
+
     -- ** Projections
     p1,
     p2,
@@ -116,9 +126,15 @@ module LAoP.Relation
     linearOrder,
     equivalence,
     partialEquivalence,
+    difunctional,
+
+    -- * Conditionals
+    equalizer,
 
     -- ** McCarthy's Conditional
-    -- cond,
+    predR,
+    guard,
+    cond,
 
     -- * Relational composition and lifting
     identity,
@@ -128,6 +144,7 @@ module LAoP.Relation
 
     -- ** Relational application
     pointAp,
+    pointApBool,
 
     -- * Matrix printing
     pretty,
