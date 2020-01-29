@@ -16,17 +16,20 @@ See the candidate package in hackage [here](https://hackage.haskell.org/package/
 
 This library offers:
 
-- An internal representation that uses normal datatypes (`Void`, `()`, `Either`) for matrix dimensions and two
+- An internal module representation that uses normal datatypes (`Void`, `()`, `Either`) for matrix dimensions and two
   type families `FromNat` and `Count` to make it easier to work with these type of matrices.
-- A module that uses generalised types for the dimensions and is just a newtype wrapper
+- An interfacing module that uses generalised types for the dimensions and is just a newtype wrapper
   around the internal matrix data type.
-- Other that uses type level naturals for the dimensions and is just a newtype wrapper
+- An interfacing module that uses type level naturals for the dimensions and is just a newtype wrapper
   around the internal matrix data type.
+- An interfacing module that restricts the matrix contents to being only 0's or 1's (True
+  and False). This module is called 'Relation' and offers many of the combinators seen in
+  AoP and Relational Calculus/Algebra.
 - A very simple Probabilistic Programming module and several functions and data types to
   make it easier to deal with sample space.
 
 Given this, this new matrix formulation compared to other libraries one has much more advantages, such as:
-        
+
 - Has an inductive definition enabling writing matrix manipulation functions in a much more elegant and calculational way;
 - Statically typed dimensions;
 - Polymorphic data type dimensions;
@@ -35,7 +38,7 @@ Given this, this new matrix formulation compared to other libraries one has much
 - Fast type natural conversion via `FromNat` type family;
 - Matrix `Junc` and `Split`-ing in O(1);
 - Matrix composition takes advantage of divide-and-conquer and fusion laws.
-        
+
 Unfortunately, this approach does not solve the issue of type dimensions being in some way constrainted making it impossible to write Arrow instances, for example. Type inference isn't perfect, when it comes to infer the types of matrices which dimensions are computed using type level naturals multiplication, the compiler needs type annotations in order to succeed.
 
 ## Notes
@@ -118,6 +121,73 @@ grass_wet = row [0,1] . kp1
 rainning :: Matrix Double (Bool, (Bool, Bool)) One
 rainning = row [0,1] . kp2 . kp2 
 
+-- Alcuin Puzzle
+
+data Being = Farmer | Fox | Goose | Beans
+  deriving (Bounded, Enum, Eq, Show, Generic)
+
+data Bank = LeftB | RightB
+  deriving (Bounded, Enum, Eq, Show, Generic)
+
+eats :: Being -> Being -> Bool
+eats Fox Goose   = True
+eats Goose Beans = True
+eats _ _         = False
+
+eatsR :: R.Relation Being Being
+eatsR = R.toRel eats
+
+cross :: Bank -> Bank
+cross LeftB = RightB
+cross RightB = LeftB
+
+crossR :: R.Relation Bank Bank
+crossR = R.fromF' cross
+
+-- | Initial state, everyone in the left bank
+locationLeft :: Being -> Bank
+locationLeft _ = LeftB
+
+locationLeftR :: R.Relation Being Bank
+locationLeftR = R.fromF' locationLeft
+
+-- | Initial state, everyone in the right bank
+locationRight :: Being -> Bank
+locationRight _ = RightB
+
+locationRightR :: R.Relation Being Bank
+locationRightR = R.fromF' locationRight
+
+-- Properties
+
+-- Being at the same bank
+sameBank :: R.Relation Being Bank -> R.Relation Being Being
+sameBank = R.ker 
+
+-- Risk of somebody eating somebody else
+canEat :: R.Relation Being Bank -> R.Relation Being Being
+canEat w = sameBank w `R.intersection` eatsR
+
+-- "Starvation" property.
+inv :: R.Relation Being Bank -> Bool
+inv w = (w `R.comp` canEat w) `R.sse` (w `R.comp` farmer)
+  where
+    farmer :: R.Relation Being Being
+    farmer = R.fromF' (const Farmer)
+
+-- Arbitrary state
+bankState :: Being -> Bank -> Bool
+bankState Farmer LeftB = True
+bankState Fox LeftB = True
+bankState Goose RightB = True
+bankState Beans RightB = True
+bankState _ _ = False
+
+bankStateR :: R.Relation Being Bank
+bankStateR = R.toRel bankState
+
+-- Main
+
 main :: IO ()
 main = do
     putStrLn "Monty Hall Problem solution:"
@@ -132,6 +202,8 @@ main = do
     prettyPrint (grass_wet . state)
     putStrLn "\n Probability of rain:"
     prettyPrint (rainning . state)
+    putStrLn "\n Is the arbitrary state a valid state? (Alcuin Puzzle)"
+    print (inv bankStateR)
 ```
 
 ```Shell
@@ -190,4 +262,7 @@ Monty Hall Problem solution:
 ┌     ┐
 │ 0.2 │
 └     ┘
+
+Is the arbitrary state a valid state? (Alcuin Puzzle)
+False
 ```
