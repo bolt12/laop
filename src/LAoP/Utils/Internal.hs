@@ -5,7 +5,7 @@
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Utils.Internal
+module LAoP.Utils.Internal
   ( -- | This is an internal module and it is not meant to be imported.
     --
     -- Utility module that provides the 'Natural' data type.
@@ -78,7 +78,7 @@ module Utils.Internal
     -- @
     --
     -- * 'Natural' data type
-    Natural,
+    Natural(..),
     nat,
 
     -- * Coerce auxiliar functions to help promote 'Int' typed functions to
@@ -86,11 +86,16 @@ module Utils.Internal
     coerceNat,
     coerceNat2,
     coerceNat3,
+
+    -- * Powerset data type
+    Powerset (..)
   )
 where
 
 import Data.Coerce
 import Data.Proxy
+import Data.List
+import Data.Maybe
 import GHC.TypeLits
 import Control.DeepSeq
 
@@ -174,3 +179,60 @@ instance
         fstI = fromEnum a
         sndI = fromEnum b
      in fstI * lengthB + sndI
+
+instance
+  ( Bounded a,
+    Bounded b
+  ) => Bounded (Either a b)
+  where
+  minBound = Left (minBound :: a)
+  maxBound = Right (maxBound :: b)
+
+instance
+  ( Enum a,
+    Bounded a,
+    Enum b,
+    Bounded b
+  ) => Enum (Either a b)
+  where
+  toEnum i =
+      let la = fmap Left ([minBound..maxBound] :: [a])
+          lb = fmap Right ([minBound..maxBound] :: [b])
+       in (la ++ lb) !! i
+
+  fromEnum (Left a) = fromEnum a
+  fromEnum (Right b) = fromEnum (maxBound :: a) + fromEnum b + 1
+
+-- | Powerset data type.
+--
+-- This data type is a newtype wrapper around '[]'. This exists in order to
+-- implement an 'Enum' and 'Bounded' instance that cannot be harmful for the outside.
+newtype Powerset a = PS [a]
+  deriving (Eq, Show, Read)
+
+powerset :: [a] -> [[a]]
+powerset [] = [[]]
+powerset (x:xs) = powerset xs ++ [x:ps | ps <- powerset xs]
+
+instance
+  ( Enum a,
+    Bounded a
+  ) => Bounded (Powerset a)
+  where
+  minBound = PS [] 
+  maxBound = PS [minBound .. maxBound]
+
+instance
+  ( Bounded a,
+    Enum a,
+    Eq a
+  ) => Enum (Powerset a)
+  where
+  toEnum i =
+    let as = [minBound .. maxBound]
+        in PS (powerset as !! i)
+
+  fromEnum (PS []) = 0
+  fromEnum (PS x) = 
+    let as = [minBound .. maxBound]
+        in fromMaybe (error "Does not exist") $ elemIndex x (powerset as)

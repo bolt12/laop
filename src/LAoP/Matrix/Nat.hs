@@ -15,7 +15,7 @@
 
 -----------------------------------------------------------------------------
 -- |
--- Module     : Matrix.Nat
+-- Module     : LAoP.Matrix.Nat
 -- Copyright  : (c) Armando Santos 2019-2020
 -- Maintainer : armandoifsantos@gmail.com
 -- Stability  : experimental
@@ -33,7 +33,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Matrix.Nat
+module LAoP.Matrix.Nat
   ( -- | LAoP (Linear Algebra of Programming) Inductive Matrix definition.
     --
     --         LAoP generalises relations and functions treating them as
@@ -142,7 +142,7 @@ import Data.Proxy
 import GHC.TypeLits
 import Control.DeepSeq
 import qualified Control.Category as C
-import qualified Matrix.Internal as I
+import qualified LAoP.Matrix.Internal as I
 
 newtype Matrix e (cols :: Nat) (rows :: Nat) = M (I.Matrix e (I.FromNat cols) (I.FromNat rows))
   deriving (Show, Num, Eq, Ord, NFData) via (I.Matrix e (I.FromNat cols) (I.FromNat rows))

@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeFamilyDependencies #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -9,13 +10,12 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 -----------------------------------------------------------------------------
 -- |
--- Module     : Matrix.Internal
+-- Module     : LAoP.Matrix.Internal
 -- Copyright  : (c) Armando Santos 2019-2020
 -- Maintainer : armandoifsantos@gmail.com
 -- Stability  : experimental
@@ -34,7 +34,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Matrix.Internal
+module LAoP.Matrix.Internal
   ( -- | This definition makes use of the fact that 'Void' is
     -- isomorphic to 0 and '()' to 1 and captures matrix
     -- dimensions as stacks of 'Either's.
@@ -134,15 +134,20 @@ module Matrix.Internal
     toBool,
     fromBool,
     compRel,
+    divR,
+    divL,
+    divS,
     fromFRel,
     fromFRel',
+    toRel,
+    negateM,
     orM,
     andM,
     subM
   )
     where
 
-import Utils
+import LAoP.Utils.Internal
 import Data.Bool
 import Data.Kind
 import Data.List
@@ -170,17 +175,18 @@ deriving instance (Show e) => Show (Matrix e cols rows)
 -- 'Generic' instance.
 type family Count (d :: Type) :: Nat where
   Count (Natural n m) = (m - n) + 1
-  Count (Either a b) = (+) (Count a) (Count b)
-  Count (a, b) = (*) (Count a) (Count b)
-  Count (a -> b) = (^) (Count b) (Count a)
+  Count (Powerset a)  = (^) (Count a) (Count a)
+  Count (Either a b)  = (+) (Count a) (Count b)
+  Count (a, b)        = (*) (Count a) (Count b)
+  Count (a -> b)      = (^) (Count b) (Count a)
   -- Generics
-  Count (M1 _ _ f p) = Count (f p)
-  Count (K1 _ _ _) = 1
-  Count (V1 _) = 0
-  Count (U1 _) = 1
+  Count (M1 _ _ f p)  = Count (f p)
+  Count (K1 _ _ _)    = 1
+  Count (V1 _)        = 0
+  Count (U1 _)        = 1
   Count ((:*:) a b p) = Count (a p) * Count (b p)
   Count ((:+:) a b p) = Count (a p) + Count (b p)
-  Count d = Count (Rep d R)
+  Count d             = Count (Rep d R)
 
 -- | Type family that computes of a given type dimension from a given natural
 --
@@ -785,6 +791,9 @@ prettyPrint = putStrLn . pretty
 
 -- Relational operators functions
 
+type Boolean = Natural 0 1
+type Relation a b = Matrix Boolean a b
+
 -- | Helper conversion function
 toBool :: (Num e, Eq e) => e -> Bool
 toBool n
@@ -796,8 +805,16 @@ fromBool :: Bool -> Natural 0 1
 fromBool True  = nat 1
 fromBool False = nat 0
 
+-- | Relational negation
+negateM :: Relation cols rows -> Relation cols rows
+negateM Empty         = Empty
+negateM (One (Nat 0)) = One (Nat 1)
+negateM (One (Nat 1)) = One (Nat 0)
+negateM (Junc a b)    = Junc (negateM a) (negateM b)
+negateM (Split a b)   = Split (negateM a) (negateM b)
+
 -- | Relational addition
-orM :: Matrix (Natural 0 1) cols rows -> Matrix (Natural 0 1) cols rows -> Matrix (Natural 0 1) cols rows
+orM :: Relation cols rows -> Relation cols rows -> Relation cols rows
 orM Empty Empty                = Empty
 orM (One a) (One b)            = One (fromBool (toBool a || toBool b))
 orM (Junc a b) (Junc c d)      = Junc (orM a c) (orM b d)
@@ -806,7 +823,7 @@ orM x@(Split _ _) y@(Junc _ _) = orM x (abideJS y)
 orM x@(Junc _ _) y@(Split _ _) = orM (abideJS x) y
 
 -- | Relational multiplication
-andM :: Matrix (Natural 0 1) cols rows -> Matrix (Natural 0 1) cols rows -> Matrix (Natural 0 1) cols rows
+andM :: Relation cols rows -> Relation cols rows -> Relation cols rows
 andM Empty Empty                = Empty
 andM (One a) (One b)            = One (fromBool (toBool a && toBool b))
 andM (Junc a b) (Junc c d)      = Junc (andM a c) (andM b d)
@@ -815,7 +832,7 @@ andM x@(Split _ _) y@(Junc _ _) = andM x (abideJS y)
 andM x@(Junc _ _) y@(Split _ _) = andM (abideJS x) y
 
 -- | Relational subtraction
-subM :: Matrix (Natural 0 1) cols rows -> Matrix (Natural 0 1) cols rows -> Matrix (Natural 0 1) cols rows
+subM :: Relation cols rows -> Relation cols rows -> Relation cols rows
 subM Empty Empty                = Empty
 subM (One a) (One b)            = if a - b < nat 0 then One (nat 0) else One (a - b)
 subM (Junc a b) (Junc c d)      = Junc (subM a c) (subM b d)
@@ -824,12 +841,30 @@ subM x@(Split _ _) y@(Junc _ _) = subM x (abideJS y)
 subM x@(Junc _ _) y@(Split _ _) = subM (abideJS x) y
 
 -- | Matrix relational composition.
-compRel :: Matrix (Natural 0 1) cr rows -> Matrix (Natural 0 1) cols cr -> Matrix (Natural 0 1) cols rows
+compRel :: Relation cr rows -> Relation cols cr -> Relation cols rows
 compRel Empty Empty            = Empty
 compRel (One a) (One b)        = One (fromBool (toBool a && toBool b))
-compRel (Junc a b) (Split c d) = orM (compRel a c) (compRel b d)         -- Divide-and-conquer law
+compRel (Junc a b) (Split c d) = orM (compRel a c) (compRel b d)   -- Divide-and-conquer law
 compRel (Split a b) c          = Split (compRel a c) (compRel b c) -- Split fusion law
 compRel c (Junc a b)           = Junc (compRel c a) (compRel c b)  -- Junc fusion law
+
+-- | Matrix relational right division
+divR :: Relation b c -> Relation b a -> Relation a c
+divR Empty Empty           = Empty
+divR (One a) (One b)       = One (fromBool (not (toBool b) || toBool a)) -- b implies a
+divR (Junc a b) (Junc c d) = andM (divR a c) (divR b d)
+divR (Split a b) c         = Split (divR a c) (divR b c)
+divR c (Split a b)         = Junc (divR c a) (divR c b)
+
+-- | Matrix relational left division
+divL :: Relation c b -> Relation a b -> Relation a c
+divL x y = tr (divR (tr y) (tr x))
+
+-- | Matrix relational symmetric division
+divS :: Relation c a -> Relation b a -> Relation c b
+divS s r = divL r s `intersection` divR (tr r) (tr s)
+  where
+    intersection = andM
 
 -- | Lifts functions to relations with arbitrary dimensions.
 --
@@ -847,7 +882,7 @@ fromFRel ::
     FromLists (Natural 0 1) rows cols
   ) =>
   (a -> b) ->
-  Matrix (Natural 0 1) cols rows
+  Relation cols rows
 fromFRel f =
   let minA         = minBound @a
       maxA         = maxBound @a
@@ -881,7 +916,7 @@ fromFRel' ::
     FromLists (Natural 0 1) (Normalize b) (Normalize a)
   ) =>
   (a -> b) ->
-  Matrix (Natural 0 1) (Normalize a) (Normalize b)
+  Relation (Normalize a) (Normalize b)
 fromFRel' f =
   let minA         = minBound @a
       maxA         = maxBound @a
@@ -893,6 +928,38 @@ fromFRel' f =
       elementsB    = take rrows [minB .. maxB]
       combinations = (,) <$> elementsA <*> elementsB
       combAp       = map snd . sort . map (\(a, b) -> if f a == b 
+                                                         then ((fromEnum a, fromEnum b), nat 1) 
+                                                         else ((fromEnum a, fromEnum b), nat 0)) $ combinations
+      mList        = buildList combAp rrows
+   in tr $ fromLists mList
+  where
+    buildList [] _ = []
+    buildList l r  = take r l : buildList (drop r l) r
+
+-- | Lifts a relation function to a Boolean Matrix
+toRel :: 
+      forall a b.
+      ( Bounded a,
+        Bounded b,
+        Enum a,
+        Enum b,
+        Eq b,
+        KnownNat (Count (Normalize a)),
+        KnownNat (Count (Normalize b)),
+        FromLists (Natural 0 1) (Normalize b) (Normalize a)
+      ) 
+      => (a -> b -> Bool) -> Relation (Normalize a) (Normalize b)
+toRel f =
+  let minA         = minBound @a
+      maxA         = maxBound @a
+      minB         = minBound @b
+      maxB         = maxBound @b
+      ccols        = fromInteger $ natVal (Proxy :: Proxy (Count (Normalize a)))
+      rrows        = fromInteger $ natVal (Proxy :: Proxy (Count (Normalize b)))
+      elementsA    = take ccols [minA .. maxA]
+      elementsB    = take rrows [minB .. maxB]
+      combinations = (,) <$> elementsA <*> elementsB
+      combAp       = map snd . sort . map (\(a, b) -> if uncurry f (a, b) 
                                                          then ((fromEnum a, fromEnum b), nat 1) 
                                                          else ((fromEnum a, fromEnum b), nat 0)) $ combinations
       mList        = buildList combAp rrows

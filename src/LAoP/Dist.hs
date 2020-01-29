@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 -- |
--- Module     : Dist
+-- Module     : LAoP.Dist
 -- Copyright  : (c) Armando Santos 2019-2020
 -- Maintainer : armandoifsantos@gmail.com
 -- Stability  : experimental
@@ -16,7 +16,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Dist
+module LAoP.Dist
   ( -- | If the sum of the rows of a column matrix 
     -- is equal to 1 then this stochastic matrix
     -- can be seen as a probability distribution.
@@ -66,4 +66,4 @@ module Dist
   )
 where
 
-import Dist.Internal
+import LAoP.Dist.Internal
