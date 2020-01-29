@@ -1,3 +1,4 @@
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DerivingVia #-}
@@ -170,6 +171,17 @@ import qualified LAoP.Matrix.Internal as I
 newtype Matrix e (cols :: Type) (rows :: Type) = M (I.Matrix e (I.Normalize cols) (I.Normalize rows))
   deriving (Show, Num, Eq, Ord, NFData) via (I.Matrix e (I.Normalize cols) (I.Normalize rows))
 
+-- | Constraint type synonyms to keep the type signatures less convoluted
+type Countable a              = KnownNat (I.Count a)
+type CountableDimensions a b  = (Countable a, Countable b)
+type CountableN a             = KnownNat (I.Count (I.Normalize a))
+type CountableDimensionsN a b = (CountableN a, CountableN b)
+type FromListsN e a b         = I.FromLists e (I.Normalize a) (I.Normalize b)
+type Liftable e a b           = (Bounded a, Bounded b, Enum a, Enum b, Eq b, Num e, Ord e)
+type Trivial a                = I.Normalize a ~ I.Normalize (I.Normalize a)
+type TrivialE a b             = I.Normalize (Either a b) ~ Either (I.Normalize a) (I.Normalize b)
+type TrivialP a b             = I.Normalize (a, b) ~ I.Normalize (I.Normalize a, I.Normalize b)
+
 -- | It isn't possible to implement the 'id' function so it's
 -- implementation is 'undefined'. However 'comp' can be and this partial
 -- class implementation exists just to make the code more readable.
@@ -197,7 +209,7 @@ one = M . I.One
 
 -- | Matrix 'Junc' constructor
 junc ::
-  (I.Normalize (Either a b) ~ Either (I.Normalize a) (I.Normalize b)) =>
+  (TrivialE a b) =>
   Matrix e a rows ->
   Matrix e b rows ->
   Matrix e (Either a b) rows
@@ -206,7 +218,7 @@ junc (M a) (M b) = M (I.Junc a b)
 infixl 3 |||
 -- | Matrix 'Junc' constructor
 (|||) ::
-  (I.Normalize (Either a b) ~ Either (I.Normalize a) (I.Normalize b)) =>
+  (TrivialE a b) =>
   Matrix e a rows ->
   Matrix e b rows ->
   Matrix e (Either a b) rows
@@ -214,7 +226,7 @@ infixl 3 |||
 
 -- | Matrix 'Split' constructor
 split ::
-  (I.Normalize (Either a b) ~ Either (I.Normalize a) (I.Normalize b)) =>
+  (TrivialE a b) =>
   Matrix e cols a ->
   Matrix e cols b ->
   Matrix e cols (Either a b)
@@ -223,7 +235,7 @@ split (M a) (M b) = M (I.Split a b)
 infixl 2 ===
 -- | Matrix 'Split' constructor
 (===) ::
-  (I.Normalize (Either a b) ~ Either (I.Normalize a) (I.Normalize b)) =>
+  (TrivialE a b) =>
   Matrix e cols a ->
   Matrix e cols b ->
   Matrix e cols (Either a b)
@@ -233,16 +245,9 @@ infixl 2 ===
 
 -- | Functor instance equivalent function
 fmapM :: 
-     ( Bounded a,
-       Bounded b,
-       Enum a,
-       Enum b,
-       Eq b,
-       Num e,
-       Ord e,
-       KnownNat (I.Count (I.Normalize a)),
-       KnownNat (I.Count (I.Normalize b)),
-       I.FromLists e (I.Normalize b) (I.Normalize a)
+     ( Liftable e a b,
+       CountableDimensionsN a b,
+       FromListsN e b a
      )
      =>
      (a -> b) -> Matrix e c a -> Matrix e c b
@@ -254,25 +259,23 @@ unitM = one 1
 
 -- | Applicative instance equivalent 'unit' function,
 multM :: 
-      ( KnownNat (I.Count (I.Normalize a)),
-        KnownNat (I.Count (I.Normalize b)),
-        KnownNat (I.Count (I.Normalize (a, b))),
+      ( CountableDimensionsN a b,
+        CountableN (a, b),
         Num e,
-        I.FromLists e (I.Normalize (a, b)) (I.Normalize a),
-        I.FromLists e (I.Normalize (a, b)) (I.Normalize b),
-        I.Normalize (a, b) ~ I.Normalize (I.Normalize a, I.Normalize b)
+        FromListsN e (a, b) a,
+        FromListsN e (a, b) b,
+        TrivialP a b
       ) => Matrix e c a -> Matrix e c b -> Matrix e c (a, b)
-multM a b = khatri a b
-
+multM = khatri
 
 -- | Monad instance equivalent 'return' function,
 returnM :: 
         forall e a . 
-        ( Num e, 
-          Enum e, 
-          Enum a, 
-          I.FromLists e () (I.Normalize a),
-          KnownNat (I.Count a)
+        ( Num e,
+          Enum e,
+          Enum a,
+          FromListsN e () a,
+          Countable a
         ) => a -> Matrix e One a
 returnM a = col l
     where
@@ -288,23 +291,22 @@ bindM = flip comp
 
 -- | Build a matrix out of a list of list of elements. Throws a runtime
 -- error if the dimensions do not match.
-fromLists :: (I.FromLists e (I.Normalize cols) (I.Normalize rows)) => [[e]] -> Matrix e cols rows
+fromLists :: (FromListsN e cols rows) => [[e]] -> Matrix e cols rows
 fromLists = M . I.fromLists
 
 -- | Matrix builder function. Constructs a matrix provided with
 -- a construction function.
 matrixBuilder ::
-  (I.FromLists e (I.Normalize cols) (I.Normalize rows), KnownNat (I.Count (I.Normalize cols)), KnownNat (I.Count (I.Normalize rows))) =>
-  ((Int, Int) -> e) ->
-  Matrix e cols rows
+  (FromListsN e cols rows, CountableDimensionsN cols rows )
+  => ((Int, Int) -> e) -> Matrix e cols rows
 matrixBuilder = M . I.matrixBuilder
 
 -- | Constructs a column vector matrix
-col :: (I.FromLists e () (I.Normalize rows)) => [e] -> Matrix e One rows
+col :: (FromListsN e () rows) => [e] -> Matrix e One rows
 col = M . I.col
 
 -- | Constructs a row vector matrix
-row :: (I.FromLists e (I.Normalize cols) ()) => [e] -> Matrix e cols One
+row :: (FromListsN e cols ()) => [e] -> Matrix e cols One
 row = M . I.row
 
 -- | Lifts functions to matrices with arbitrary dimensions.
@@ -312,49 +314,28 @@ row = M . I.row
 --   NOTE: Be careful to not ask for a matrix bigger than the cardinality of
 -- types @a@ or @b@ allows.
 fromF ::
-  ( Bounded a,
-    Bounded b,
-    Enum a,
-    Enum b,
-    Eq b,
-    Num e,
-    Ord e,
-    KnownNat (I.Count (I.Normalize cols)),
-    KnownNat (I.Count (I.Normalize rows)),
-    I.FromLists e (I.Normalize rows) (I.Normalize cols)
+  ( Liftable e a b,
+    CountableDimensionsN cols rows,
+    FromListsN e rows cols
   ) =>
-  (a -> b) ->
-  Matrix e cols rows
+  (a -> b) -> Matrix e cols rows
 fromF = M . I.fromF
 
 -- | Lifts functions to matrices with dimensions matching @a@ and @b@
 -- cardinality's.
 fromF' ::
-  ( Bounded a,
-    Bounded b,
-    Enum a,
-    Enum b,
-    Eq b,
-    Num e,
-    Ord e,
-    KnownNat (I.Count (I.Normalize a)),
-    KnownNat (I.Count (I.Normalize b)),
-    I.FromLists e (I.Normalize b) (I.Normalize a)
+  ( Liftable e a b,
+    CountableDimensionsN a b,
+    FromListsN e b a
   ) =>
-  (a -> b) ->
-  Matrix e a b
+  (a -> b) -> Matrix e a b
 fromF' = M . I.fromF'
 
 -- | Lifts relation functions to Boolean Matrix
 toRel ::
-  ( Bounded a,
-    Bounded b,
-    Enum a,
-    Enum b,
-    Eq b,
-    KnownNat (I.Count (I.Normalize a)),
-    KnownNat (I.Count (I.Normalize b)),
-    I.FromLists (Natural 0 1) (I.Normalize b) (I.Normalize a)
+  ( Liftable (Natural 0 1) a b,
+    CountableDimensionsN a b,
+    FromListsN (Natural 0 1) b a
   ) => (a -> b -> Bool) -> Matrix (Natural 0 1) a b
 toRel = M . I.toRel
 
@@ -372,8 +353,8 @@ toList (M m) = I.toList m
 
 -- | The zero matrix. A matrix wholly filled with zeros.
 zeros ::
-  (Num e, I.FromLists e (I.Normalize cols) (I.Normalize rows), KnownNat (I.Count (I.Normalize cols)), KnownNat (I.Count (I.Normalize rows))) =>
-  Matrix e cols rows
+  (Num e, FromListsN e cols rows, CountableDimensionsN cols rows) 
+  => Matrix e cols rows
 zeros = M I.zeros
 
 -- Ones Matrix
@@ -382,8 +363,8 @@ zeros = M I.zeros
 --
 --   Also known as T (Top) matrix.
 ones ::
-  (Num e, I.FromLists e (I.Normalize cols) (I.Normalize rows), KnownNat (I.Count (I.Normalize cols)), KnownNat (I.Count (I.Normalize rows))) =>
-  Matrix e cols rows
+  (Num e, FromListsN e cols rows, CountableDimensionsN cols rows) 
+  => Matrix e cols rows
 ones = M I.ones
 
 -- Const Matrix
@@ -391,9 +372,8 @@ ones = M I.ones
 -- | The constant matrix constructor. A matrix wholly filled with a given
 -- value.
 constant ::
-  (Num e, I.FromLists e (I.Normalize cols) (I.Normalize rows), KnownNat (I.Count (I.Normalize cols)), KnownNat (I.Count (I.Normalize rows))) =>
-  e ->
-  Matrix e cols rows
+  (Num e, FromListsN e cols rows, CountableDimensionsN cols rows) 
+  => e -> Matrix e cols rows
 constant = M . I.constant
 
 -- Bang Matrix
@@ -401,7 +381,7 @@ constant = M . I.constant
 -- | The T (Top) row vector matrix.
 bang ::
   forall e cols.
-  (Num e, Enum e, I.FromLists e (I.Normalize cols) (), KnownNat (I.Count (I.Normalize cols))) =>
+  (Num e, Enum e, FromListsN e cols (), CountableN cols) =>
   Matrix e cols One
 bang = M I.bang
 
@@ -409,7 +389,7 @@ bang = M I.bang
 
 -- | Identity matrix
 identity ::
-  (Num e, I.FromLists e (I.Normalize a) (I.Normalize a), KnownNat (I.Count (I.Normalize a))) =>
+  (Num e, FromListsN e a a, CountableN a) =>
   Matrix e a a
 identity = M I.identity
 
@@ -425,11 +405,10 @@ comp (M a) (M b) = M (I.comp a b)
 -- | Biproduct first component projection
 p1 ::
   ( Num e,
-    KnownNat (I.Count (I.Normalize n)),
-    KnownNat (I.Count (I.Normalize m)),
-    I.FromLists e (I.Normalize n) (I.Normalize m),
-    I.FromLists e (I.Normalize m) (I.Normalize m),
-    I.Normalize (Either m n) ~ Either (I.Normalize m) (I.Normalize n)
+    CountableDimensionsN n m,
+    FromListsN e n m,
+    FromListsN e m m,
+    TrivialE m n
   ) =>
   Matrix e (Either m n) m
 p1 = M I.p1
@@ -437,11 +416,10 @@ p1 = M I.p1
 -- | Biproduct second component projection
 p2 ::
   ( Num e,
-    KnownNat (I.Count (I.Normalize n)),
-    KnownNat (I.Count (I.Normalize m)),
-    I.FromLists e (I.Normalize m) (I.Normalize n),
-    I.FromLists e (I.Normalize n) (I.Normalize n),
-    I.Normalize (Either m n) ~ Either (I.Normalize m) (I.Normalize n)
+    CountableDimensionsN n m,
+    FromListsN e m n,
+    FromListsN e n n,
+    TrivialE m n
   ) =>
   Matrix e (Either m n) n
 p2 = M I.p2
@@ -451,11 +429,10 @@ p2 = M I.p2
 -- | Biproduct first component injection
 i1 ::
   ( Num e,
-    KnownNat (I.Count (I.Normalize n)),
-    KnownNat (I.Count (I.Normalize m)),
-    I.FromLists e (I.Normalize n) (I.Normalize m),
-    I.FromLists e (I.Normalize m) (I.Normalize m),
-    I.Normalize (Either m n) ~ Either (I.Normalize m) (I.Normalize n)
+    CountableDimensionsN n m,
+    FromListsN e n m,
+    FromListsN e m m,
+    TrivialE m n
   ) =>
   Matrix e m (Either m n)
 i1 = tr p1
@@ -463,11 +440,10 @@ i1 = tr p1
 -- | Biproduct second component injection
 i2 ::
   ( Num e,
-    KnownNat (I.Count (I.Normalize n)),
-    KnownNat (I.Count (I.Normalize m)),
-    I.FromLists e (I.Normalize m) (I.Normalize n),
-    I.FromLists e (I.Normalize n) (I.Normalize n),
-    I.Normalize (Either m n) ~ Either (I.Normalize m) (I.Normalize n)
+    CountableDimensionsN n m,
+    FromListsN e m n,
+    FromListsN e n n,
+    TrivialE m n
   ) =>
   Matrix e n (Either m n)
 i2 = tr p2
@@ -481,7 +457,7 @@ i2 = tr p2
 --
 -- TODO: A 'rows' function that does not need the 'KnownNat' constraint in
 -- exchange for performance.
-rows :: (KnownNat (I.Count (I.Normalize rows))) => Matrix e cols rows -> Int
+rows :: (CountableN rows) => Matrix e cols rows -> Int
 rows (M m) = I.rows m
 
 -- | Obtain the number of columns.
@@ -491,7 +467,7 @@ rows (M m) = I.rows m
 --
 -- TODO: A 'columns' function that does not need the 'KnownNat' constraint in
 -- exchange for performance.
-columns :: (KnownNat (I.Count (I.Normalize cols))) => Matrix e cols rows -> Int
+columns :: (CountableN cols) => Matrix e cols rows -> Int
 columns (M m) = I.columns m
 
 -- Coproduct Bifunctor
@@ -501,14 +477,13 @@ infixl 5 -|-
 -- | Matrix coproduct functor also known as matrix direct sum.
 (-|-) ::
   ( Num e,
-    KnownNat (I.Count (I.Normalize j)),
-    KnownNat (I.Count (I.Normalize k)),
-    I.FromLists e (I.Normalize k) (I.Normalize k),
-    I.FromLists e (I.Normalize j) (I.Normalize k),
-    I.FromLists e (I.Normalize k) (I.Normalize j),
-    I.FromLists e (I.Normalize j) (I.Normalize j),
-    I.Normalize (Either n m) ~ Either (I.Normalize n) (I.Normalize m),
-    I.Normalize (Either k j) ~ Either (I.Normalize k) (I.Normalize j)
+    CountableDimensionsN j k,
+    FromListsN e k k,
+    FromListsN e j k,
+    FromListsN e k j,
+    FromListsN e j j,
+    TrivialE n m,
+    TrivialE k j
   ) =>
   Matrix e n k ->
   Matrix e m j ->
@@ -521,11 +496,10 @@ infixl 5 -|-
 kp1 :: 
   forall e m k .
   ( Num e,
-    KnownNat (I.Count (I.Normalize m)),
-    KnownNat (I.Count (I.Normalize k)),
-    KnownNat (I.Count (I.Normalize (m, k))),
-    I.FromLists e (I.Normalize (m, k)) (I.Normalize m),
-    I.Normalize (m, k) ~ I.Normalize (I.Normalize m, I.Normalize k)
+    CountableDimensionsN m k,
+    CountableN (m, k),
+    FromListsN e (m, k) m,
+    TrivialP m k
   ) => Matrix e (m, k) m
 kp1 = M (I.kp1 @e @(I.Normalize m) @(I.Normalize k))
 
@@ -533,11 +507,10 @@ kp1 = M (I.kp1 @e @(I.Normalize m) @(I.Normalize k))
 kp2 :: 
     forall e m k.
     ( Num e,
-      KnownNat (I.Count (I.Normalize k)),
-      KnownNat (I.Count (I.Normalize m)),
-      KnownNat (I.Count (I.Normalize (m, k))),
-      I.FromLists e (I.Normalize (m, k)) (I.Normalize k),
-      I.Normalize (m, k) ~ I.Normalize (I.Normalize m, I.Normalize k)
+      CountableDimensionsN k m,
+      CountableN (m, k),
+      FromListsN e (m, k) k,
+      TrivialP m k
     ) => Matrix e (m, k) k
 kp2 = M (I.kp2 @e @(I.Normalize m) @(I.Normalize k))
 
@@ -555,12 +528,11 @@ kp2 = M (I.kp2 @e @(I.Normalize m) @(I.Normalize k))
 khatri ::
   forall e cols a b.
   ( Num e,
-    KnownNat (I.Count (I.Normalize a)),
-    KnownNat (I.Count (I.Normalize b)),
-    KnownNat (I.Count (I.Normalize (a, b))),
-    I.FromLists e (I.Normalize (a, b)) (I.Normalize a),
-    I.FromLists e (I.Normalize (a, b)) (I.Normalize b),
-    I.Normalize (a, b) ~ I.Normalize (I.Normalize a, I.Normalize b)
+    CountableDimensionsN a b,
+    CountableN (a, b),
+    FromListsN e (a, b) a,
+    FromListsN e (a, b) b,
+    TrivialP a b
   ) => Matrix e cols a -> Matrix e cols b -> Matrix e cols (a, b)
 khatri a b =
   let kp1' = kp1 @e @a @b
@@ -575,18 +547,15 @@ infixl 4 ><
 (><) ::
   forall e m p n q.
   ( Num e,
-    KnownNat (I.Count (I.Normalize m)),
-    KnownNat (I.Count (I.Normalize n)),
-    KnownNat (I.Count (I.Normalize p)),
-    KnownNat (I.Count (I.Normalize q)),
-    KnownNat (I.Count (I.Normalize (m, n))),
-    KnownNat (I.Count (I.Normalize (p, q))),
-    I.FromLists e (I.Normalize (m, n)) (I.Normalize m),
-    I.FromLists e (I.Normalize (m, n)) (I.Normalize n),
-    I.FromLists e (I.Normalize (p, q)) (I.Normalize p),
-    I.FromLists e (I.Normalize (p, q)) (I.Normalize q),
-    I.Normalize (m, n) ~ I.Normalize (I.Normalize m, I.Normalize n),
-    I.Normalize (p, q) ~ I.Normalize (I.Normalize p, I.Normalize q)
+    CountableDimensionsN m n,
+    CountableDimensionsN p q,
+    CountableDimensionsN (m, n) (p, q),
+    FromListsN e (m, n) m,
+    FromListsN e (m, n) n,
+    FromListsN e (p, q) p,
+    FromListsN e (p, q) q,
+    TrivialP m n,
+    TrivialP p q
   ) => Matrix e m p -> Matrix e n q -> Matrix e (m, n) (p, q)
 (><) a b =
   let kp1' = kp1 @e @m @n
@@ -629,9 +598,9 @@ tr (M m) = M (I.tr m)
 -- ArrowMonad solution presented in the paper.
 selectM :: 
        ( Num e,
-         I.FromLists e (I.Normalize b) (I.Normalize b),
-         KnownNat (I.Count (I.Normalize b)),
-         I.Normalize (Either a b) ~ Either (I.Normalize a) (I.Normalize b)
+         FromListsN e b b,
+         CountableN b,
+         TrivialE a b
        ) => Matrix e cols (Either a b) -> Matrix e a b -> Matrix e cols b
 selectM (M m) (M y) = M (I.select m y)
 
@@ -639,15 +608,12 @@ selectM (M m) (M y) = M (I.select m y)
 
 -- | McCarthy's Conditional expresses probabilistic choice.
 cond ::
-     ( I.Normalize (I.Normalize a) ~ I.Normalize a,
-       KnownNat (I.Count (I.Normalize a)),
-       I.FromLists e () (I.Normalize a),
-       I.FromLists e (I.Normalize a) (),
-       I.FromLists e (I.Normalize a) (I.Normalize a),
-       Bounded a,
-       Enum a,
-       Num e,
-       Ord e
+     ( Trivial a,
+       CountableN a,
+       FromListsN e () a,
+       FromListsN e a (),
+       FromListsN e a a,
+       Liftable e a Bool
      )
      =>
      (a -> Bool) -> Matrix e a b -> Matrix e a b -> Matrix e a b
@@ -656,9 +622,9 @@ cond p (M a) (M b) = M (I.cond p a b)
 -- Pretty print
 
 -- | Matrix pretty printer
-pretty :: (KnownNat (I.Count (I.Normalize cols)), Show e) => Matrix e cols rows -> String
+pretty :: (CountableN cols, Show e) => Matrix e cols rows -> String
 pretty (M m) = I.pretty m
 
 -- | Matrix pretty printer
-prettyPrint :: (KnownNat (I.Count (I.Normalize cols)), Show e) => Matrix e cols rows -> IO ()
+prettyPrint :: (CountableN cols, Show e) => Matrix e cols rows -> IO ()
 prettyPrint (M m) = I.prettyPrint m
