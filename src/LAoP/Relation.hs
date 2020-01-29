@@ -53,6 +53,7 @@ module LAoP.Relation
     toList,
     toBool,
     pt,
+    belongs,
     relationBuilder,
     zeros,
     ones,
