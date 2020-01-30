@@ -30,6 +30,18 @@ module LAoP.Relation
     Relation (..),
     Boolean,
 
+    -- * Constraint type synonyms
+    Countable,
+    CountableDimensions,
+    CountableN,
+    CountableDimensionsN,
+    FromListsN,
+    Liftable,
+    Trivial,
+    TrivialE,
+    TrivialP,
+    TrivialP2,
+
     -- * Primitives
     empty,
     one,

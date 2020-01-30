@@ -1,3 +1,4 @@
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DerivingVia #-}
@@ -52,6 +53,18 @@ module LAoP.Matrix.Nat
 
     -- * Type safe matrix representation
     Matrix (..),
+
+    -- * Constraint type synonyms
+    Countable,
+    CountableDimensions,
+    CountableN,
+    CountableNz,
+    CountableDimensionsN,
+    FromListsN,
+    FromListsNz,
+    Liftable,
+    TrivialE,
+    TrivialP,
 
     -- * Primitives
     empty,
@@ -147,6 +160,18 @@ import qualified LAoP.Matrix.Internal as I
 newtype Matrix e (cols :: Nat) (rows :: Nat) = M (I.Matrix e (I.FromNat cols) (I.FromNat rows))
   deriving (Show, Num, Eq, Ord, NFData) via (I.Matrix e (I.FromNat cols) (I.FromNat rows))
 
+-- | Constraint type synonyms to keep the type signatures less convoluted
+type Countable a              = KnownNat (I.Count a)
+type CountableDimensions a b  = (Countable a, Countable b)
+type CountableN a             = KnownNat (I.Count (I.FromNat a))
+type CountableNz a            = KnownNat (I.Count (I.Normalize a))
+type CountableDimensionsN a b = (CountableN a, CountableN b)
+type FromListsN e a b         = I.FromLists e (I.FromNat a) (I.FromNat b)
+type FromListsNz e a b        = I.FromLists e (I.Normalize a) (I.Normalize b)
+type Liftable e a b           = (Bounded a, Bounded b, Enum a, Enum b, Eq b, Num e, Ord e)
+type TrivialE a b             = I.FromNat (a + b) ~ Either (I.FromNat a) (I.FromNat b)
+type TrivialP a b             = I.FromNat (a * b) ~ I.FromNat (I.Count (I.FromNat a) * I.Count (I.FromNat b))
+
 -- | It isn't possible to implement the 'id' function so it's
 -- implementation is 'undefined'. However 'comp' can be and this partial
 -- class implementation exists just to make the code more readable.
@@ -165,44 +190,43 @@ one :: e -> Matrix e 1 1
 one = M . I.One
 
 junc ::
-  (I.FromNat cols3 ~ Either (I.FromNat cols1) (I.FromNat cols2)) =>
-  Matrix e cols1 rows ->
-  Matrix e cols2 rows ->
-  Matrix e cols3 rows
+  (TrivialE a b) =>
+  Matrix e a rows ->
+  Matrix e b rows ->
+  Matrix e (a + b) rows
 junc (M a) (M b) = M (I.Junc a b)
 
 infixl 3 |||
 (|||) ::
-  (I.FromNat cols3 ~ Either (I.FromNat cols1) (I.FromNat cols2)) =>
-  Matrix e cols1 rows ->
-  Matrix e cols2 rows ->
-  Matrix e cols3 rows
+  (TrivialE a b) =>
+  Matrix e a rows ->
+  Matrix e b rows ->
+  Matrix e (a + b) rows
 (|||) = junc
 
 split ::
-  (I.FromNat rows3 ~ Either (I.FromNat rows1) (I.FromNat rows2)) =>
-  Matrix e cols rows1 ->
-  Matrix e cols rows2 ->
-  Matrix e cols rows3
+  (TrivialE a b) =>
+  Matrix e cols a ->
+  Matrix e cols b ->
+  Matrix e cols (a + b)
 split (M a) (M b) = M (I.Split a b)
 
 infixl 2 ===
 (===) ::
-  (I.FromNat rows3 ~ Either (I.FromNat rows1) (I.FromNat rows2)) =>
-  Matrix e cols rows1 ->
-  Matrix e cols rows2 ->
-  Matrix e cols rows3
+  (TrivialE a b) =>
+  Matrix e cols a ->
+  Matrix e cols b ->
+  Matrix e cols (a + b)
 (===) = split
 
 -- Construction
 
-fromLists :: (I.FromLists e (I.FromNat cols) (I.FromNat rows)) => [[e]] -> Matrix e cols rows
+fromLists :: (FromListsN e cols rows) => [[e]] -> Matrix e cols rows
 fromLists = M . I.fromLists
 
 matrixBuilder ::
-  (I.FromLists e (I.FromNat cols) (I.FromNat rows), KnownNat (I.Count (I.FromNat cols)), KnownNat (I.Count (I.FromNat rows))) =>
-  ((Int, Int) -> e) ->
-  Matrix e cols rows
+  (FromListsN e cols rows, CountableN cols, CountableN rows) 
+  => ((Int, Int) -> e) -> Matrix e cols rows
 matrixBuilder = M . I.matrixBuilder
 
 col :: (I.FromLists e () (I.FromNat rows)) => [e] -> Matrix e 1 rows
@@ -212,32 +236,20 @@ row :: (I.FromLists e (I.FromNat cols) ()) => [e] -> Matrix e cols 1
 row = M . I.row
 
 fromF ::
-  ( Bounded a,
-    Bounded b,
-    Enum a,
-    Enum b,
-    Eq b,
-    Num e,
-    Ord e,
-    KnownNat (I.Count (I.FromNat cols)),
-    KnownNat (I.Count (I.FromNat rows)),
-    I.FromLists e (I.FromNat rows) (I.FromNat cols)
+  ( Liftable e a b,
+    CountableN cols,
+    CountableN rows,
+    FromListsN e rows cols
   ) =>
   (a -> b) ->
   Matrix e cols rows
 fromF = M . I.fromF
 
 fromF' ::
-  ( Bounded a,
-    Bounded b,
-    Enum a,
-    Enum b,
-    Eq b,
-    Num e,
-    Ord e,
-    KnownNat (I.Count (I.Normalize a)),
-    KnownNat (I.Count (I.Normalize b)),
-    I.FromLists e (I.Normalize b) (I.Normalize a)
+  ( Liftable e a b,
+    CountableNz a,
+    CountableNz b,
+    FromListsNz e b a
   ) =>
   (a -> b) ->
   Matrix e (I.Count a) (I.Count b)
@@ -254,21 +266,21 @@ toList (M m) = I.toList m
 -- Zeros Matrix
 
 zeros ::
-  (Num e, I.FromLists e (I.FromNat cols) (I.FromNat rows), KnownNat (I.Count (I.FromNat cols)), KnownNat (I.Count (I.FromNat rows))) =>
+  (Num e, FromListsN e cols rows, CountableN cols, CountableN rows) =>
   Matrix e cols rows
 zeros = M I.zeros
 
 -- Ones Matrix
 
 ones ::
-  (Num e, I.FromLists e (I.FromNat cols) (I.FromNat rows), KnownNat (I.Count (I.FromNat cols)), KnownNat (I.Count (I.FromNat rows))) =>
+  (Num e, FromListsN e cols rows, CountableN cols, CountableN rows) =>
   Matrix e cols rows
 ones = M I.ones
 
 -- Const Matrix
 
 constant ::
-  (Num e, I.FromLists e (I.FromNat cols) (I.FromNat rows), KnownNat (I.Count (I.FromNat cols)), KnownNat (I.Count (I.FromNat rows))) =>
+  (Num e, FromListsN e cols rows, CountableN cols, CountableN rows) =>
   e ->
   Matrix e cols rows
 constant = M . I.constant
@@ -277,14 +289,14 @@ constant = M . I.constant
 
 bang ::
   forall e cols.
-  (Num e, Enum e, I.FromLists e (I.FromNat cols) (), KnownNat (I.Count (I.FromNat cols))) =>
+  (Num e, Enum e, I.FromLists e (I.FromNat cols) (), CountableN cols) =>
   Matrix e cols 1
 bang = M I.bang
 
 -- Identity Matrix
 
 identity ::
-  (Num e, I.FromLists e (I.FromNat cols) (I.FromNat cols), KnownNat (I.Count (I.FromNat cols))) =>
+  (Num e, FromListsN e cols cols, CountableN cols) =>
   Matrix e cols cols
 identity = M I.identity
 
@@ -295,22 +307,20 @@ comp (M a) (M b) = M (I.comp a b)
 
 p1 ::
   ( Num e,
-    KnownNat (I.Count (I.FromNat n)),
-    KnownNat (I.Count (I.FromNat m)),
-    I.FromLists e (I.FromNat n) (I.FromNat m),
-    I.FromLists e (I.FromNat m) (I.FromNat m),
-    I.FromNat (m + n) ~ Either (I.FromNat m) (I.FromNat n)
+    CountableDimensionsN n m,
+    FromListsN e n m,
+    FromListsN e m m,
+    TrivialE m n
   ) =>
   Matrix e (m + n) m
 p1 = M I.p1
 
 p2 ::
   ( Num e,
-    KnownNat (I.Count (I.FromNat n)),
-    KnownNat (I.Count (I.FromNat m)),
-    I.FromLists e (I.FromNat m) (I.FromNat n),
-    I.FromLists e (I.FromNat n) (I.FromNat n),
-    I.FromNat (m + n) ~ Either (I.FromNat m) (I.FromNat n)
+    CountableDimensionsN n m,
+    FromListsN e m n,
+    FromListsN e n n,
+    TrivialE m n
   ) =>
   Matrix e (m + n) n
 p2 = M I.p2
@@ -319,138 +329,123 @@ p2 = M I.p2
 
 i1 ::
   ( Num e,
-    KnownNat (I.Count (I.FromNat n)),
-    KnownNat (I.Count (I.FromNat rows)),
-    I.FromLists e (I.FromNat n) (I.FromNat rows),
-    I.FromLists e (I.FromNat rows) (I.FromNat rows),
-    I.FromNat (rows + n) ~ Either (I.FromNat rows) (I.FromNat n)
+    CountableDimensionsN n rows,
+    FromListsN e n rows,
+    FromListsN e rows rows,
+    TrivialE rows n
   ) =>
   Matrix e rows (rows + n)
 i1 = tr p1
 
 i2 ::
   ( Num e,
-    KnownNat (I.Count (I.FromNat rows)),
-    KnownNat (I.Count (I.FromNat m)),
-    I.FromLists e (I.FromNat m) (I.FromNat rows),
-    I.FromLists e (I.FromNat rows) (I.FromNat rows),
-    I.FromNat (m + rows) ~ Either (I.FromNat m) (I.FromNat rows)
+    CountableDimensionsN rows m,
+    FromListsN e m rows,
+    FromListsN e rows rows,
+    TrivialE m rows
   ) =>
   Matrix e rows (m + rows)
 i2 = tr p2
 
 -- Dimensions
 
-rows :: (KnownNat (I.Count (I.FromNat rows))) => Matrix e cols rows -> Int
+rows :: (CountableN rows) => Matrix e cols rows -> Int
 rows (M m) = I.rows m
 
-columns :: (KnownNat (I.Count (I.FromNat cols))) => Matrix e cols rows -> Int
+columns :: (CountableN cols) => Matrix e cols rows -> Int
 columns (M m) = I.columns m
 
--- Coproduct Bifunctor
-
+-- | Coproduct Bifunctor
 infixl 5 -|-
 
 (-|-) ::
   ( Num e,
-    KnownNat (I.Count (I.FromNat j)),
-    KnownNat (I.Count (I.FromNat k)),
-    I.FromLists e (I.FromNat k) (I.FromNat k),
-    I.FromLists e (I.FromNat j) (I.FromNat k),
-    I.FromLists e (I.FromNat k) (I.FromNat j),
-    I.FromLists e (I.FromNat j) (I.FromNat j),
-    I.FromNat (n + m) ~ Either (I.FromNat n) (I.FromNat m),
-    I.FromNat (k + j) ~ Either (I.FromNat k) (I.FromNat j)
+    CountableDimensionsN j k,
+    FromListsN e k k,
+    FromListsN e j k,
+    FromListsN e k j,
+    FromListsN e j j,
+    TrivialE n m,
+    TrivialE k j
   ) =>
   Matrix e n k ->
   Matrix e m j ->
   Matrix e (n + m) (k + j)
 (-|-) (M a) (M b) = M ((I.-|-) a b)
 
--- Khatri Rao Product and projections
-
+-- | Khatri Rao Product and projections
 kp1 :: 
   forall e m k .
   ( Num e,
-    KnownNat (I.Count (I.FromNat m)),
-    KnownNat (I.Count (I.FromNat k)),
-    KnownNat (I.Count (I.FromNat (m * k))),
-    I.FromLists e (I.FromNat (m * k)) (I.FromNat m),
-    I.FromNat (m * k) ~ I.FromNat (I.Count (I.FromNat m) * I.Count (I.FromNat k))
+    CountableDimensionsN m k,
+    CountableN (m * k),
+    FromListsN e (m * k) m,
+    TrivialP m k
   ) => Matrix e (m * k) m
 kp1 = M (I.kp1 @e @(I.FromNat m) @(I.FromNat k))
 
 kp2 :: 
     forall e m k.
     ( Num e,
-      KnownNat (I.Count (I.FromNat k)),
-      I.FromLists e (I.FromNat (m * k)) (I.FromNat k),
-      KnownNat (I.Count (I.FromNat m)),
-      KnownNat (I.Count (I.FromNat (m * k))),
-      I.FromNat (m * k) ~ I.FromNat (I.Count (I.FromNat m) * I.Count (I.FromNat k))
+      CountableDimensionsN k m,
+      FromListsN e (m * k) k,
+      CountableN (m * k),
+      TrivialP m k
     ) => Matrix e (m * k) k
 kp2 = M (I.kp2 @e @(I.FromNat m) @(I.FromNat k))
 
 khatri ::
   forall e cols a b.
   ( Num e,
-    KnownNat (I.Count (I.FromNat a)),
-    KnownNat (I.Count (I.FromNat b)),
-    KnownNat (I.Count (I.FromNat (a * b))),
-    I.FromLists e (I.FromNat (a * b)) (I.FromNat a),
-    I.FromLists e (I.FromNat (a * b)) (I.FromNat b),
-    I.FromNat (a * b) ~ I.FromNat (I.Count (I.FromNat a) * I.Count (I.FromNat b))
+    CountableDimensionsN a b,
+    CountableN (a * b),
+    FromListsN e (a * b) a,
+    FromListsN e (a * b) b,
+    TrivialP a b
   ) => Matrix e cols a -> Matrix e cols b -> Matrix e cols (a * b)
 khatri a b =
   let kp1' = kp1 @e @a @b
       kp2' = kp2 @e @a @b
    in comp (tr kp1') a * comp (tr kp2') b
 
--- Product Bifunctor (Kronecker)
-
+-- | Product Bifunctor (Kronecker)
 infixl 4 ><
 
 (><) ::
   forall e m p n q.
   ( Num e,
-    KnownNat (I.Count (I.FromNat m)),
-    KnownNat (I.Count (I.FromNat n)),
-    KnownNat (I.Count (I.FromNat p)),
-    KnownNat (I.Count (I.FromNat q)),
-    KnownNat (I.Count (I.FromNat (m * n))),
-    KnownNat (I.Count (I.FromNat (p * q))),
-    I.FromLists e (I.FromNat (m * n)) (I.FromNat m),
-    I.FromLists e (I.FromNat (m * n)) (I.FromNat n),
-    I.FromLists e (I.FromNat (p * q)) (I.FromNat p),
-    I.FromLists e (I.FromNat (p * q)) (I.FromNat q),
-    I.FromNat (m * n) ~ I.FromNat (I.Count (I.FromNat m) * I.Count (I.FromNat n)),
-    I.FromNat (p * q) ~ I.FromNat (I.Count (I.FromNat p) * I.Count (I.FromNat q))
+    CountableDimensionsN m n,
+    CountableDimensionsN p q,
+    CountableDimensionsN (m * n) (p * q),
+    FromListsN e (m * n) m,
+    FromListsN e (m * n) n,
+    FromListsN e (p * q) p,
+    FromListsN e (p * q) q,
+    TrivialP m n,
+    TrivialP p q
   ) => Matrix e m p -> Matrix e n q -> Matrix e (m * n) (p * q)
 (><) a b =
   let kp1' = kp1 @e @m @n
       kp2' = kp2 @e @m @n
    in khatri (comp a kp1') (comp b kp2')
 
--- Matrix abide Junc Split
-
+-- | Matrix abide Junc Split
 abideJS :: Matrix e cols rows -> Matrix e cols rows
 abideJS (M m) = M (I.abideJS m)
 
--- Matrix abide Split Junc
-
+-- | Matrix abide Split Junc
 abideSJ :: Matrix e cols rows -> Matrix e cols rows
 abideSJ (M m) = M (I.abideSJ m)
 
--- Matrix transposition
-
+-- | Matrix transposition
 tr :: Matrix e cols rows -> Matrix e rows cols
 tr (M m) = M (I.tr m)
 
 -- Selective 'select' operator
 select :: 
        ( Num e,
-         I.FromLists e (I.FromNat rows1) (I.FromNat rows1),
-         KnownNat (I.Count (I.FromNat rows1)),
+         FromListsN e rows1 rows1,
+         CountableN rows1,
          I.FromNat rows2 ~ I.FromNat rows1,
          I.FromNat cols1 ~ I.FromNat cols2,
          I.FromNat rows3 ~ Either (I.FromNat cols3) (I.FromNat rows1)
@@ -461,14 +456,11 @@ select (M m) (M y) = M (I.select m y)
 
 cond ::
      ( I.FromNat (I.Count (I.FromNat cols)) ~ I.FromNat cols,
-       KnownNat (I.Count (I.FromNat cols)),
+       CountableN cols,
        I.FromLists e () (I.FromNat cols),
        I.FromLists e (I.FromNat cols) (),
-       I.FromLists e (I.FromNat cols) (I.FromNat cols),
-       Bounded a,
-       Enum a,
-       Num e,
-       Ord e
+       FromListsN e cols cols,
+       Liftable e a Bool
      )
      =>
      (a -> Bool) -> Matrix e cols rows -> Matrix e cols rows -> Matrix e cols rows
@@ -476,8 +468,8 @@ cond p (M a) (M b) = M (I.cond p a b)
 
 -- Pretty print
 
-pretty :: (KnownNat (I.Count (I.FromNat cols)), Show e) => Matrix e cols rows -> String
+pretty :: (CountableN cols, Show e) => Matrix e cols rows -> String
 pretty (M m) = I.pretty m
 
-prettyPrint :: (KnownNat (I.Count (I.FromNat cols)), Show e) => Matrix e cols rows -> IO ()
+prettyPrint :: (CountableN cols, Show e) => Matrix e cols rows -> IO ()
 prettyPrint (M m) = I.prettyPrint m

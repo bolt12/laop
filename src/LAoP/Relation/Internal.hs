@@ -1,3 +1,4 @@
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -38,6 +39,18 @@ module LAoP.Relation.Internal
     -- * Relation data type
     Relation (..),
     Boolean,
+
+    -- * Constraint type synonyms
+    Countable,
+    CountableDimensions,
+    CountableN,
+    CountableDimensionsN,
+    FromListsN,
+    Liftable,
+    Trivial,
+    TrivialE,
+    TrivialP,
+    TrivialP2,
 
     -- * Primitives
     empty,
@@ -179,6 +192,18 @@ newtype Relation a b = R (I.Matrix Boolean (I.Normalize a) (I.Normalize b))
 
 deriving instance (Read (I.Matrix Boolean (I.Normalize a) (I.Normalize b))) => Read (Relation a b)
 
+-- | Constraint type synonyms to keep the type signatures less convoluted
+type Countable a              = KnownNat (I.Count a)
+type CountableDimensions a b  = (Countable a, Countable b)
+type CountableN a             = KnownNat (I.Count (I.Normalize a))
+type CountableDimensionsN a b = (CountableN a, CountableN b)
+type FromListsN a b           = I.FromLists Boolean (I.Normalize a) (I.Normalize b)
+type Liftable a b             = (Bounded a, Bounded b, Enum a, Enum b, Eq b, Num Boolean, Ord Boolean)
+type Trivial a                = I.Normalize a ~ I.Normalize (I.Normalize a)
+type TrivialE a b             = I.Normalize (Either a b) ~ Either (I.Normalize a) (I.Normalize b)
+type TrivialP a b             = I.Normalize (a, b) ~ I.Normalize (I.Normalize a, I.Normalize b)
+type TrivialP2 a b            = I.Normalize (I.Normalize a, I.Normalize b) ~ I.Normalize (I.Normalize (a, b))
+
 -- | It isn't possible to implement the 'id' function so it's
 -- implementation is 'undefined'. However 'comp' can be and this partial
 -- class implementation exists just to make the code more readable.
@@ -218,7 +243,7 @@ one = R . I.One
 -- | Boolean Matrix 'Junc' constructor, also known as relational coproduct.
 --
 -- See 'eitherR'.
-junc :: (I.Normalize (Either a b) ~ Either (I.Normalize a) (I.Normalize b)) 
+junc :: (TrivialE a b) 
      => Relation a c -> Relation b c -> Relation (Either a b) c
 junc (R a) (R b) = R (I.Junc a b)
 
@@ -227,21 +252,21 @@ infixl 3 |||
 --
 -- See 'eitherR'.
 (|||) ::
-  (I.Normalize (Either a b) ~ Either (I.Normalize a) (I.Normalize b)) =>
+  (TrivialE a b) =>
   Relation a c ->
   Relation b c ->
   Relation (Either a b) c
 (|||) = junc
 
 -- | Boolean Matrix 'Split' constructor, also known as relational product.
-split :: (I.Normalize (Either a b) ~ Either (I.Normalize a) (I.Normalize b)) 
+split :: (TrivialE a b) 
       => Relation c a -> Relation c b -> Relation c (Either a b)
 split (R a) (R b) = R (I.Split a b)
 
 infixl 2 ===
 -- | Boolean Matrix 'Split' constructor
 (===) ::
-  (I.Normalize (Either a b) ~ Either (I.Normalize a) (I.Normalize b)) =>
+  (TrivialE a b) =>
   Relation c a ->
   Relation c b ->
   Relation c (Either a b)
@@ -251,15 +276,14 @@ infixl 2 ===
 
 -- | Build a matrix out of a list of list of elements. Throws a runtime
 -- error if the dimensions do not match.
-fromLists :: (I.FromLists Boolean (I.Normalize a) (I.Normalize b)) => [[Boolean]] -> Relation a b
+fromLists :: (FromListsN a b) => [[Boolean]] -> Relation a b
 fromLists = R . I.fromLists
 
 -- | Matrix builder function. Constructs a matrix provided with
 -- a construction function.
 relationBuilder ::
-  (I.FromLists Boolean (I.Normalize a) (I.Normalize b), KnownNat (I.Count (I.Normalize a)), KnownNat (I.Count (I.Normalize b))) =>
-  ((Int, Int) -> Boolean) ->
-  Relation a b
+  (FromListsN a b, CountableDimensionsN a b) =>
+  ((Int, Int) -> Boolean) -> Relation a b
 relationBuilder = R . I.matrixBuilder
 
 -- | Lifts functions to matrices with arbitrary dimensions.
@@ -267,14 +291,9 @@ relationBuilder = R . I.matrixBuilder
 --   NOTE: Be careful to not ask for a matrix bigger than the cardinality of
 -- types @a@ or @b@ allows.
 fromF :: 
-      ( Bounded a,
-        Bounded b,
-        Enum a,
-        Enum b,
-        Eq b,
-        KnownNat (I.Count (I.Normalize c)),
-        KnownNat (I.Count (I.Normalize d)),
-        I.FromLists Boolean (I.Normalize d) (I.Normalize c)
+      ( Liftable a b,
+        CountableDimensionsN c d,
+        FromListsN d c
       )
       => (a -> b) -> Relation c d
 fromF f = R (I.fromFRel f)
@@ -282,44 +301,29 @@ fromF f = R (I.fromFRel f)
 -- | Lifts functions to matrices with dimensions matching @a@ and @b@
 -- cardinality's.
 fromF' :: 
-      ( Bounded b,
-        Bounded a,
-        Enum a,
-        Enum b,
-        Eq b,
-        KnownNat (I.Count (I.Normalize a)),
-        KnownNat (I.Count (I.Normalize b)),
-        I.FromLists Boolean (I.Normalize b) (I.Normalize a)
+      ( Liftable a b,
+        CountableDimensionsN a b,
+        FromListsN b a
       )
       => (a -> b) -> Relation a b
 fromF' f = R (I.fromFRel' f)
 
 -- | Lifts relation functions to 'Relation'
 toRel ::
-      ( Bounded b,
-        Bounded a,
-        Enum a,
-        Enum b,
-        Eq b,
-        KnownNat (I.Count (I.Normalize a)),
-        KnownNat (I.Count (I.Normalize b)),
-        I.FromLists Boolean (I.Normalize b) (I.Normalize a)
+      ( Liftable a b,
+        CountableDimensionsN a b,
+        FromListsN b a
       )
- => (a -> b -> Bool) -> Relation a b
+      => (a -> b -> Bool) -> Relation a b
 toRel = R . I.toRel
 
 -- | Lowers a 'Relation' to a function
 fromRel ::
-        ( Bounded a,
-          Bounded b,
-          Enum a,
-          Enum b,
+        ( Liftable a b,
           Eq a,
-          Eq b,
-          KnownNat (I.Count (I.Normalize a)),
-          KnownNat (I.Count (I.Normalize b)),
-          I.FromLists Boolean (I.Normalize a) One,
-          I.FromLists Boolean (I.Normalize b) One
+          CountableDimensionsN a b,
+          FromListsN a One,
+          FromListsN b One
         )
         => Relation a b -> (a -> b -> Bool)
 fromRel r a b = pointApBool a b r
@@ -344,16 +348,11 @@ toBool r = case toList r of
 --
 --  Maps a relation to a set valued function.
 pt :: 
-   ( Bounded a,
-     Bounded b,
-     Enum a,
-     Enum b,
+   ( Liftable a b,
      Eq a,
-     Eq b,
-     KnownNat (I.Count (I.Normalize a)),
-     KnownNat (I.Count (I.Normalize b)),
-     I.FromLists Boolean (I.Normalize a) One,
-     I.FromLists Boolean (I.Normalize b) One
+     CountableDimensionsN a b,
+     FromListsN a One,
+     FromListsN b One
    )
    => Relation a b -> (a -> Powerset b)
 pt r a =
@@ -365,9 +364,8 @@ belongs ::
         ( Bounded a,
           Enum a,
           Eq a,
-          KnownNat (I.Count (I.Normalize (Powerset a))),
-          KnownNat (I.Count (I.Normalize a)),
-          I.FromLists Boolean (I.Normalize a) (I.Normalize (Powerset a))
+          CountableDimensionsN (Powerset a) a,
+          FromListsN a (Powerset a)
         )
         => Relation (Powerset a) a
 belongs = toRel (flip elemR)
@@ -386,7 +384,7 @@ belongs = toRel (flip elemR)
 --   ⊥ ``sse`` R && R ``sse`` T == True
 --   @
 zeros ::
-  (I.FromLists Boolean (I.Normalize a) (I.Normalize b), KnownNat (I.Count (I.Normalize a)), KnownNat (I.Count (I.Normalize b))) =>
+  (FromListsN a b, CountableDimensionsN a b) =>
   Relation a b
 zeros = relationBuilder (const (nat 0))
 
@@ -401,7 +399,7 @@ zeros = relationBuilder (const (nat 0))
 --   ⊥ ``sse`` R && R ``sse`` T == True
 --   @
 ones ::
-  (I.FromLists Boolean (I.Normalize a) (I.Normalize b), KnownNat (I.Count (I.Normalize a)), KnownNat (I.Count (I.Normalize b))) =>
+  (FromListsN a b, CountableDimensionsN a b) =>
   Relation a b
 ones = relationBuilder (const (nat 1))
 
@@ -409,7 +407,7 @@ ones = relationBuilder (const (nat 1))
 
 -- | The T (Top) row vector relation.
 bang ::
-  (I.FromLists Boolean (I.Normalize a) One, KnownNat (I.Count (I.Normalize a))) =>
+  (FromListsN a One, CountableN a) =>
   Relation a One
 bang = ones
 
@@ -418,8 +416,8 @@ point ::
       ( Bounded a,
         Enum a,
         Eq a,
-        KnownNat (I.Count (I.Normalize a)),
-        I.FromLists Boolean (I.Normalize a) One
+        CountableN a,
+        FromListsN a One
       ) => a -> Relation One a
 point = fromF' . const
 
@@ -431,8 +429,7 @@ point = fromF' . const
 -- 'identity' ``comp`` r == r == r ``comp`` 'identity'
 -- @
 identity ::
-  (I.FromLists Boolean (I.Normalize a) (I.Normalize a), KnownNat (I.Count (I.Normalize a))) =>
-  Relation a a
+  (FromListsN a a, CountableN a) => Relation a a
 identity = relationBuilder (bool (nat 0) (nat 1) . uncurry (==))
 
 -- | Relational composition
@@ -486,8 +483,8 @@ shrunkBy r s = r `intersection` divR s (conv r)
 -- r ``overriddenBy`` r       == r
 -- @
 overriddenBy :: 
-             ( I.FromLists Boolean (I.Normalize b) (I.Normalize b),
-               KnownNat (I.Count (I.Normalize b))
+             ( FromListsN b b,
+               CountableN b
              ) => Relation a b -> Relation a b -> Relation a b
 overriddenBy r s = s `union` r `intersection` divR zeros (conv s)
 
@@ -496,16 +493,11 @@ overriddenBy r s = s `union` r `intersection` divR zeros (conv s)
 -- If @a@ and @b@ are related by 'Relation' @r@
 -- then @'pointAp' a b r == 'one' ('nat' 1)@
 pointAp ::
-        ( Bounded a,
-          Bounded b,
-          Enum a,
-          Enum b,
+        ( Liftable a b,
           Eq a,
-          Eq b,
-          KnownNat (I.Count (I.Normalize a)),
-          KnownNat (I.Count (I.Normalize b)),
-          I.FromLists Boolean (I.Normalize a) One,
-          I.FromLists Boolean (I.Normalize b) One
+          CountableDimensionsN a b,
+          FromListsN a One,
+          FromListsN b One
         ) => a -> b -> Relation a b -> Relation One One
 pointAp a b r = conv (point b) `comp` r `comp` point a
 
@@ -513,16 +505,11 @@ pointAp a b r = conv (point b) `comp` r `comp` point a
 --
 -- The same as 'pointAp' but converts 'Boolean' to 'Bool'
 pointApBool ::
-        ( Bounded a,
-          Bounded b,
-          Enum a,
-          Enum b,
+        ( Liftable a b,
           Eq a,
-          Eq b,
-          KnownNat (I.Count (I.Normalize a)),
-          KnownNat (I.Count (I.Normalize b)),
-          I.FromLists Boolean (I.Normalize a) One,
-          I.FromLists Boolean (I.Normalize b) One
+          CountableDimensionsN a b,
+          FromListsN a One,
+          FromListsN b One
         ) => a -> b -> Relation a b -> Bool
 pointApBool a b r = toBool $ conv (point b) `comp` r `comp` point a
 
@@ -602,19 +589,19 @@ divisionF f g = conv g `comp` f
 -- Taxonomy of binary relations
 
 -- | A 'Relation' @r@ is 'simple' 'iff' @'coreflexive' ('img' r)@
-simple :: (KnownNat (I.Count (I.Normalize b)), I.FromLists Boolean (I.Normalize b) (I.Normalize b)) => Relation a b -> Bool
+simple :: (CountableN b, FromListsN b b) => Relation a b -> Bool
 simple = coreflexive . img
 
 -- | A 'Relation' @r@ is 'injective' 'iff' @'coreflexive' ('ker' r)@
-injective :: (KnownNat (I.Count (I.Normalize a)), I.FromLists Boolean (I.Normalize a) (I.Normalize a)) => Relation a b -> Bool
+injective :: (CountableN a, FromListsN a a) => Relation a b -> Bool
 injective = coreflexive . ker
 
 -- | A 'Relation' @r@ is 'entire' 'iff' @'reflexive' ('ker' r)@
-entire :: (KnownNat (I.Count (I.Normalize a)), I.FromLists Boolean (I.Normalize a) (I.Normalize a)) => Relation a b -> Bool
+entire :: (CountableN a, FromListsN a a) => Relation a b -> Bool
 entire = reflexive . ker
 
 -- | A 'Relation' @r@ is 'surjective' 'iff' @'reflexive' ('img' r)@
-surjective :: (KnownNat (I.Count (I.Normalize b)), I.FromLists Boolean (I.Normalize b) (I.Normalize b)) => Relation a b -> Bool
+surjective :: (CountableN b, FromListsN b b) => Relation a b -> Bool
 surjective = reflexive . img
 
 -- | A 'Relation' @r@ is a 'function' 'iff' @'simple' r && 'entire' r@
@@ -627,68 +614,63 @@ surjective = reflexive . img
 -- r ``comp`` f ``sse`` s == r ``sse`` s ``comp`` f
 -- @
 function :: 
-         ( KnownNat (I.Count (I.Normalize b)),
-           KnownNat (I.Count (I.Normalize a)),
-           I.FromLists Boolean (I.Normalize a) (I.Normalize a),
-           I.FromLists Boolean (I.Normalize b) (I.Normalize b)
+         ( CountableDimensionsN a b,
+           FromListsN a a,
+           FromListsN b b
          ) 
          => Relation a b -> Bool
 function r = simple r && entire r
 
 -- | A 'Relation' @r@ is a 'representation' 'iff' @'injective' r && 'entire' r@
 representation ::
-               ( KnownNat (I.Count (I.Normalize a)),
-                 I.FromLists Boolean (I.Normalize a) (I.Normalize a)
+               ( CountableN a,
+                 FromListsN a a
                )
                => Relation a b -> Bool
 representation r = injective r && entire r
 
 -- | A 'Relation' @r@ is an 'abstraction' 'iff' @'surjective' r && 'simple' r@
 abstraction ::
-            ( KnownNat (I.Count (I.Normalize b)),
-              I.FromLists Boolean (I.Normalize b) (I.Normalize b)
+            ( CountableN b,
+              FromListsN b b
             )
             => Relation a b -> Bool
 abstraction r = surjective r && simple r
 
 -- | A 'Relation' @r@ is a 'surjection' 'iff' @'function' r && 'abstraction' r@
 surjection ::
-           ( KnownNat (I.Count (I.Normalize b)),
-             KnownNat (I.Count (I.Normalize a)),
-             I.FromLists Boolean (I.Normalize a) (I.Normalize a),
-             I.FromLists Boolean (I.Normalize b) (I.Normalize b)
+           ( CountableDimensionsN a b,
+             FromListsN a a,
+             FromListsN b b
            )
            => Relation a b -> Bool
 surjection r = function r && abstraction r
 
 -- | A 'Relation' @r@ is a 'injection' 'iff' @'function' r && 'representation' r@
 injection ::
-           ( KnownNat (I.Count (I.Normalize b)),
-             KnownNat (I.Count (I.Normalize a)),
-             I.FromLists Boolean (I.Normalize a) (I.Normalize a),
-             I.FromLists Boolean (I.Normalize b) (I.Normalize b)
+           ( CountableDimensionsN a b,
+             FromListsN a a,
+             FromListsN b b
            )
            => Relation a b -> Bool
 injection r = function r && representation r
 
 -- | A 'Relation' @r@ is an 'bijection' 'iff' @'injection' r && 'surjection' r@
 bijection :: 
-          ( KnownNat (I.Count (I.Normalize b)), 
-            KnownNat (I.Count (I.Normalize a)), 
-            I.FromLists Boolean (I.Normalize b) (I.Normalize b),
-            I.FromLists Boolean (I.Normalize a) (I.Normalize a)
+          ( CountableDimensionsN a b,
+            FromListsN b b,
+            FromListsN a a
           ) => Relation a b -> Bool
 bijection r = injection r && surjection r
-
 
 -- Properties of relations
 
 -- | A 'Relation' @r@ is 'reflexive' 'iff' @'identity' ``sse`` r@
-reflexive :: (KnownNat (I.Count (I.Normalize a)), I.FromLists Boolean (I.Normalize a) (I.Normalize a)) => Relation a a -> Bool
+reflexive :: (CountableN a, FromListsN a a) => Relation a a -> Bool
 reflexive r = identity <= r
 
 -- | A 'Relation' @r@ is 'coreflexive' 'iff' @r ``sse`` 'identity'@
-coreflexive :: (KnownNat (I.Count (I.Normalize a)), I.FromLists Boolean (I.Normalize a) (I.Normalize a)) => Relation a a -> Bool
+coreflexive :: (CountableN a, FromListsN a a) => Relation a a -> Bool
 coreflexive r = r <= identity
 
 -- | A 'Relation' @r@ is 'transitive' 'iff' @(r ``comp`` r) ``sse`` r@
@@ -700,35 +682,35 @@ symmetric :: Relation a a -> Bool
 symmetric r = r == conv r
 
 -- | A 'Relation' @r@ is anti-symmetric 'iff' @(r ``intersection`` 'conv' r) ``sse`` 'identity'@
-antiSymmetric :: (KnownNat (I.Count (I.Normalize a)), I.FromLists Boolean (I.Normalize a) (I.Normalize a)) => Relation a a -> Bool
+antiSymmetric :: (CountableN a, FromListsN a a) => Relation a a -> Bool
 antiSymmetric r = (r `intersection` conv r) `sse` identity
 
 -- | A 'Relation' @r@ is 'irreflexive' 'iff' @(r ``intersection`` 'identity') == 'zeros'@
-irreflexive :: (KnownNat (I.Count (I.Normalize a)), I.FromLists Boolean (I.Normalize a) (I.Normalize a)) => Relation a a -> Bool
+irreflexive :: (CountableN a, FromListsN a a) => Relation a a -> Bool
 irreflexive r = (r `intersection` identity) == zeros
 
 -- | A 'Relation' @r@ is 'connected' 'iff' @(r ``union`` 'conv' r) == 'ones'@
-connected :: (KnownNat (I.Count (I.Normalize a)), I.FromLists Boolean (I.Normalize a) (I.Normalize a)) => Relation a a -> Bool
+connected :: (CountableN a, FromListsN a a) => Relation a a -> Bool
 connected r = (r `union` conv r) == ones
 
 -- | A 'Relation' @r@ is a 'preorder' 'iff' @'reflexive' r && 'transitive' r@
-preorder :: (KnownNat (I.Count (I.Normalize a)), I.FromLists Boolean (I.Normalize a) (I.Normalize a)) => Relation a a -> Bool
+preorder :: (CountableN a, FromListsN a a) => Relation a a -> Bool
 preorder r = reflexive r && transitive r
 
 -- | A 'Relation' @r@ is a partial-order 'iff' @'antiSymmetric' r && 'preorder' r@
-partialOrder :: (KnownNat (I.Count (I.Normalize a)), I.FromLists Boolean (I.Normalize a) (I.Normalize a)) => Relation a a -> Bool
+partialOrder :: (CountableN a, FromListsN a a) => Relation a a -> Bool
 partialOrder r = antiSymmetric r && preorder r
 
 -- | A 'Relation' @r@ is a linear-order 'iff' @'connected' r && 'partialOrder' r@
-linearOrder :: (KnownNat (I.Count (I.Normalize a)), I.FromLists Boolean (I.Normalize a) (I.Normalize a)) => Relation a a -> Bool
+linearOrder :: (CountableN a, FromListsN a a) => Relation a a -> Bool
 linearOrder r = connected r && partialOrder r
 
 -- | A 'Relation' @r@ is an 'equivalence' 'iff' @'symmetric' r && 'preorder' r@
-equivalence :: (KnownNat (I.Count (I.Normalize a)), I.FromLists Boolean (I.Normalize a) (I.Normalize a)) => Relation a a -> Bool
+equivalence :: (CountableN a, FromListsN a a) => Relation a a -> Bool
 equivalence r = symmetric r && preorder r
 
 -- | A 'Relation' @r@ is a partial-equivalence 'iff' @'partialOrder' r && 'equivalence' r@
-partialEquivalence :: (KnownNat (I.Count (I.Normalize a)), I.FromLists Boolean (I.Normalize a) (I.Normalize a)) => Relation a a -> Bool
+partialEquivalence :: (CountableN a, FromListsN a a) => Relation a a -> Bool
 partialEquivalence r = partialOrder r && equivalence r
 
 -- | A 'Relation' @r@ is 'difunctional' or regular wherever 
@@ -760,12 +742,11 @@ difunctional r = r `comp` conv r `comp` r == r
 -- 'eitherR' ('splitR' r s) ('splitR' t v) == 'splitR' ('eitherR' r t) ('eitherR' s v)
 -- @
 splitR :: 
-       ( KnownNat (I.Count (I.Normalize a)),
-         KnownNat (I.Count (I.Normalize b)),
-         KnownNat (I.Count (I.Normalize (a, b))),
-         I.FromLists Boolean (I.Normalize (a, b)) (I.Normalize a),
-         I.FromLists Boolean (I.Normalize (a, b)) (I.Normalize b),
-         I.Normalize (a, b) ~ I.Normalize (I.Normalize a, I.Normalize b)
+       ( CountableDimensionsN a b,
+         CountableN (a, b),
+         FromListsN (a, b) a,
+         FromListsN (a, b) b,
+         TrivialP a b
        )
        => Relation c a -> Relation c b -> Relation c (a, b)
 splitR (R f) (R g) = R (I.khatri f g)
@@ -777,11 +758,10 @@ splitR (R f) (R g) = R (I.khatri f g)
 -- @
 p1 ::
    forall a b .
-   ( KnownNat (I.Count (I.Normalize a)),
-     KnownNat (I.Count (I.Normalize b)),
-     KnownNat (I.Count (I.Normalize (a, b))),
-     I.FromLists Boolean (I.Normalize (a, b)) (I.Normalize a),
-     I.Normalize (a, b) ~ I.Normalize (I.Normalize a, I.Normalize b)
+   ( CountableDimensionsN a b,
+     CountableN (a, b),
+     FromListsN (a, b) a,
+     TrivialP a b
    )
    => Relation (a, b) a
 p1 = R (I.kp1 @Boolean @(I.Normalize a) @(I.Normalize b))
@@ -793,11 +773,10 @@ p1 = R (I.kp1 @Boolean @(I.Normalize a) @(I.Normalize b))
 -- @
 p2 ::
    forall a b .
-   ( KnownNat (I.Count (I.Normalize b)),
-     KnownNat (I.Count (I.Normalize a)),
-     KnownNat (I.Count (I.Normalize (a, b))),
-     I.FromLists Boolean (I.Normalize (a, b)) (I.Normalize b),
-     I.Normalize (a, b) ~ I.Normalize (I.Normalize a, I.Normalize b)
+   ( CountableDimensionsN a b,
+     CountableN (a, b),
+     FromListsN (a, b) b,
+     TrivialP a b
    )
    => Relation (a, b) b
 p2 = R (I.kp2 @Boolean @(I.Normalize a) @(I.Normalize b))
@@ -812,18 +791,15 @@ infixl 4 ><
 -- (r '><' s) ``comp`` (p '><' q) == (r ``comp`` p) '><' (s ``comp`` q)
 -- @
 (><) ::
-     ( KnownNat (I.Count (I.Normalize a)),
-       KnownNat (I.Count (I.Normalize b)),
-       KnownNat (I.Count (I.Normalize c)),
-       KnownNat (I.Count (I.Normalize d)),
-       KnownNat (I.Count (I.Normalize (a, c))),
-       KnownNat (I.Count (I.Normalize (b, d))),
-       I.FromLists Boolean (I.Normalize (a, c)) (I.Normalize a),
-       I.FromLists Boolean (I.Normalize (a, c)) (I.Normalize c),
-       I.FromLists Boolean (I.Normalize (b, d)) (I.Normalize b),
-       I.FromLists Boolean (I.Normalize (b, d)) (I.Normalize d),
-       I.Normalize (a, c) ~ I.Normalize (I.Normalize a, I.Normalize c),
-       I.Normalize (b, d) ~ I.Normalize (I.Normalize b, I.Normalize d)
+     ( CountableDimensionsN a b,
+       CountableDimensionsN c d,
+       CountableDimensionsN (a, c) (b, d),
+       FromListsN (a, c) a,
+       FromListsN (a, c) c,
+       FromListsN (b, d) b,
+       FromListsN (b, d) d,
+       TrivialP a c,
+       TrivialP b d
      )
      => Relation a b -> Relation c d -> Relation (a, c) (b, d)
 (><) (R a) (R b) = R ((I.><) a b)
@@ -845,7 +821,7 @@ infixl 4 ><
 -- @
 -- 'eitherR' ('splitR' r s) ('splitR' t v) == 'splitR' ('eitherR' r t) ('eitherR' s v)
 -- @
-eitherR :: (I.Normalize (Either a b) ~ Either (I.Normalize a) (I.Normalize b)) 
+eitherR :: (TrivialE a b) 
      => Relation a c -> Relation b c -> Relation (Either a b) c
 eitherR = junc
 
@@ -856,11 +832,10 @@ eitherR = junc
 -- 'i1' ``comp`` 'i2' = 'zeros'
 -- @
 i1 :: 
-   ( KnownNat (I.Count (I.Normalize b)),
-     KnownNat (I.Count (I.Normalize a)),
-     I.FromLists Boolean (I.Normalize b) (I.Normalize a),
-     I.FromLists Boolean (I.Normalize a) (I.Normalize a),
-     I.Normalize (Either a b) ~ Either (I.Normalize a) (I.Normalize b)
+   ( CountableDimensionsN a b,
+     FromListsN b a,
+     FromListsN a a,
+     TrivialE a b
    )
    => Relation a (Either a b)
 i1 = R I.i1
@@ -872,11 +847,10 @@ i1 = R I.i1
 -- 'i1' ``comp`` 'i2' = 'zeros'
 -- @
 i2 :: 
-   ( KnownNat (I.Count (I.Normalize b)),
-     KnownNat (I.Count (I.Normalize a)),
-     I.FromLists Boolean (I.Normalize a) (I.Normalize b),
-     I.FromLists Boolean (I.Normalize b) (I.Normalize b),
-     I.Normalize (Either a b) ~ Either (I.Normalize a) (I.Normalize b)
+   ( CountableDimensionsN a b,
+     FromListsN a b,
+     FromListsN b b,
+     TrivialE a b
    )
    => Relation b (Either a b)
 i2 = R I.i2
@@ -889,14 +863,13 @@ infixl 5 -|-
 -- r '-|-' s == 'eitherR' ('i1' ``comp`` r) ('i2' ``comp`` s)
 -- @
 (-|-) ::
-  ( KnownNat (I.Count (I.Normalize d)),
-    KnownNat (I.Count (I.Normalize b)),
-    I.FromLists Boolean (I.Normalize b) (I.Normalize b),
-    I.FromLists Boolean (I.Normalize d) (I.Normalize b),
-    I.FromLists Boolean (I.Normalize b) (I.Normalize d),
-    I.FromLists Boolean (I.Normalize d) (I.Normalize d),
-    I.Normalize (Either a c) ~ Either (I.Normalize a) (I.Normalize c),
-    I.Normalize (Either b d) ~ Either (I.Normalize b) (I.Normalize d)
+  ( CountableDimensionsN b d,
+    FromListsN b b,
+    FromListsN d b,
+    FromListsN b d,
+    FromListsN d d,
+    TrivialE a c,
+    TrivialE b d
   ) 
   => Relation a b -> Relation c d -> Relation (Either a c) (Either b d)
 (-|-) (R a) (R b) = R ((I.-|-) a b)
@@ -909,19 +882,17 @@ infixl 5 -|-
 -- 'trans'/'untrans';
 -- more-over, where each particular attribute is placed (input/output) is irrelevant.
 trans :: 
-      ( KnownNat (I.Count (I.Normalize (a, b))),
-        KnownNat (I.Count (I.Normalize a)),
-        KnownNat (I.Count (I.Normalize (c, b))),
-        KnownNat (I.Count (I.Normalize b)),
-        KnownNat (I.Count (I.Normalize c)),
-        I.FromLists Boolean (I.Normalize (c, b)) (I.FromNat (I.Count c)),
-        I.FromLists Boolean (I.Normalize (c, b)) (I.FromNat (I.Count b)),
-        I.FromLists Boolean (I.Normalize (a, b)) (I.FromNat (I.Count b)),
-        I.FromLists Boolean (I.Normalize (a, b)) (I.FromNat (I.Count a)),
-        I.Normalize (a, b) ~ I.Normalize (I.Normalize (a, b)),
-        I.Normalize (c, b) ~ I.Normalize (I.Normalize (c, b)),
-        I.Normalize (I.Normalize a, I.Normalize b) ~ I.FromNat (I.Count (I.Normalize (a, b))),
-        I.Normalize (I.Normalize c, I.Normalize b) ~ I.FromNat (I.Count (I.Normalize (c, b)))
+      ( CountableDimensionsN a b,
+        CountableN c,
+        CountableDimensionsN (a, b) (c, b),
+        FromListsN (c, b) c,
+        FromListsN (c, b) b,
+        FromListsN (a, b) a,
+        FromListsN (a, b) b,
+        Trivial (a, b),
+        Trivial (c, b),
+        TrivialP2 a b,
+        TrivialP2 c b
       )
       => Relation (a, b) c -> Relation a (c, b)
 trans r = splitR r p2 `comp` conv p1
@@ -932,19 +903,17 @@ trans r = splitR r p2 `comp` conv p1
 -- 'trans'/'untrans';
 -- more-over, where each particular attribute is placed (input/output) is irrelevant.
 untrans ::
-        ( KnownNat (I.Count (I.Normalize (a, b))),
-          KnownNat (I.Count (I.Normalize a)),
-          KnownNat (I.Count (I.Normalize (c, b))),
-          KnownNat (I.Count (I.Normalize b)),
-          KnownNat (I.Count (I.Normalize c)),
-          I.FromLists Boolean (I.Normalize (c, b)) (I.FromNat (I.Count c)),
-          I.FromLists Boolean (I.Normalize (c, b)) (I.FromNat (I.Count b)),
-          I.FromLists Boolean (I.Normalize (a, b)) (I.FromNat (I.Count b)),
-          I.FromLists Boolean (I.Normalize (a, b)) (I.FromNat (I.Count a)),
-          I.Normalize (a, b) ~ I.Normalize (I.Normalize (a, b)),
-          I.Normalize (c, b) ~ I.Normalize (I.Normalize (c, b)),
-          I.Normalize (I.Normalize a, I.Normalize b) ~ I.FromNat (I.Count (I.Normalize (a, b))),
-          I.Normalize (I.Normalize c, I.Normalize b) ~ I.FromNat (I.Count (I.Normalize (c, b)))
+        ( CountableDimensionsN a b,
+          CountableN c,
+          CountableDimensionsN (a, b) (c, b),
+          FromListsN (c, b) c,
+          FromListsN (c, b) b,
+          FromListsN (a, b) b,
+          FromListsN (a, b) a,
+          Trivial (a, b),
+          Trivial (c, b),
+          TrivialP2 a b,
+          TrivialP2 c b
         )
          => Relation a (c, b) -> Relation (a, b) c
 untrans s = p1 `comp` conv (splitR (conv s) p2)
@@ -962,9 +931,9 @@ untrans s = p1 `comp` conv (splitR (conv s) p2)
 predR :: 
       ( Bounded a,
         Enum a,
-        KnownNat (I.Count (I.Normalize a)),
-        I.FromLists Boolean (I.Normalize a) (I.Normalize a),
-        I.FromLists Boolean (I.Normalize Bool) (I.Normalize a)
+        CountableN a,
+        FromListsN a a,
+        FromListsN Bool a
       )
       => (a -> Bool) -> Relation a a
 predR p = identity `intersection` divisionF (fromF' (const True)) (fromF' p)
@@ -978,8 +947,8 @@ predR p = identity `intersection` divisionF (fromF' (const True)) (fromF' p)
 -- 'equalizer' ('point' True) ('point' False) == 'zeros'
 -- @
 equalizer ::
-          ( KnownNat (I.Count (I.Normalize a)),
-            I.FromLists Boolean (I.Normalize a) (I.Normalize a)
+          ( CountableN a,
+            FromListsN a a
           )
           => Relation a b -> Relation a b -> Relation a a
 equalizer f g = identity `intersection` divisionF f g
@@ -992,10 +961,10 @@ equalizer f g = identity `intersection` divisionF f g
 guard :: 
      ( Bounded b,
        Enum b,
-       KnownNat (I.Count (I.Normalize b)),
-       I.FromLists Boolean (I.Normalize b) (I.Normalize b),
-       I.FromLists Boolean (I.Normalize Bool) (I.Normalize b),
-       I.Normalize (Either b b) ~ Either (I.Normalize b) (I.Normalize b)
+       CountableN b,
+       FromListsN b b,
+       FromListsN Bool b,
+       TrivialE b b
      ) => (b -> Bool) -> Relation b (Either b b)
 guard p = conv (eitherR (predR p) (predR (not . p)))
 
@@ -1003,10 +972,10 @@ guard p = conv (eitherR (predR p) (predR (not . p)))
 cond :: 
      ( Bounded b,
        Enum b,
-       KnownNat (I.Count (I.Normalize b)),
-       I.FromLists Boolean (I.Normalize b) (I.Normalize b),
-       I.FromLists Boolean (I.Normalize Bool) (I.Normalize b),
-       I.Normalize (Either b b) ~ Either (I.Normalize b) (I.Normalize b)
+       CountableN b,
+       FromListsN b b,
+       FromListsN Bool b,
+       TrivialE b b
      ) 
      => (b -> Bool) -> Relation b c -> Relation b c -> Relation b c
 cond p r s = eitherR r s `comp` guard p
@@ -1016,8 +985,8 @@ cond p r s = eitherR r s `comp` guard p
 -- For injective relations, 'domain' and 'ker'nel coincide,
 -- since @'ker' r ``sse`` 'identity'@ in such situations.
 domain :: 
-       ( KnownNat (I.Count (I.Normalize a)),
-         I.FromLists Boolean (I.Normalize a) (I.Normalize a)
+       ( CountableN a,
+         FromListsN a a
        ) => Relation a b -> Relation a a
 domain r = ker r `intersection` identity
 
@@ -1026,17 +995,17 @@ domain r = ker r `intersection` identity
 -- For functions, 'range' and 'img' (image) coincide,
 -- since @'img' f ``sse`` 'identity'@ for any @f@.
 range :: 
-      ( I.FromLists Boolean (I.Normalize b) (I.Normalize b),
-        KnownNat (I.Count (I.Normalize b))
+      ( CountableN b,
+        FromListsN b b
       ) => Relation a b -> Relation b b
 range r = img r `intersection` identity
 
 -- Relation pretty print
 
 -- | Relation pretty printing
-pretty :: (KnownNat (I.Count (I.Normalize a))) => Relation a b -> String
+pretty :: (CountableN a) => Relation a b -> String
 pretty (R a) = I.pretty a
 
 -- | Relation pretty printing
-prettyPrint :: (KnownNat (I.Count (I.Normalize a))) => Relation a b -> IO ()
+prettyPrint :: (CountableN a) => Relation a b -> IO ()
 prettyPrint (R a) = I.prettyPrint a

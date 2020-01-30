@@ -56,6 +56,17 @@ module LAoP.Matrix.Type
     -- * Type safe matrix representation
     Matrix (..),
 
+    -- * Constraint type aliases
+    Countable,
+    CountableDimensions,
+    CountableN,
+    CountableDimensionsN,
+    FromListsN,
+    Liftable,
+    Trivial,
+    TrivialE,
+    TrivialP,
+
     -- * Type aliases
     Zero,
     One,
