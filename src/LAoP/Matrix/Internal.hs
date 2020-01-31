@@ -1,4 +1,5 @@
 {-# LANGUAGE TypeFamilyDependencies #-}
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -205,6 +206,14 @@ type family FromNat' (b :: Bool) (m :: Type) :: Type where
 type family Normalize (d :: Type) :: Type where
   Normalize d = FromNat (Count d)
 
+-- | Constraint type synonyms to keep the type signatures less convoluted
+type Countable a = KnownNat (Count a)
+type CountableN a = KnownNat (Count (Normalize a))
+type CountableDimensions a b = (Countable a, Countable b)
+type CountableDimensionsN a b = (CountableN a, CountableN b)
+type FromListsN e a b = FromLists e (Normalize a) (Normalize b)
+type Liftable e a b = (Bounded a, Bounded b, Enum a, Enum b, Eq b, Num e, Ord e)
+
 -- | It isn't possible to implement the 'id' function so it's
 -- implementation is 'undefined'. However 'comp' can be and this partial
 -- class implementation exists just to make the code more readable.
@@ -322,7 +331,7 @@ instance {-# OVERLAPPING #-} (FromLists e cols ()) => FromLists e (Either () col
   fromLists [h : t] = Junc (One h) (fromLists [t])
   fromLists _       = error "Wrong dimensions"
 
-instance {-# OVERLAPPABLE #-} (FromLists e a (), FromLists e b (), KnownNat (Count a)) => FromLists e (Either a b) () where
+instance {-# OVERLAPPABLE #-} (FromLists e a (), FromLists e b (), Countable a) => FromLists e (Either a b) () where
   fromLists [l] = 
       let rowsA = fromInteger (natVal (Proxy :: Proxy (Count a)))
        in Junc (fromLists [take rowsA l]) (fromLists [drop rowsA l])
@@ -332,13 +341,13 @@ instance {-# OVERLAPPING #-} (FromLists e () rows) => FromLists e () (Either () 
   fromLists ([h] : t) = Split (One h) (fromLists t)
   fromLists _         = error "Wrong dimensions"
 
-instance {-# OVERLAPPABLE #-} (FromLists e () a, FromLists e () b, KnownNat (Count a)) => FromLists e () (Either a b) where
+instance {-# OVERLAPPABLE #-} (FromLists e () a, FromLists e () b, Countable a) => FromLists e () (Either a b) where
   fromLists l@([_] : _) = 
       let rowsA = fromInteger (natVal (Proxy :: Proxy (Count a)))
        in Split (fromLists (take rowsA l)) (fromLists (drop rowsA l))
   fromLists _         = error "Wrong dimensions"
 
-instance {-# OVERLAPPABLE #-} (FromLists e (Either a b) c, FromLists e (Either a b) d, KnownNat (Count c)) => FromLists e (Either a b) (Either c d) where
+instance {-# OVERLAPPABLE #-} (FromLists e (Either a b) c, FromLists e (Either a b) d, Countable c) => FromLists e (Either a b) (Either c d) where
   fromLists l@(h : t) =
     let lh        = length h
         rowsC     = fromInteger (natVal (Proxy :: Proxy (Count c)))
@@ -352,8 +361,7 @@ instance {-# OVERLAPPABLE #-} (FromLists e (Either a b) c, FromLists e (Either a
 matrixBuilder ::
   forall e cols rows.
   ( FromLists e cols rows,
-    KnownNat (Count cols),
-    KnownNat (Count rows)
+    CountableDimensions cols rows
   ) =>
   ((Int, Int) -> e) ->
   Matrix e cols rows
@@ -377,15 +385,8 @@ row = fromLists . (: [])
 -- types @a@ or @b@ allows.
 fromF ::
   forall a b cols rows e.
-  ( Bounded a,
-    Bounded b,
-    Enum a,
-    Enum b,
-    Eq b,
-    Num e,
-    Ord e,
-    KnownNat (Count cols),
-    KnownNat (Count rows),
+  ( Liftable e a b,
+    CountableDimensions cols rows,
     FromLists e rows cols
   ) =>
   (a -> b) ->
@@ -413,16 +414,9 @@ fromF f =
 -- cardinality's.
 fromF' ::
   forall a b e.
-  ( Bounded a,
-    Bounded b,
-    Enum a,
-    Enum b,
-    Eq b,
-    Num e,
-    Ord e,
-    KnownNat (Count (Normalize a)),
-    KnownNat (Count (Normalize b)),
-    FromLists e (Normalize b) (Normalize a)
+  ( Liftable e a b,
+    CountableDimensionsN a b,
+    FromListsN e b a
   ) =>
   (a -> b) ->
   Matrix e (Normalize a) (Normalize b)
@@ -461,7 +455,7 @@ toList = concat . toLists
 -- Zeros Matrix
 
 -- | The zero matrix. A matrix wholly filled with zeros.
-zeros :: (Num e, FromLists e cols rows, KnownNat (Count cols), KnownNat (Count rows)) => Matrix e cols rows
+zeros :: (Num e, FromLists e cols rows, CountableDimensions cols rows) => Matrix e cols rows
 zeros = matrixBuilder (const 0)
 
 -- Ones Matrix
@@ -469,20 +463,20 @@ zeros = matrixBuilder (const 0)
 -- | The ones matrix. A matrix wholly filled with ones.
 --
 --   Also known as T (Top) matrix.
-ones :: (Num e, FromLists e cols rows, KnownNat (Count cols), KnownNat (Count rows)) => Matrix e cols rows
+ones :: (Num e, FromLists e cols rows, CountableDimensions cols rows) => Matrix e cols rows
 ones = matrixBuilder (const 1)
 
 -- Const Matrix
 
 -- | The constant matrix constructor. A matrix wholly filled with a given
 -- value.
-constant :: (Num e, FromLists e cols rows, KnownNat (Count cols), KnownNat (Count rows)) => e -> Matrix e cols rows
+constant :: (Num e, FromLists e cols rows, CountableDimensions cols rows) => e -> Matrix e cols rows
 constant e = matrixBuilder (const e)
 
 -- Bang Matrix
 
 -- | The T (Top) row vector matrix.
-bang :: forall e cols. (Num e, Enum e, FromLists e cols (), KnownNat (Count cols)) => Matrix e cols ()
+bang :: forall e cols. (Num e, Enum e, FromLists e cols (), Countable cols) => Matrix e cols ()
 bang =
   let c = fromInteger $ natVal (Proxy :: Proxy (Count cols))
    in fromLists [take c [1, 1 ..]]
@@ -490,7 +484,7 @@ bang =
 -- Identity Matrix
 
 -- | Identity matrix.
-identity :: (Num e, FromLists e cols cols, KnownNat (Count cols)) => Matrix e cols cols
+identity :: (Num e, FromLists e cols cols, Countable cols) => Matrix e cols cols
 identity = matrixBuilder (bool 0 1 . uncurry (==))
 
 -- Matrix composition (MMM)
@@ -509,14 +503,14 @@ comp c (Junc a b)           = Junc (comp c a) (comp c b)  -- Junc fusion law
 -- Projections
 
 -- | Biproduct first component projection
-p1 :: forall e m n. (Num e, KnownNat (Count n), KnownNat (Count m), FromLists e n m, FromLists e m m) => Matrix e (Either m n) m
+p1 :: forall e m n. (Num e, CountableDimensions n m, FromLists e n m, FromLists e m m) => Matrix e (Either m n) m
 p1 =
   let iden = identity :: Matrix e m m
       zero = zeros :: Matrix e n m
    in junc iden zero
 
 -- | Biproduct second component projection
-p2 :: forall e m n. (Num e, KnownNat (Count n), KnownNat (Count m), FromLists e m n, FromLists e n n) => Matrix e (Either m n) n
+p2 :: forall e m n. (Num e, CountableDimensions n m, FromLists e m n, FromLists e n n) => Matrix e (Either m n) n
 p2 =
   let iden = identity :: Matrix e n n
       zero = zeros :: Matrix e m n
@@ -525,11 +519,11 @@ p2 =
 -- Injections
 
 -- | Biproduct first component injection
-i1 :: (Num e, KnownNat (Count n), KnownNat (Count m), FromLists e n m, FromLists e m m) => Matrix e m (Either m n)
+i1 :: (Num e, CountableDimensions n m, FromLists e n m, FromLists e m m) => Matrix e m (Either m n)
 i1 = tr p1
 
 -- | Biproduct second component injection
-i2 :: (Num e, KnownNat (Count n), KnownNat (Count m), FromLists e m n, FromLists e n n) => Matrix e n (Either m n)
+i2 :: (Num e, CountableDimensions n m, FromLists e m n, FromLists e n n) => Matrix e n (Either m n)
 i2 = tr p2
 
 -- Dimensions
@@ -541,7 +535,7 @@ i2 = tr p2
 --
 -- TODO: A 'rows' function that does not need the 'KnownNat' constraint in
 -- exchange for performance.
-rows :: forall e cols rows. (KnownNat (Count rows)) => Matrix e cols rows -> Int
+rows :: forall e cols rows. (Countable rows) => Matrix e cols rows -> Int
 rows _ = fromInteger $ natVal (Proxy :: Proxy (Count rows))
 
 -- | Obtain the number of columns.
@@ -551,7 +545,7 @@ rows _ = fromInteger $ natVal (Proxy :: Proxy (Count rows))
 --
 -- TODO: A 'columns' function that does not need the 'KnownNat' constraint in
 -- exchange for performance.
-columns :: forall e cols rows. (KnownNat (Count cols)) => Matrix e cols rows -> Int
+columns :: forall e cols rows. (Countable cols) => Matrix e cols rows -> Int
 columns _ = fromInteger $ natVal (Proxy :: Proxy (Count cols))
 
 -- Coproduct Bifunctor
@@ -562,8 +556,7 @@ infixl 5 -|-
 (-|-) ::
   forall e n k m j.
   ( Num e,
-    KnownNat (Count j),
-    KnownNat (Count k),
+    CountableDimensions j k,
     FromLists e k k,
     FromLists e j k,
     FromLists e k j,
@@ -580,10 +573,9 @@ infixl 5 -|-
 kp1 :: 
   forall e m k .
   ( Num e,
-    KnownNat (Count k),
-    FromLists e (FromNat (Count m * Count k)) m,
-    KnownNat (Count m),
-    KnownNat (Count (Normalize (m, k)))
+    CountableDimensions k m,
+    FromLists e (Normalize (m, k)) m,
+    CountableN (m, k)
   ) => Matrix e (Normalize (m, k)) m
 kp1 = matrixBuilder f
   where
@@ -596,10 +588,9 @@ kp1 = matrixBuilder f
 kp2 :: 
     forall e m k .
     ( Num e,
-      KnownNat (Count k),
-      FromLists e (FromNat (Count m * Count k)) k,
-      KnownNat (Count m),
-      KnownNat (Count (Normalize (m, k)))
+      CountableDimensions k m,
+      FromLists e (Normalize (m, k)) k,
+      CountableN (m, k)
     ) => Matrix e (Normalize (m, k)) k
 kp2 = matrixBuilder f
   where
@@ -622,9 +613,8 @@ kp2 = matrixBuilder f
 khatri :: 
        forall e cols a b. 
        ( Num e,
-         KnownNat (Count a),
-         KnownNat (Count b),
-         KnownNat (Count (Normalize (a, b))),
+         CountableDimensions a b,
+         CountableN (a, b),
          FromLists e (Normalize (a, b)) a,
          FromLists e (Normalize (a, b)) b
        ) => Matrix e cols a -> Matrix e cols b -> Matrix e cols (Normalize (a, b))
@@ -641,14 +631,11 @@ infixl 4 ><
 (><) :: 
      forall e m p n q. 
      ( Num e,
-       KnownNat (Count m),
-       KnownNat (Count n),
-       KnownNat (Count p),
-       KnownNat (Count q),
-       KnownNat (Count (Normalize (m, n))),
+       CountableDimensions m n,
+       CountableDimensions p q,
+       CountableDimensionsN (m, n) (p, q),
        FromLists e (Normalize (m, n)) m,
        FromLists e (Normalize (m, n)) n,
-       KnownNat (Count (Normalize (p, q))),
        FromLists e (Normalize (p, q)) p,
        FromLists e (Normalize (p, q)) q
      ) 
@@ -701,15 +688,15 @@ tr (Split a b) = Junc (tr a) (tr b)
 
 -- | Selective functors 'select' operator equivalent inspired by the
 -- ArrowMonad solution presented in the paper.
-select :: (Num e, FromLists e b b, KnownNat (Count b)) => Matrix e cols (Either a b) -> Matrix e a b -> Matrix e cols b
+select :: (Num e, FromLists e b b, Countable b) => Matrix e cols (Either a b) -> Matrix e a b -> Matrix e cols b
 select m y = junc y identity . m
 
 -- McCarthy's Conditional
 
 -- | McCarthy's Conditional expresses probabilistic choice.
 cond ::
-     ( cols ~ FromNat (Count cols),
-       KnownNat (Count cols),
+     ( cols ~ Normalize cols,
+       Countable cols,
        FromLists e () cols,
        FromLists e cols (),
        FromLists e cols cols,
@@ -723,8 +710,8 @@ cond ::
 cond p f g = junc f g . grd p
 
 grd :: 
-    ( q ~ FromNat (Count q),
-      KnownNat (Count q),
+    ( q ~ Normalize q,
+      Countable q,
       FromLists e () q,
       FromLists e q (),
       FromLists e q q,
@@ -739,15 +726,12 @@ grd f = split (corr f) (corr (not . f))
 
 corr :: 
     forall e a q . 
-    ( q ~ FromNat (Count q),
-      KnownNat (Count q),
+    ( q ~ Normalize q,
+      Countable q,
       FromLists e () q,
       FromLists e q (),
       FromLists e q q,
-      Bounded a,
-      Enum a,
-      Num e,
-      Ord e
+      Liftable e a Bool
     ) 
      => (a -> Bool) -> Matrix e q q
 corr p = let f = fromF p :: Matrix e q ()
@@ -775,7 +759,7 @@ prettyAux (h : t) l = "│ " ++ fill (unwords $ map show h) ++ " │\n" ++
    fill str = replicate (widest - length str - 2) ' ' ++ str
 
 -- | Matrix pretty printer
-pretty :: (KnownNat (Count cols), Show e) => Matrix e cols rows -> String
+pretty :: (Countable cols, Show e) => Matrix e cols rows -> String
 pretty m = "┌ " ++ unwords (replicate (columns m) blank) ++ " ┐\n" ++ 
             prettyAux (toLists m) (toLists m) ++
             "└ " ++ unwords (replicate (columns m) blank) ++ " ┘"
@@ -786,7 +770,7 @@ pretty m = "┌ " ++ unwords (replicate (columns m) blank) ++ " ┐\n" ++
    blank = fill ""
 
 -- | Matrix pretty printer
-prettyPrint :: (KnownNat (Count cols), Show e) => Matrix e cols rows -> IO ()
+prettyPrint :: (Countable cols, Show e) => Matrix e cols rows -> IO ()
 prettyPrint = putStrLn . pretty
 
 -- Relational operators functions
@@ -872,14 +856,9 @@ divS s r = divL r s `intersection` divR (tr r) (tr s)
 -- types @a@ or @b@ allows.
 fromFRel ::
   forall a b cols rows.
-  ( Bounded a,
-    Bounded b,
-    Enum a,
-    Enum b,
-    Eq b,
-    KnownNat (Count cols),
-    KnownNat (Count rows),
-    FromLists (Natural 0 1) rows cols
+  ( Liftable Boolean a b,
+    CountableDimensions cols rows,
+    FromLists Boolean rows cols
   ) =>
   (a -> b) ->
   Relation cols rows
@@ -906,14 +885,9 @@ fromFRel f =
 -- cardinality's.
 fromFRel' ::
   forall a b.
-  ( Bounded a,
-    Bounded b,
-    Enum a,
-    Enum b,
-    Eq b,
-    KnownNat (Count (Normalize a)),
-    KnownNat (Count (Normalize b)),
-    FromLists (Natural 0 1) (Normalize b) (Normalize a)
+  ( Liftable Boolean a b,
+    CountableDimensionsN a b,
+    FromLists Boolean (Normalize b) (Normalize a)
   ) =>
   (a -> b) ->
   Relation (Normalize a) (Normalize b)
@@ -944,9 +918,8 @@ toRel ::
         Enum a,
         Enum b,
         Eq b,
-        KnownNat (Count (Normalize a)),
-        KnownNat (Count (Normalize b)),
-        FromLists (Natural 0 1) (Normalize b) (Normalize a)
+        CountableDimensionsN a b,
+        FromListsN Boolean b a
       ) 
       => (a -> b -> Bool) -> Relation (Normalize a) (Normalize b)
 toRel f =
