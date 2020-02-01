@@ -935,8 +935,8 @@ predR ::
         FromListsN a a,
         FromListsN Bool a
       )
-      => (a -> Bool) -> Relation a a
-predR p = identity `intersection` divisionF (fromF' (const True)) (fromF' p)
+      => Relation a Bool -> Relation a a
+predR p = identity `intersection` divisionF (fromF' (const True)) p
 
 -- | Equalizes functions @f@ and @g@.
 -- That is, @'equalizer' f g@ is the largest coreflexive
@@ -965,8 +965,8 @@ guard ::
        FromListsN b b,
        FromListsN Bool b,
        TrivialE b b
-     ) => (b -> Bool) -> Relation b (Either b b)
-guard p = conv (eitherR (predR p) (predR (not . p)))
+     ) => Relation b Bool -> Relation b (Either b b)
+guard p = conv (eitherR (predR p) (predR (negate p)))
 
 -- | Relational McCarthy's conditional.
 cond :: 
@@ -977,7 +977,7 @@ cond ::
        FromListsN Bool b,
        TrivialE b b
      ) 
-     => (b -> Bool) -> Relation b c -> Relation b c -> Relation b c
+     => Relation b Bool -> Relation b c -> Relation b c -> Relation b c
 cond p r s = eitherR r s `comp` guard p
 
 -- | Relational domain.
