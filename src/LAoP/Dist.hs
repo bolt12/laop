@@ -36,6 +36,15 @@ module LAoP.Dist
     Dist (..),
     Prob,
 
+    -- * Constraint type synonyms
+    Countable,
+    CountableN,
+    CountableDimensionsN,
+    FromListsN,
+    Liftable,
+    TrivialP,
+    TrivialE,
+
     -- * Functor instance equivalent functions
     fmapD,
 
