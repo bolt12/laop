@@ -185,6 +185,7 @@ import GHC.TypeLits
 
 -- | Boolean type synonym for working with boolean matrices
 type Boolean = Natural 0 1
+type Powerset a = List (List a)
 
 -- | Relation data type.
 newtype Relation a b = R (I.Matrix Boolean (I.Normalize a) (I.Normalize b))
@@ -354,23 +355,23 @@ pt ::
      FromListsN a One,
      FromListsN b One
    )
-   => Relation a b -> (a -> Powerset b)
+   => Relation a b -> (a -> List b)
 pt r a =
-  let (PS lb) = maxBound
-   in PS [ b | b <- lb, toBool (pointAp a b r) ]
+  let (L lb) = maxBound
+   in L [ b | b <- lb, toBool (pointAp a b r) ]
 
 -- | Belongs relation
 belongs ::
         ( Bounded a,
           Enum a,
           Eq a,
-          CountableDimensionsN (Powerset a) a,
-          FromListsN a (Powerset a)
+          CountableDimensionsN (List a) a,
+          FromListsN a (List a)
         )
-        => Relation (Powerset a) a
-belongs = toRel (flip elemR)
+        => Relation (List a) a
+belongs = toRel elemR
   where
-    elemR x (PS l) = x `elem` l
+    elemR (L l) x = x `elem` l
 
 -- Zeros Matrix
 

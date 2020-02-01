@@ -88,7 +88,7 @@ module LAoP.Utils.Internal
     coerceNat3,
 
     -- * Powerset data type
-    Powerset (..)
+    List (..)
   )
 where
 
@@ -207,7 +207,7 @@ instance
 --
 -- This data type is a newtype wrapper around '[]'. This exists in order to
 -- implement an 'Enum' and 'Bounded' instance that cannot be harmful for the outside.
-newtype Powerset a = PS [a]
+newtype List a = L [a]
   deriving (Eq, Show, Read)
 
 powerset :: [a] -> [[a]]
@@ -217,22 +217,22 @@ powerset (x:xs) = powerset xs ++ [x:ps | ps <- powerset xs]
 instance
   ( Enum a,
     Bounded a
-  ) => Bounded (Powerset a)
+  ) => Bounded (List a)
   where
-  minBound = PS [] 
-  maxBound = PS [minBound .. maxBound]
+  minBound = L [] 
+  maxBound = L [minBound .. maxBound]
 
 instance
   ( Bounded a,
     Enum a,
     Eq a
-  ) => Enum (Powerset a)
+  ) => Enum (List a)
   where
   toEnum i =
     let as = [minBound .. maxBound]
-        in PS (powerset as !! i)
+        in L (powerset as !! i)
 
-  fromEnum (PS []) = 0
-  fromEnum (PS x) = 
+  fromEnum (L []) = 0
+  fromEnum (L x) = 
     let as = [minBound .. maxBound]
         in fromMaybe (error "Does not exist") $ elemIndex x (powerset as)
