@@ -10,7 +10,7 @@ motivation behind the library, the underlying theory, and implementation details
 This module offers many of the combinators mentioned in the work of
 [Macedo (2012)](https://repositorium.sdum.uminho.pt/handle/1822/22894) and [Oliveira (2012)](https://pdfs.semanticscholar.org/ccf5/27fa9179081223bffe8067edd81948644fc0.pdf). 
 
-See the candidate package in hackage [here](https://hackage.haskell.org/package/laop-0.1.0.0/candidate)
+See the candidate package in hackage [here](https://hackage.haskell.org/package/laop-0.1.0.0)
 
 ## Features
 
