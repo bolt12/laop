@@ -25,6 +25,7 @@ module LAoP.Dist.Internal
         unitD,
         multD,
         selectD,
+        selectD2,
         returnD,
         bindD,
         (??),
@@ -49,7 +50,7 @@ import Data.Proxy
 import Data.List (sortBy)
 
 -- | Type synonym for probability value
-type Prob = Double
+type Prob = Float
 
 -- | Type synonym for column vector matrices. This represents a probability
 -- distribution.
@@ -94,8 +95,14 @@ selectD ::
          FromListsN b b,
          CountableN b
        ) => Dist (Either a b) -> Matrix Prob a b -> Dist b
-selectD (D d) m = D (junc m identity `comp` d)
+selectD (D d) m = D (selectM d m)
 
+selectD2 :: 
+       ( TrivialE a b,
+         FromListsN b b,
+         CountableN b
+       ) => Dist (Either a b) -> Matrix Prob a b -> Dist b
+selectD2 (D d) m = D (junc m identity `comp` d)
 
 -- | Monad instance 'return' function
 returnD :: forall a . (Enum a, FromListsN () a, Countable a) => a -> Dist a

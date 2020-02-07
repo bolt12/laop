@@ -54,6 +54,7 @@ module LAoP.Dist
 
     -- * Selective equivalent functions
     selectD,
+    selectD2,
 
     -- * Monad equivalent functions
     returnD,

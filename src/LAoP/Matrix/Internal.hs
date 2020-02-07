@@ -81,7 +81,8 @@ module LAoP.Matrix.Internal
     tr,
 
     -- ** Selective operator
-    select, 
+    select,
+    branch,
 
     -- ** McCarthy's Conditional
     cond,
@@ -313,7 +314,7 @@ infixl 2 ===
 -- | Type class for defining the 'fromList' conversion function.
 --
 --   Given that it is not possible to branch on types at the term level type
--- classes are needed bery much like an inductive definition but on types.
+-- classes are needed very much like an inductive definition but on types.
 class FromLists e cols rows where
   -- | Build a matrix out of a list of list of elements. Throws a runtime
   -- error if the dimensions do not match.
@@ -689,7 +690,32 @@ tr (Split a b) = Junc (tr a) (tr b)
 -- | Selective functors 'select' operator equivalent inspired by the
 -- ArrowMonad solution presented in the paper.
 select :: (Num e, FromLists e b b, Countable b) => Matrix e cols (Either a b) -> Matrix e a b -> Matrix e cols b
-select m y = junc y identity . m
+select (Split a b) y                    = y . a + b                     -- Divide-and-conquer law
+select (Junc (Split a c) (Split b d)) y = junc (y . a + c) (y . b + d)  -- Pattern matching + DnC law
+select m y                              = junc y identity . m
+
+branch :: 
+       ( Num e,
+         CountableDimensions a b,
+         CountableDimensions c (Either b c),
+         FromLists e c b,
+         FromLists e a b,
+         FromLists e a a,
+         FromLists e b b,
+         FromLists e c c,
+         FromLists e b a,
+         FromLists e b c,
+         FromLists e (Either b c) b,
+         FromLists e (Either b c) c
+       )
+       => Matrix e cols (Either a b) -> Matrix e a c -> Matrix e b c -> Matrix e cols c
+branch x l r = f x `select` g l `select` r
+  where
+    f :: (Num e, Countable a, CountableDimensions b c, FromLists e a b, FromLists e c b, FromLists e b b, FromLists e b a, FromLists e a a)
+      => Matrix e cols (Either a b) -> Matrix e cols (Either a (Either b c))
+    f m = split (tr i1) (i1 . tr i2) . m
+    g :: (Num e, CountableDimensions b c, FromLists e b c, FromLists e c c) => Matrix e a c -> Matrix e a (Either b c)
+    g m = i2 . m
 
 -- McCarthy's Conditional
 
