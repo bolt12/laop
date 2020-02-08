@@ -104,12 +104,14 @@ normalize3 as l = let s  = sum l
                       probs = map (/ s) l
                    in zip as probs
 
-randomDistF :: forall a b . (CoArbitrary a, Arbitrary b) => Gen (Dist' (a -> b))
+randomDistF :: forall a b . (CountableDimensions a b, CoArbitrary a, Arbitrary b) => Gen (Dist' (a -> b))
 randomDistF = do
-  let size = 200
+  let a = fromInteger (natVal (Proxy :: Proxy (Count a)))
+      b = fromInteger (natVal (Proxy :: Proxy (Count b)))
+      size = a * b
   l <- vectorOf size (arbitrary :: Gen Prob)
   l2 <- vectorOf size (arbitrary :: Gen (a -> b))
-  let ln = normalize3 l2 (map P l)
+  let !ln = normalize3 l2 (map P l)
   return (D' ln)
 
 instance CoArbitrary (Natural a b)
@@ -134,11 +136,11 @@ setupEnv = do
 
 setupEnv2 = do
   m21 <- generate (resize 1 (randomMatrix @(Natural 0 100) @(Natural 0 100) ))
-  m40 <- generate (resize 1 (randomMatrix @(Natural 0 300) @(Either (Natural 0 100) (Natural 0 100) )))
-  dist <- generate (resize 1 (randomDist @(Either (Natural 0 1000) (Natural 0 1000)) ))
-  dist2 <- generate (resize 1 (randomMatrix @(Natural 0 1000) @(Natural 0 1000) ))
-  distList1 <- generate (resize 1 (randomDist2 @(Either (Natural 0 1000) (Natural 0 1000))))
-  distList2 <- generate (resize 1 (randomDistF @(Natural 0 1000) @(Natural 0 1000)))
+  m40 <- generate (resize 1 (randomMatrix @(Natural 0 100) @(Either (Natural 0 100) (Natural 0 100) )))
+  dist <- generate (resize 1 (randomDist @(Either (Natural 0 100) (Natural 0 100)) ))
+  dist2 <- generate (resize 1 (randomMatrix @(Natural 0 100) @(Natural 0 100) ))
+  distList1 <- generate (resize 1 (randomDist2 @(Either (Natural 0 100) (Natural 0 100))))
+  distList2 <- generate (resize 1 (randomDistF @(Natural 0 100) @(Natural 0 100)))
   return (m21, m40, dist, dist2, distList1, distList2)
 
 benchmark :: IO ()
@@ -157,12 +159,12 @@ benchmark = defaultMain [
    , bench "NF - 200x200" $ nf (comp m31) m32
    ] ],
    env setupEnv2 $ \ ~(m21, m40, dist, dist2, dl1, dl2) -> bgroup "Matrix vs List - `select`" [
-   bgroup "Distribution" [
+   bgroup "Distribution `select` - 100+100 / 100x100" [
      bench "List Distribution - Applicative version" $ nf (select dl1) dl2
    , bench "Matrix Distribution - Applicative version" $ nf (selectD2 dist) dist2
    , bench "Matrix Distribution - Selective version" $ nf (selectD dist) dist2
    ],
-   bgroup "Matrix `select`" [
+   bgroup "Matrix `select` - 100x(100+100) / 100x100" [
      bench "Applicative version" $ nf (selectM2 m40) m21
    , bench "Selective version" $ nf (selectM m40) m21
    ] ] ]
