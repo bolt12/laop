@@ -412,6 +412,7 @@ identity ::
   (Num e, FromListsN e a a, CountableN a) =>
   Matrix e a a
 identity = M I.identity
+{-# NOINLINE identity #-}
 
 -- Matrix composition (MMM)
 
@@ -421,6 +422,11 @@ identity = M I.identity
 -- from LAoP.
 comp :: (Num e) => Matrix e cr rows -> Matrix e cols cr -> Matrix e cols rows
 comp (M a) (M b) = M (I.comp a b)
+{-# NOINLINE comp #-}
+{-# RULES 
+   "comp/identity1" forall m. comp m identity = m ;
+   "comp/identity2" forall m. comp identity m = m
+#-}
 
 -- | Biproduct first component projection
 p1 ::

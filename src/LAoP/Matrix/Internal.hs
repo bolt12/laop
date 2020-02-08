@@ -1,3 +1,4 @@
+{-# LANGUAGE StrictData #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
@@ -489,6 +490,7 @@ bang =
 -- | Identity matrix.
 identity :: (Num e, FromLists e cols cols, Countable cols) => Matrix e cols cols
 identity = matrixBuilder (bool 0 1 . uncurry (==))
+{-# NOINLINE identity #-}
 
 -- Matrix composition (MMM)
 
@@ -502,6 +504,11 @@ comp (One a) (One b)        = One (a * b)
 comp (Junc a b) (Split c d) = comp a c + comp b d         -- Divide-and-conquer law
 comp (Split a b) c          = Split (comp a c) (comp b c) -- Split fusion law
 comp c (Junc a b)           = Junc (comp c a) (comp c b)  -- Junc fusion law
+{-# NOINLINE comp #-}
+{-# RULES 
+   "comp/identity1" forall m. comp m identity = m ;
+   "comp/identity2" forall m. comp identity m = m
+#-}
 
 -- Projections
 

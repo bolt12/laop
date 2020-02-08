@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -98,12 +99,13 @@ import Data.List
 import Data.Maybe
 import GHC.TypeLits
 import Control.DeepSeq
+import GHC.Generics
 
 -- | Wrapper around 'Int's that have a restrictive semantic associated.
 -- A value of type @'Natural' n m@ can only be instanciated with some 'Int'
 -- @i@ that's @n <= i <= m@.
 newtype Natural (start :: Nat) (end :: Nat) = Nat Int
-  deriving (Show, Read, Eq, Ord, NFData)
+  deriving (Show, Read, Eq, Ord, NFData, Generic)
 
 -- | Throws a runtime error if any of the operations overflows or
 -- underflows.

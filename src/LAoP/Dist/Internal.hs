@@ -50,7 +50,7 @@ import Data.List (sortBy)
 import Control.DeepSeq
 
 -- | Type synonym for probability value
-type Prob = Float
+type Prob = Double
 
 -- | Type synonym for column vector matrices. This represents a probability
 -- distribution.

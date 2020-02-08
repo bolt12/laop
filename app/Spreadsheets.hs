@@ -8,6 +8,7 @@ module Spreadsheets
   where
 
 import LAoP.Matrix.Type
+import qualified LAoP.Matrix.Internal as I
 import GHC.Generics
 
 data Student = Student1 | Student2 | Student3 | Student4
@@ -42,7 +43,19 @@ xls w m t = junc (split w m) (split zeros r)
   where
     rExam = m `comp` tr w
     rTest = tr t
-    rFinal = rTest `max` rExam
+    rFinal = rTest `maxPP` rExam
     rAux = junc rTest (junc rExam rFinal)
     r = tr (converter `comp` tr rAux)
     converter = junc test (junc exam final)
+
+-- | Overloaded, point-wise 'max' function
+maxPP_ :: Ord e => I.Matrix e a b -> I.Matrix e a b -> I.Matrix e a b
+maxPP_ I.Empty I.Empty = I.Empty
+maxPP_ (I.One a) (I.One b) = I.One (a `max` b)
+maxPP_ (I.Junc a b) (I.Junc c d) = I.Junc (maxPP_ a c) (maxPP_ b d)
+maxPP_ (I.Split a b) (I.Split c d) = I.Split (maxPP_ a c) (maxPP_ b d)
+maxPP_ x@(I.Split _ _) y@(I.Junc _ _) = maxPP_ x (I.abideJS y)
+maxPP_ x@(I.Junc _ _) y@(I.Split _ _) = maxPP_ (I.abideJS x) y
+
+maxPP :: Ord e => Matrix e a b -> Matrix e a b -> Matrix e a b
+maxPP (M a) (M b) = M (maxPP_ a b)

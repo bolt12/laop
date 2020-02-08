@@ -1,5 +1,5 @@
 name:                laop
-version:             0.1.0.0
+version:             0.1.0.3
 github:              "bolt12/laop"
 license:             BSD3
 author:              "Armando Santos"
@@ -12,7 +12,7 @@ extra-source-files:
 
 # Metadata used when publishing your package
 # synopsis:            Short description of your package
-# category:            Web
+category:              Data
 
 # To avoid duplicated efforts in documentation and dealing with the
 # complications of embedding Haddock markup inside cabal files, it is
@@ -21,20 +21,29 @@ description:         Please see the README on GitHub at <https://github.com/bolt
 
 dependencies:
 - base >= 4.7 && < 5
+- deepseq
 
 library:
   source-dirs: src
 
-#executables:
-#  laop-exe:
-#    main:                Main.hs
-#    source-dirs:         app
-#    ghc-options:
-#    - -threaded
-#    - -rtsopts
-#    - -with-rtsopts=-N
-#    dependencies:
-#    - laop
+executables:
+  laop-exe:
+    main:                Main.hs
+    source-dirs:         app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    - -funfolding-use-threshold=16
+    - -fexcess-precision # Good for doubles
+    - -optc-O3 # Good for doubles
+    - -optc-ffast-math # Good for doubles
+    - -O # Optimize
+    dependencies:
+    - laop
+    - criterion
+    - deepseq
+    - QuickCheck
 
 tests:
   laop-test:
