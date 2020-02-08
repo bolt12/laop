@@ -253,7 +253,7 @@ fromF' ::
   ) =>
   (a -> b) ->
   Matrix e (I.Count a) (I.Count b)
-fromF' = M . I.fromF'
+fromF' = undefined -- M . I.fromF'
 
 -- Conversion
 

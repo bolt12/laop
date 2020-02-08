@@ -1,3 +1,4 @@
+{-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
@@ -19,13 +20,11 @@ module LAoP.Dist.Internal
         FromListsN,
         Liftable,
         TrivialP,
-        TrivialE,
 
         fmapD,
         unitD,
         multD,
         selectD,
-        selectD2,
         returnD,
         bindD,
         (??),
@@ -42,12 +41,13 @@ module LAoP.Dist.Internal
         )
     where
 
-import LAoP.Matrix.Type hiding (TrivialP, TrivialE, Countable, CountableDimensions, CountableN, CountableDimensionsN, Liftable, FromListsN)
+import LAoP.Matrix.Type hiding (TrivialP, Countable, CountableDimensions, CountableN, CountableDimensionsN, Liftable, FromListsN)
 import qualified LAoP.Matrix.Internal as I
 import LAoP.Utils
 import GHC.TypeLits
 import Data.Proxy
 import Data.List (sortBy)
+import Control.DeepSeq
 
 -- | Type synonym for probability value
 type Prob = Float
@@ -55,6 +55,7 @@ type Prob = Float
 -- | Type synonym for column vector matrices. This represents a probability
 -- distribution.
 newtype Dist a = D (Matrix Prob () a)
+  deriving (Show, Num, Eq, Ord, NFData) via (Matrix Prob () a)
 
 -- | Constraint type synonyms to keep the type signatures less convoluted
 type Countable a              = KnownNat (I.Count a)
@@ -63,7 +64,6 @@ type CountableDimensionsN a b = (CountableN a, CountableN b)
 type FromListsN a b           = I.FromLists Prob (I.Normalize a) (I.Normalize b)
 type Liftable a b             = (Bounded a, Bounded b, Enum a, Enum b, Eq b, Num Prob, Ord Prob)
 type TrivialP a b             = Normalize (a, b) ~ Normalize (Normalize a, Normalize b)
-type TrivialE a b             = Normalize (Either a b) ~ Either (Normalize a) (Normalize b)
 
 -- | Functor instance
 fmapD :: 
@@ -91,18 +91,10 @@ multD (D a) (D b) = D (khatri a b)
 
 -- | Selective instance function
 selectD :: 
-       ( TrivialE a b,
-         FromListsN b b,
+       ( FromListsN b b,
          CountableN b
        ) => Dist (Either a b) -> Matrix Prob a b -> Dist b
 selectD (D d) m = D (selectM d m)
-
-selectD2 :: 
-       ( TrivialE a b,
-         FromListsN b b,
-         CountableN b
-       ) => Dist (Either a b) -> Matrix Prob a b -> Dist b
-selectD2 (D d) m = D (junc m identity `comp` d)
 
 -- | Monad instance 'return' function
 returnD :: forall a . (Enum a, FromListsN () a, Countable a) => a -> Dist a

@@ -64,7 +64,6 @@ module LAoP.Matrix.Type
     FromListsN,
     Liftable,
     Trivial,
-    TrivialE,
     TrivialP,
 
     -- * Type aliases
@@ -93,6 +92,7 @@ module LAoP.Matrix.Type
     zeros,
     ones,
     bang,
+    point,
     constant,
 
     -- * Functor instance equivalent function
@@ -189,8 +189,9 @@ type CountableN a             = KnownNat (I.Count (I.Normalize a))
 type CountableDimensionsN a b = (CountableN a, CountableN b)
 type FromListsN e a b         = I.FromLists e (I.Normalize a) (I.Normalize b)
 type Liftable e a b           = (Bounded a, Bounded b, Enum a, Enum b, Eq b, Num e, Ord e)
-type Trivial a                = I.Normalize a ~ I.Normalize (I.Normalize a)
-type TrivialE a b             = I.Normalize (Either a b) ~ Either (I.Normalize a) (I.Normalize b)
+type Trivial a                = I.Normalize (I.Normalize a) ~ I.Normalize (I.Normalize (I.Normalize a))
+type Trivial2 a               = I.Normalize a ~ I.Normalize (I.Normalize a)
+type Trivial3 a               = I.FromNat (I.Count (I.Normalize (I.Normalize a))) ~ I.Normalize (I.Normalize a)
 type TrivialP a b             = I.Normalize (a, b) ~ I.Normalize (I.Normalize a, I.Normalize b)
 
 -- | It isn't possible to implement the 'id' function so it's
@@ -220,7 +221,6 @@ one = M . I.One
 
 -- | Matrix 'Junc' constructor
 junc ::
-  (TrivialE a b) =>
   Matrix e a rows ->
   Matrix e b rows ->
   Matrix e (Either a b) rows
@@ -229,7 +229,6 @@ junc (M a) (M b) = M (I.Junc a b)
 infixl 3 |||
 -- | Matrix 'Junc' constructor
 (|||) ::
-  (TrivialE a b) =>
   Matrix e a rows ->
   Matrix e b rows ->
   Matrix e (Either a b) rows
@@ -237,7 +236,6 @@ infixl 3 |||
 
 -- | Matrix 'Split' constructor
 split ::
-  (TrivialE a b) =>
   Matrix e cols a ->
   Matrix e cols b ->
   Matrix e cols (Either a b)
@@ -246,7 +244,6 @@ split (M a) (M b) = M (I.Split a b)
 infixl 2 ===
 -- | Matrix 'Split' constructor
 (===) ::
-  (TrivialE a b) =>
   Matrix e cols a ->
   Matrix e cols b ->
   Matrix e cols (Either a b)
@@ -396,6 +393,18 @@ bang ::
   Matrix e cols One
 bang = M I.bang
 
+-- | Point constant relation
+point :: 
+      ( Bounded a,
+        Enum a,
+        Eq a,
+        Num e,
+        Ord e,
+        CountableN a,
+        FromListsN e a One
+      ) => a -> Matrix e One a
+point = fromF' . const
+
 -- Identity Matrix
 
 -- | Identity matrix
@@ -418,8 +427,7 @@ p1 ::
   ( Num e,
     CountableDimensionsN n m,
     FromListsN e n m,
-    FromListsN e m m,
-    TrivialE m n
+    FromListsN e m m
   ) =>
   Matrix e (Either m n) m
 p1 = M I.p1
@@ -429,8 +437,7 @@ p2 ::
   ( Num e,
     CountableDimensionsN n m,
     FromListsN e m n,
-    FromListsN e n n,
-    TrivialE m n
+    FromListsN e n n
   ) =>
   Matrix e (Either m n) n
 p2 = M I.p2
@@ -442,8 +449,7 @@ i1 ::
   ( Num e,
     CountableDimensionsN n m,
     FromListsN e n m,
-    FromListsN e m m,
-    TrivialE m n
+    FromListsN e m m
   ) =>
   Matrix e m (Either m n)
 i1 = tr p1
@@ -453,8 +459,7 @@ i2 ::
   ( Num e,
     CountableDimensionsN n m,
     FromListsN e m n,
-    FromListsN e n n,
-    TrivialE m n
+    FromListsN e n n
   ) =>
   Matrix e n (Either m n)
 i2 = tr p2
@@ -492,9 +497,7 @@ infixl 5 -|-
     FromListsN e k k,
     FromListsN e j k,
     FromListsN e k j,
-    FromListsN e j j,
-    TrivialE n m,
-    TrivialE k j
+    FromListsN e j j
   ) =>
   Matrix e n k ->
   Matrix e m j ->
@@ -610,8 +613,7 @@ tr (M m) = M (I.tr m)
 selectM :: 
        ( Num e,
          FromListsN e b b,
-         CountableN b,
-         TrivialE a b
+         CountableN b
        ) => Matrix e cols (Either a b) -> Matrix e a b -> Matrix e cols b
 selectM (M m) (M y) = M (I.select m y)
 
@@ -620,6 +622,8 @@ selectM (M m) (M y) = M (I.select m y)
 -- | McCarthy's Conditional expresses probabilistic choice.
 cond ::
      ( Trivial a,
+       Trivial2 a,
+       Trivial3 a,
        CountableN a,
        FromListsN e () a,
        FromListsN e a (),

@@ -205,6 +205,7 @@ type family FromNat' (b :: Bool) (m :: Type) :: Type where
 -- | Type family that normalizes the representation of a given data
 -- structure
 type family Normalize (d :: Type) :: Type where
+  Normalize (Either a b)  = Either (Normalize a) (Normalize b)
   Normalize d = FromNat (Count d)
 
 -- | Constraint type synonyms to keep the type signatures less convoluted
@@ -214,6 +215,7 @@ type CountableDimensions a b = (Countable a, Countable b)
 type CountableDimensionsN a b = (CountableN a, CountableN b)
 type FromListsN e a b = FromLists e (Normalize a) (Normalize b)
 type Liftable e a b = (Bounded a, Bounded b, Enum a, Enum b, Eq b, Num e, Ord e)
+type Trivial a = FromNat (Count a) ~ a
 
 -- | It isn't possible to implement the 'id' function so it's
 -- implementation is 'undefined'. However 'comp' can be and this partial
@@ -721,7 +723,7 @@ branch x l r = f x `select` g l `select` r
 
 -- | McCarthy's Conditional expresses probabilistic choice.
 cond ::
-     ( cols ~ Normalize cols,
+     ( Trivial cols,
        Countable cols,
        FromLists e () cols,
        FromLists e cols (),
@@ -736,7 +738,7 @@ cond ::
 cond p f g = junc f g . grd p
 
 grd :: 
-    ( q ~ Normalize q,
+    ( Trivial q,
       Countable q,
       FromLists e () q,
       FromLists e q (),
@@ -752,7 +754,7 @@ grd f = split (corr f) (corr (not . f))
 
 corr :: 
     forall e a q . 
-    ( q ~ Normalize q,
+    ( Trivial q,
       Countable q,
       FromLists e () q,
       FromLists e q (),
