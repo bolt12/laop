@@ -154,6 +154,7 @@ import LAoP.Utils.Internal
 import Data.Bool
 import Data.Kind
 import Data.List
+import Data.Maybe
 import Data.Proxy
 import Data.Void
 import GHC.TypeLits
@@ -804,18 +805,36 @@ prettyAux (h : t) l = "│ " ++ fill (unwords $ map show h) ++ " │\n" ++
    fill str = replicate (widest - length str - 2) ' ' ++ str
 
 -- | Matrix pretty printer
-pretty :: (Countable cols, Show e) => Matrix e cols rows -> String
-pretty m = "┌ " ++ unwords (replicate (columns m) blank) ++ " ┐\n" ++ 
-            prettyAux (toLists m) (toLists m) ++
-            "└ " ++ unwords (replicate (columns m) blank) ++ " ┘"
-  where
-   v  = fmap show (toList m)
-   widest = maximum $ fmap length v
+pretty :: (CountableDimensions cols rows, Show e) => Matrix e cols rows -> String
+pretty m = concat
+   [ "┌ ", unwords (replicate (columns m) blank), " ┐\n"
+   , unlines
+   [ "│ " ++ unwords (fmap (\j -> fill $ show $ getElem i j m) [1..columns m]) ++ " │" | i <- [1..rows m] ]
+   , "└ ", unwords (replicate (columns m) blank), " ┘"
+   ]
+ where
+   strings = map show (toList m)
+   widest = maximum $ map length strings
    fill str = replicate (widest - length str) ' ' ++ str
    blank = fill ""
+   safeGet i j m
+    | i > rows m || j > columns m || i < 1 || j < 1 = Nothing
+    | otherwise = Just $ unsafeGet i j m (toList m)
+   unsafeGet i j m l = l !! encode (columns m) (i,j)
+   encode m (i,j) = (i-1)*m + j - 1
+   getElem i j m =
+     fromMaybe
+       (error $
+          "getElem: Trying to get the "
+           ++ show (i, j)
+           ++ " element from a "
+           ++ show (rows m) ++ "x" ++ show (columns m)
+           ++ " matrix."
+       )
+       (safeGet i j m)
 
 -- | Matrix pretty printer
-prettyPrint :: (Countable cols, Show e) => Matrix e cols rows -> IO ()
+prettyPrint :: (CountableDimensions cols rows, Show e) => Matrix e cols rows -> IO ()
 prettyPrint = putStrLn . pretty
 
 -- Relational operators functions

@@ -643,9 +643,9 @@ cond p (M a) (M b) = M (I.cond p a b)
 -- Pretty print
 
 -- | Matrix pretty printer
-pretty :: (CountableN cols, Show e) => Matrix e cols rows -> String
+pretty :: (CountableDimensionsN cols rows, Show e) => Matrix e cols rows -> String
 pretty (M m) = I.pretty m
 
 -- | Matrix pretty printer
-prettyPrint :: (CountableN cols, Show e) => Matrix e cols rows -> IO ()
+prettyPrint :: (CountableDimensionsN cols rows, Show e) => Matrix e cols rows -> IO ()
 prettyPrint (M m) = I.prettyPrint m

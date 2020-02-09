@@ -989,9 +989,9 @@ range r = img r `intersection` identity
 -- Relation pretty print
 
 -- | Relation pretty printing
-pretty :: (CountableN a) => Relation a b -> String
+pretty :: (CountableDimensionsN a b) => Relation a b -> String
 pretty (R a) = I.pretty a
 
 -- | Relation pretty printing
-prettyPrint :: (CountableN a) => Relation a b -> IO ()
+prettyPrint :: (CountableDimensionsN a b) => Relation a b -> IO ()
 prettyPrint (R a) = I.prettyPrint a
