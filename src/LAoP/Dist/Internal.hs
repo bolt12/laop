@@ -25,6 +25,8 @@ module LAoP.Dist.Internal
         unitD,
         multD,
         selectD,
+        branchD,
+        ifD,
         returnD,
         bindD,
         (??),
@@ -48,6 +50,7 @@ import GHC.TypeLits
 import Data.Proxy
 import Data.List (sortBy)
 import Control.DeepSeq
+import Data.Bool
 
 -- | Type synonym for probability value
 type Prob = Double
@@ -95,6 +98,41 @@ selectD ::
          CountableN b
        ) => Dist (Either a b) -> Matrix Prob a b -> Dist b
 selectD (D d) m = D (selectM d m)
+
+-- | Chooses which of the two given effectful
+-- functions to apply to a given argument; 
+branchD ::
+       ( Num e,
+         CountableDimensionsN a b,
+         CountableDimensionsN c (Either b c),
+         FromListsN c b,
+         FromListsN a b,
+         FromListsN a a,
+         FromListsN b b,
+         FromListsN c c,
+         FromListsN b a,
+         FromListsN b c,
+         FromListsN (Either b c) b,
+         FromListsN (Either b c) c
+       )
+       => Dist (Either a b) -> Matrix Prob a c -> Matrix Prob b c -> Dist c
+branchD x l r = f x `selectD` g l `selectD` r
+  where
+    f (D m) = D (split (tr i1) (i1 `comp` tr i2) `comp` m)
+    g m = i2 `comp` m
+
+-- | Branch on a Boolean value, skipping unnecessary computations.
+ifD ::
+    ( CountableDimensionsN a (Either () a),
+      FromListsN a a,
+      FromListsN a (),
+      FromListsN () a,
+      FromListsN (Either () a) a
+    )
+    => Dist Bool -> Dist a -> Dist a -> Dist a
+ifD x (D t) (D e) = branchD x' t e
+  where
+    x' = bool (Right ()) (Left ()) `fmapD` x
 
 -- | Monad instance 'return' function
 returnD :: forall a . (Enum a, FromListsN () a, Countable a) => a -> Dist a

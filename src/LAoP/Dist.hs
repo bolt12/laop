@@ -53,6 +53,8 @@ module LAoP.Dist
 
     -- * Selective equivalent functions
     selectD,
+    branchD,
+    ifD,
 
     -- * Monad equivalent functions
     returnD,

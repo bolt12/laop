@@ -48,9 +48,7 @@ module LAoP.Relation.Internal
     FromListsN,
     Liftable,
     Trivial,
-    TrivialE,
     TrivialP,
-    TrivialP2,
 
     -- * Primitives
     empty,
@@ -201,9 +199,7 @@ type CountableDimensionsN a b = (CountableN a, CountableN b)
 type FromListsN a b           = I.FromLists Boolean (I.Normalize a) (I.Normalize b)
 type Liftable a b             = (Bounded a, Bounded b, Enum a, Enum b, Eq b, Num Boolean, Ord Boolean)
 type Trivial a                = I.Normalize a ~ I.Normalize (I.Normalize a)
-type TrivialE a b             = I.Normalize (Either a b) ~ Either (I.Normalize a) (I.Normalize b)
 type TrivialP a b             = I.Normalize (a, b) ~ I.Normalize (I.Normalize a, I.Normalize b)
-type TrivialP2 a b            = I.Normalize (I.Normalize a, I.Normalize b) ~ I.Normalize (I.Normalize (a, b))
 
 -- | It isn't possible to implement the 'id' function so it's
 -- implementation is 'undefined'. However 'comp' can be and this partial
@@ -244,8 +240,7 @@ one = R . I.One
 -- | Boolean Matrix 'Junc' constructor, also known as relational coproduct.
 --
 -- See 'eitherR'.
-junc :: (TrivialE a b) 
-     => Relation a c -> Relation b c -> Relation (Either a b) c
+junc :: Relation a c -> Relation b c -> Relation (Either a b) c
 junc (R a) (R b) = R (I.Junc a b)
 
 infixl 3 |||
@@ -253,21 +248,18 @@ infixl 3 |||
 --
 -- See 'eitherR'.
 (|||) ::
-  (TrivialE a b) =>
   Relation a c ->
   Relation b c ->
   Relation (Either a b) c
 (|||) = junc
 
 -- | Boolean Matrix 'Split' constructor, also known as relational product.
-split :: (TrivialE a b) 
-      => Relation c a -> Relation c b -> Relation c (Either a b)
+split :: Relation c a -> Relation c b -> Relation c (Either a b)
 split (R a) (R b) = R (I.Split a b)
 
 infixl 2 ===
 -- | Boolean Matrix 'Split' constructor
 (===) ::
-  (TrivialE a b) =>
   Relation c a ->
   Relation c b ->
   Relation c (Either a b)
@@ -822,8 +814,7 @@ infixl 4 ><
 -- @
 -- 'eitherR' ('splitR' r s) ('splitR' t v) == 'splitR' ('eitherR' r t) ('eitherR' s v)
 -- @
-eitherR :: (TrivialE a b) 
-     => Relation a c -> Relation b c -> Relation (Either a b) c
+eitherR :: Relation a c -> Relation b c -> Relation (Either a b) c
 eitherR = junc
 
 -- | Relational coproduct first component injection
@@ -835,8 +826,7 @@ eitherR = junc
 i1 :: 
    ( CountableDimensionsN a b,
      FromListsN b a,
-     FromListsN a a,
-     TrivialE a b
+     FromListsN a a
    )
    => Relation a (Either a b)
 i1 = R I.i1
@@ -850,8 +840,7 @@ i1 = R I.i1
 i2 :: 
    ( CountableDimensionsN a b,
      FromListsN a b,
-     FromListsN b b,
-     TrivialE a b
+     FromListsN b b
    )
    => Relation b (Either a b)
 i2 = R I.i2
@@ -868,9 +857,7 @@ infixl 5 -|-
     FromListsN b b,
     FromListsN d b,
     FromListsN b d,
-    FromListsN d d,
-    TrivialE a c,
-    TrivialE b d
+    FromListsN d d
   ) 
   => Relation a b -> Relation c d -> Relation (Either a c) (Either b d)
 (-|-) (R a) (R b) = R ((I.-|-) a b)
@@ -892,8 +879,8 @@ trans ::
         FromListsN (a, b) b,
         Trivial (a, b),
         Trivial (c, b),
-        TrivialP2 a b,
-        TrivialP2 c b
+        TrivialP a b,
+        TrivialP c b
       )
       => Relation (a, b) c -> Relation a (c, b)
 trans r = splitR r p2 `comp` conv p1
@@ -913,8 +900,8 @@ untrans ::
           FromListsN (a, b) a,
           Trivial (a, b),
           Trivial (c, b),
-          TrivialP2 a b,
-          TrivialP2 c b
+          TrivialP a b,
+          TrivialP c b
         )
          => Relation a (c, b) -> Relation (a, b) c
 untrans s = p1 `comp` conv (splitR (conv s) p2)
@@ -964,8 +951,7 @@ guard ::
        Enum b,
        CountableN b,
        FromListsN b b,
-       FromListsN Bool b,
-       TrivialE b b
+       FromListsN Bool b
      ) => Relation b Bool -> Relation b (Either b b)
 guard p = conv (eitherR (predR p) (predR (negate p)))
 
@@ -975,8 +961,7 @@ cond ::
        Enum b,
        CountableN b,
        FromListsN b b,
-       FromListsN Bool b,
-       TrivialE b b
+       FromListsN Bool b
      ) 
      => Relation b Bool -> Relation b c -> Relation b c -> Relation b c
 cond p r s = eitherR r s `comp` guard p
