@@ -201,14 +201,14 @@ type family FromNat (n :: Nat) :: Type where
   FromNat n = FromNat' (Mod n 2 == 0) (FromNat (Div n 2))
 
 type family FromNat' (b :: Bool) (m :: Type) :: Type where
-  FromNat' 'True m = Either m m
+  FromNat' 'True m  = Either m m
   FromNat' 'False m = Either () (Either m m)
 
 -- | Type family that normalizes the representation of a given data
 -- structure
 type family Normalize (d :: Type) :: Type where
-  Normalize (Either a b)  = Either (Normalize a) (Normalize b)
-  Normalize d = FromNat (Count d)
+  Normalize (Either a b) = Either (Normalize a) (Normalize b)
+  Normalize d            = FromNat (Count d)
 
 -- | Constraint type synonyms to keep the type signatures less convoluted
 type Countable a = KnownNat (Count a)

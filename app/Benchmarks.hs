@@ -36,6 +36,9 @@ selectD2 ::
        ) => Dist (Either a b) -> Matrix Prob a b -> Dist b
 selectD2 (D d) m = D (junc m identity `comp` d)
 
+-- Composition with identity
+compId m = comp identity m
+
 randomDist :: forall a . (Countable a, FromListsN () a) => Gen (Dist a)
 randomDist = do
   let size = fromInteger (natVal (Proxy :: Proxy (Count a)))
@@ -157,6 +160,10 @@ benchmark = defaultMain [
    bgroup "200x200" [
      bench "WHNF - 200x200" $ whnf (comp m31) m32
    , bench "NF - 200x200" $ nf (comp m31) m32
+   ],
+   bgroup "200x200 - RULES" [
+     bench "No rules - 200x200" $ nf (comp m21) identity
+   , bench "Rules - 200x200" $ nf compId m21
    ] ],
    env setupEnv2 $ \ ~(m21, m40, dist, dist2, dl1, dl2) -> bgroup "Matrix vs List - `select`" [
    bgroup "Distribution `select` - 100+100 / 100x100" [
