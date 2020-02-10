@@ -1,3 +1,4 @@
+{-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
@@ -19,12 +20,13 @@ module LAoP.Dist.Internal
         FromListsN,
         Liftable,
         TrivialP,
-        TrivialE,
 
         fmapD,
         unitD,
         multD,
         selectD,
+        branchD,
+        ifD,
         returnD,
         bindD,
         (??),
@@ -41,12 +43,14 @@ module LAoP.Dist.Internal
         )
     where
 
-import LAoP.Matrix.Type hiding (TrivialP, TrivialE, Countable, CountableDimensions, CountableN, CountableDimensionsN, Liftable, FromListsN)
+import LAoP.Matrix.Type hiding (TrivialP, Countable, CountableDimensions, CountableN, CountableDimensionsN, Liftable, FromListsN)
 import qualified LAoP.Matrix.Internal as I
 import LAoP.Utils
 import GHC.TypeLits
 import Data.Proxy
 import Data.List (sortBy)
+import Control.DeepSeq
+import Data.Bool
 
 -- | Type synonym for probability value
 type Prob = Double
@@ -54,6 +58,7 @@ type Prob = Double
 -- | Type synonym for column vector matrices. This represents a probability
 -- distribution.
 newtype Dist a = D (Matrix Prob () a)
+  deriving (Show, Num, Eq, Ord, NFData) via (Matrix Prob () a)
 
 -- | Constraint type synonyms to keep the type signatures less convoluted
 type Countable a              = KnownNat (I.Count a)
@@ -62,7 +67,6 @@ type CountableDimensionsN a b = (CountableN a, CountableN b)
 type FromListsN a b           = I.FromLists Prob (I.Normalize a) (I.Normalize b)
 type Liftable a b             = (Bounded a, Bounded b, Enum a, Enum b, Eq b, Num Prob, Ord Prob)
 type TrivialP a b             = Normalize (a, b) ~ Normalize (Normalize a, Normalize b)
-type TrivialE a b             = Normalize (Either a b) ~ Either (Normalize a) (Normalize b)
 
 -- | Functor instance
 fmapD :: 
@@ -90,12 +94,45 @@ multD (D a) (D b) = D (khatri a b)
 
 -- | Selective instance function
 selectD :: 
-       ( TrivialE a b,
-         FromListsN b b,
+       ( FromListsN b b,
          CountableN b
        ) => Dist (Either a b) -> Matrix Prob a b -> Dist b
-selectD (D d) m = D (junc m identity `comp` d)
+selectD (D d) m = D (selectM d m)
 
+-- | Chooses which of the two given effectful
+-- functions to apply to a given argument; 
+branchD ::
+       ( Num e,
+         CountableDimensionsN a b,
+         CountableDimensionsN c (Either b c),
+         FromListsN c b,
+         FromListsN a b,
+         FromListsN a a,
+         FromListsN b b,
+         FromListsN c c,
+         FromListsN b a,
+         FromListsN b c,
+         FromListsN (Either b c) b,
+         FromListsN (Either b c) c
+       )
+       => Dist (Either a b) -> Matrix Prob a c -> Matrix Prob b c -> Dist c
+branchD x l r = f x `selectD` g l `selectD` r
+  where
+    f (D m) = D (split (tr i1) (i1 `comp` tr i2) `comp` m)
+    g m = i2 `comp` m
+
+-- | Branch on a Boolean value, skipping unnecessary computations.
+ifD ::
+    ( CountableDimensionsN a (Either () a),
+      FromListsN a a,
+      FromListsN a (),
+      FromListsN () a,
+      FromListsN (Either () a) a
+    )
+    => Dist Bool -> Dist a -> Dist a -> Dist a
+ifD x (D t) (D e) = branchD x' t e
+  where
+    x' = bool (Right ()) (Left ()) `fmapD` x
 
 -- | Monad instance 'return' function
 returnD :: forall a . (Enum a, FromListsN () a, Countable a) => a -> Dist a

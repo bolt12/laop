@@ -38,9 +38,7 @@ module LAoP.Relation
     FromListsN,
     Liftable,
     Trivial,
-    TrivialE,
     TrivialP,
-    TrivialP2,
 
     -- * Primitives
     empty,

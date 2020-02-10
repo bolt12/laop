@@ -43,7 +43,6 @@ module LAoP.Dist
     FromListsN,
     Liftable,
     TrivialP,
-    TrivialE,
 
     -- * Functor instance equivalent functions
     fmapD,
@@ -54,6 +53,8 @@ module LAoP.Dist
 
     -- * Selective equivalent functions
     selectD,
+    branchD,
+    ifD,
 
     -- * Monad equivalent functions
     returnD,

@@ -1,3 +1,4 @@
+{-# LANGUAGE StrictData #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
@@ -81,7 +82,8 @@ module LAoP.Matrix.Internal
     tr,
 
     -- ** Selective operator
-    select, 
+    select,
+    branch,
 
     -- ** McCarthy's Conditional
     cond,
@@ -152,6 +154,7 @@ import LAoP.Utils.Internal
 import Data.Bool
 import Data.Kind
 import Data.List
+import Data.Maybe
 import Data.Proxy
 import Data.Void
 import GHC.TypeLits
@@ -198,13 +201,14 @@ type family FromNat (n :: Nat) :: Type where
   FromNat n = FromNat' (Mod n 2 == 0) (FromNat (Div n 2))
 
 type family FromNat' (b :: Bool) (m :: Type) :: Type where
-  FromNat' 'True m = Either m m
+  FromNat' 'True m  = Either m m
   FromNat' 'False m = Either () (Either m m)
 
 -- | Type family that normalizes the representation of a given data
 -- structure
 type family Normalize (d :: Type) :: Type where
-  Normalize d = FromNat (Count d)
+  Normalize (Either a b) = Either (Normalize a) (Normalize b)
+  Normalize d            = FromNat (Count d)
 
 -- | Constraint type synonyms to keep the type signatures less convoluted
 type Countable a = KnownNat (Count a)
@@ -213,6 +217,7 @@ type CountableDimensions a b = (Countable a, Countable b)
 type CountableDimensionsN a b = (CountableN a, CountableN b)
 type FromListsN e a b = FromLists e (Normalize a) (Normalize b)
 type Liftable e a b = (Bounded a, Bounded b, Enum a, Enum b, Eq b, Num e, Ord e)
+type Trivial a = FromNat (Count a) ~ a
 
 -- | It isn't possible to implement the 'id' function so it's
 -- implementation is 'undefined'. However 'comp' can be and this partial
@@ -234,8 +239,10 @@ instance Eq e => Eq (Matrix e cols rows) where
   (One a) == (One b)            = a == b
   (Junc a b) == (Junc c d)      = a == c && b == d
   (Split a b) == (Split c d)    = a == c && b == d
-  x@(Split _ _) == y@(Junc _ _) = x == abideJS y
-  x@(Junc _ _) == y@(Split _ _) = abideJS x == y
+  (Split (Junc a b) (Junc c d)) == (Junc (Split a' c') (Split b' d')) =
+    (a == a') && (b == b') && (c == c') && (d == d')
+  (Junc (Split a' c') (Split b' d')) == (Split (Junc a b) (Junc c d)) =
+    (a == a') && (b == b') && (c == c') && (d == d')
 
 instance Num e => Num (Matrix e cols rows) where
 
@@ -243,22 +250,28 @@ instance Num e => Num (Matrix e cols rows) where
   (One a) + (One b)            = One (a + b)
   (Junc a b) + (Junc c d)      = Junc (a + c) (b + d)
   (Split a b) + (Split c d)    = Split (a + c) (b + d)
-  x@(Split _ _) + y@(Junc _ _) = x + abideJS y
-  x@(Junc _ _) + y@(Split _ _) = abideJS x + y
+  (Split (Junc a b) (Junc c d)) + (Junc (Split a' c') (Split b' d')) =
+    Split (Junc (a + a') (b + b')) (Junc (c + c') (d + d'))
+  (Junc (Split a' c') (Split b' d')) + (Split (Junc a b) (Junc c d)) =
+    Split (Junc (a + a') (b + b')) (Junc (c + c') (d + d'))
 
   Empty - Empty             = Empty
   (One a) - (One b)         = One (a - b)
   (Junc a b) - (Junc c d)   = Junc (a - c) (b - d)
   (Split a b) - (Split c d) = Split (a - c) (b - d)
-  x@(Split _ _) - y@(Junc _ _) = x - abideJS y
-  x@(Junc _ _) - y@(Split _ _) = abideJS x - y
+  (Split (Junc a b) (Junc c d)) - (Junc (Split a' c') (Split b' d')) =
+    Split (Junc (a - a') (b - b')) (Junc (c - c') (d - d'))
+  (Junc (Split a' c') (Split b' d')) - (Split (Junc a b) (Junc c d)) =
+    Split (Junc (a - a') (b - b')) (Junc (c - c') (d - d'))
 
   Empty * Empty             = Empty
   (One a) * (One b)         = One (a * b)
   (Junc a b) * (Junc c d)   = Junc (a * c) (b * d)
   (Split a b) * (Split c d) = Split (a * c) (b * d)
-  x@(Split _ _) * y@(Junc _ _) = x * abideJS y
-  x@(Junc _ _) * y@(Split _ _) = abideJS x * y
+  (Split (Junc a b) (Junc c d)) * (Junc (Split a' c') (Split b' d')) =
+    Split (Junc (a * a') (b * b')) (Junc (c * c') (d * d'))
+  (Junc (Split a' c') (Split b' d')) * (Split (Junc a b) (Junc c d)) =
+    Split (Junc (a * a') (b * b')) (Junc (c * c') (d * d'))
 
   abs Empty       = Empty
   abs (One a)     = One (abs a)
@@ -275,8 +288,10 @@ instance Ord e => Ord (Matrix e cols rows) where
     (One a) <= (One b)            = a <= b
     (Junc a b) <= (Junc c d)      = (a <= c) && (b <= d)
     (Split a b) <= (Split c d)    = (a <= c) && (b <= d)
-    x@(Split _ _) <= y@(Junc _ _) = x <= abideJS y
-    x@(Junc _ _) <= y@(Split _ _) = abideJS x <= y
+    (Split (Junc a b) (Junc c d)) <= (Junc (Split a' c') (Split b' d')) =
+      (a <= a') && (b <= b') && (c <= c') && (d <= d')
+    (Junc (Split a' c') (Split b' d')) <= (Split (Junc a b) (Junc c d)) =
+      (a <= a') && (b <= b') && (c <= c') && (d <= d')
 
 -- Primitives
 
@@ -313,7 +328,7 @@ infixl 2 ===
 -- | Type class for defining the 'fromList' conversion function.
 --
 --   Given that it is not possible to branch on types at the term level type
--- classes are needed bery much like an inductive definition but on types.
+-- classes are needed very much like an inductive definition but on types.
 class FromLists e cols rows where
   -- | Build a matrix out of a list of list of elements. Throws a runtime
   -- error if the dimensions do not match.
@@ -486,6 +501,7 @@ bang =
 -- | Identity matrix.
 identity :: (Num e, FromLists e cols cols, Countable cols) => Matrix e cols cols
 identity = matrixBuilder (bool 0 1 . uncurry (==))
+{-# NOINLINE identity #-}
 
 -- Matrix composition (MMM)
 
@@ -499,6 +515,11 @@ comp (One a) (One b)        = One (a * b)
 comp (Junc a b) (Split c d) = comp a c + comp b d         -- Divide-and-conquer law
 comp (Split a b) c          = Split (comp a c) (comp b c) -- Split fusion law
 comp c (Junc a b)           = Junc (comp c a) (comp c b)  -- Junc fusion law
+{-# NOINLINE comp #-}
+{-# RULES 
+   "comp/identity1" forall m. comp m identity = m ;
+   "comp/identity2" forall m. comp identity m = m
+#-}
 
 -- Projections
 
@@ -689,13 +710,38 @@ tr (Split a b) = Junc (tr a) (tr b)
 -- | Selective functors 'select' operator equivalent inspired by the
 -- ArrowMonad solution presented in the paper.
 select :: (Num e, FromLists e b b, Countable b) => Matrix e cols (Either a b) -> Matrix e a b -> Matrix e cols b
-select m y = junc y identity . m
+select (Split a b) y                    = y . a + b                     -- Divide-and-conquer law
+select (Junc (Split a c) (Split b d)) y = junc (y . a + c) (y . b + d)  -- Pattern matching + DnC law
+select m y                              = junc y identity . m
+
+branch ::
+       ( Num e,
+         CountableDimensions a b,
+         CountableDimensions c (Either b c),
+         FromLists e c b,
+         FromLists e a b,
+         FromLists e a a,
+         FromLists e b b,
+         FromLists e c c,
+         FromLists e b a,
+         FromLists e b c,
+         FromLists e (Either b c) b,
+         FromLists e (Either b c) c
+       )
+       => Matrix e cols (Either a b) -> Matrix e a c -> Matrix e b c -> Matrix e cols c
+branch x l r = f x `select` g l `select` r
+  where
+    f :: (Num e, Countable a, CountableDimensions b c, FromLists e a b, FromLists e c b, FromLists e b b, FromLists e b a, FromLists e a a)
+      => Matrix e cols (Either a b) -> Matrix e cols (Either a (Either b c))
+    f m = split (tr i1) (i1 . tr i2) . m
+    g :: (Num e, CountableDimensions b c, FromLists e b c, FromLists e c c) => Matrix e a c -> Matrix e a (Either b c)
+    g m = i2 . m
 
 -- McCarthy's Conditional
 
 -- | McCarthy's Conditional expresses probabilistic choice.
 cond ::
-     ( cols ~ Normalize cols,
+     ( Trivial cols,
        Countable cols,
        FromLists e () cols,
        FromLists e cols (),
@@ -710,7 +756,7 @@ cond ::
 cond p f g = junc f g . grd p
 
 grd :: 
-    ( q ~ Normalize q,
+    ( Trivial q,
       Countable q,
       FromLists e () q,
       FromLists e q (),
@@ -726,7 +772,7 @@ grd f = split (corr f) (corr (not . f))
 
 corr :: 
     forall e a q . 
-    ( q ~ Normalize q,
+    ( Trivial q,
       Countable q,
       FromLists e () q,
       FromLists e q (),
@@ -759,18 +805,36 @@ prettyAux (h : t) l = "│ " ++ fill (unwords $ map show h) ++ " │\n" ++
    fill str = replicate (widest - length str - 2) ' ' ++ str
 
 -- | Matrix pretty printer
-pretty :: (Countable cols, Show e) => Matrix e cols rows -> String
-pretty m = "┌ " ++ unwords (replicate (columns m) blank) ++ " ┐\n" ++ 
-            prettyAux (toLists m) (toLists m) ++
-            "└ " ++ unwords (replicate (columns m) blank) ++ " ┘"
-  where
-   v  = fmap show (toList m)
-   widest = maximum $ fmap length v
+pretty :: (CountableDimensions cols rows, Show e) => Matrix e cols rows -> String
+pretty m = concat
+   [ "┌ ", unwords (replicate (columns m) blank), " ┐\n"
+   , unlines
+   [ "│ " ++ unwords (fmap (\j -> fill $ show $ getElem i j m) [1..columns m]) ++ " │" | i <- [1..rows m] ]
+   , "└ ", unwords (replicate (columns m) blank), " ┘"
+   ]
+ where
+   strings = map show (toList m)
+   widest = maximum $ map length strings
    fill str = replicate (widest - length str) ' ' ++ str
    blank = fill ""
+   safeGet i j m
+    | i > rows m || j > columns m || i < 1 || j < 1 = Nothing
+    | otherwise = Just $ unsafeGet i j m (toList m)
+   unsafeGet i j m l = l !! encode (columns m) (i,j)
+   encode m (i,j) = (i-1)*m + j - 1
+   getElem i j m =
+     fromMaybe
+       (error $
+          "getElem: Trying to get the "
+           ++ show (i, j)
+           ++ " element from a "
+           ++ show (rows m) ++ "x" ++ show (columns m)
+           ++ " matrix."
+       )
+       (safeGet i j m)
 
 -- | Matrix pretty printer
-prettyPrint :: (Countable cols, Show e) => Matrix e cols rows -> IO ()
+prettyPrint :: (CountableDimensions cols rows, Show e) => Matrix e cols rows -> IO ()
 prettyPrint = putStrLn . pretty
 
 -- Relational operators functions

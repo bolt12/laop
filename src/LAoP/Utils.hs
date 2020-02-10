@@ -95,7 +95,7 @@ module LAoP.Utils
     coerceNat2,
     coerceNat3,
 
-    -- * Powerset data type
+    -- * List data type
     List (..)
   )
 where
