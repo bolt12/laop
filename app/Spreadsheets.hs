@@ -2,9 +2,8 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DeriveGeneric #-}
+
 module Spreadsheets
-    ( 
-    )
   where
 
 import LAoP.Matrix.Type
@@ -17,7 +16,7 @@ data Student = Student1 | Student2 | Student3 | Student4
 data Question = Question1 | Question2 | Question3 | Question4
   deriving (Eq, Show, Enum, Bounded, Generic)
 
-data Results = Test | Exam | Final
+data Results = Exam | Test | Final
   deriving (Eq, Show, Enum, Bounded, Generic)
 
 test :: Matrix Float One Results
@@ -44,9 +43,7 @@ xls w m t = junc (split w m) (split zeros r)
     rExam = m `comp` tr w
     rTest = tr t
     rFinal = rTest `maxPP` rExam
-    rAux = junc rTest (junc rExam rFinal)
-    r = tr (converter `comp` tr rAux)
-    converter = junc test (junc exam final)
+    r = (rExam `comp` tr exam) + (rTest `comp` tr test) + (rFinal `comp` tr final)
 
 -- | Overloaded, point-wise 'max' function
 maxPP_ :: Ord e => I.Matrix e a b -> I.Matrix e a b -> I.Matrix e a b

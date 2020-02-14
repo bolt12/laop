@@ -239,10 +239,8 @@ instance Eq e => Eq (Matrix e cols rows) where
   (One a) == (One b)            = a == b
   (Junc a b) == (Junc c d)      = a == c && b == d
   (Split a b) == (Split c d)    = a == c && b == d
-  (Split (Junc a b) (Junc c d)) == (Junc (Split a' c') (Split b' d')) =
-    (a == a') && (b == b') && (c == c') && (d == d')
-  (Junc (Split a' c') (Split b' d')) == (Split (Junc a b) (Junc c d)) =
-    (a == a') && (b == b') && (c == c') && (d == d')
+  x@(Split _ _) == y@(Junc _ _) = x == abideJS y
+  x@(Junc _ _) == y@(Split _ _) = abideJS x == y
 
 instance Num e => Num (Matrix e cols rows) where
 
@@ -250,28 +248,22 @@ instance Num e => Num (Matrix e cols rows) where
   (One a) + (One b)            = One (a + b)
   (Junc a b) + (Junc c d)      = Junc (a + c) (b + d)
   (Split a b) + (Split c d)    = Split (a + c) (b + d)
-  (Split (Junc a b) (Junc c d)) + (Junc (Split a' c') (Split b' d')) =
-    Split (Junc (a + a') (b + b')) (Junc (c + c') (d + d'))
-  (Junc (Split a' c') (Split b' d')) + (Split (Junc a b) (Junc c d)) =
-    Split (Junc (a + a') (b + b')) (Junc (c + c') (d + d'))
+  x@(Split _ _) + y@(Junc _ _) = x + abideJS y
+  x@(Junc _ _) + y@(Split _ _) = abideJS x + y
 
   Empty - Empty             = Empty
   (One a) - (One b)         = One (a - b)
   (Junc a b) - (Junc c d)   = Junc (a - c) (b - d)
   (Split a b) - (Split c d) = Split (a - c) (b - d)
-  (Split (Junc a b) (Junc c d)) - (Junc (Split a' c') (Split b' d')) =
-    Split (Junc (a - a') (b - b')) (Junc (c - c') (d - d'))
-  (Junc (Split a' c') (Split b' d')) - (Split (Junc a b) (Junc c d)) =
-    Split (Junc (a - a') (b - b')) (Junc (c - c') (d - d'))
+  x@(Split _ _) - y@(Junc _ _) = x - abideJS y
+  x@(Junc _ _) - y@(Split _ _) = abideJS x - y
 
   Empty * Empty             = Empty
   (One a) * (One b)         = One (a * b)
   (Junc a b) * (Junc c d)   = Junc (a * c) (b * d)
   (Split a b) * (Split c d) = Split (a * c) (b * d)
-  (Split (Junc a b) (Junc c d)) * (Junc (Split a' c') (Split b' d')) =
-    Split (Junc (a * a') (b * b')) (Junc (c * c') (d * d'))
-  (Junc (Split a' c') (Split b' d')) * (Split (Junc a b) (Junc c d)) =
-    Split (Junc (a * a') (b * b')) (Junc (c * c') (d * d'))
+  x@(Split _ _) * y@(Junc _ _) = x * abideJS y
+  x@(Junc _ _) * y@(Split _ _) = abideJS x * y
 
   abs Empty       = Empty
   abs (One a)     = One (abs a)
@@ -288,10 +280,8 @@ instance Ord e => Ord (Matrix e cols rows) where
     (One a) <= (One b)            = a <= b
     (Junc a b) <= (Junc c d)      = (a <= c) && (b <= d)
     (Split a b) <= (Split c d)    = (a <= c) && (b <= d)
-    (Split (Junc a b) (Junc c d)) <= (Junc (Split a' c') (Split b' d')) =
-      (a <= a') && (b <= b') && (c <= c') && (d <= d')
-    (Junc (Split a' c') (Split b' d')) <= (Split (Junc a b) (Junc c d)) =
-      (a <= a') && (b <= b') && (c <= c') && (d <= d')
+    x@(Split _ _) <= y@(Junc _ _) = x <= abideJS y
+    x@(Junc _ _) <= y@(Split _ _) = abideJS x <= y
 
 -- Primitives
 

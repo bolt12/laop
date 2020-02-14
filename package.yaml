@@ -1,5 +1,5 @@
 name:                laop
-version:             0.1.0.3
+version:             0.1.0.5
 github:              "bolt12/laop"
 license:             BSD3
 author:              "Armando Santos"
@@ -38,7 +38,7 @@ executables:
     - -fexcess-precision # Good for doubles
     - -optc-O3 # Good for doubles
     - -optc-ffast-math # Good for doubles
-    - -O # Optimize
+    - -O2
     dependencies:
     - laop
     - criterion

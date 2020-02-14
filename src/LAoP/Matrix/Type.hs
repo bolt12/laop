@@ -97,6 +97,7 @@ module LAoP.Matrix.Type
 
     -- * Functor instance equivalent function
     fmapM,
+    bimapM,
 
     -- * Applicative/Monoidal instance equivalent functions
     unitM,
@@ -202,6 +203,17 @@ type TrivialP a b             = I.Normalize (a, b) ~ I.Normalize (I.Normalize a,
 instance (Num e) => C.Category (Matrix e) where
     id = undefined
     (.) = comp
+
+-- | Bifunctor equivalent function
+bimapM ::
+       ( Liftable e a b,
+         Liftable e c d,
+         CountableDimensionsN a c,
+         CountableDimensionsN b d,
+         FromListsN e d c,
+         FromListsN e b a
+       ) => (a -> b) -> (c -> d) -> Matrix e a c -> Matrix e b d
+bimapM f g m = fromF' g `comp` m `comp` tr (fromF' f)
 
 -- | Zero type alias
 type Zero = Void
