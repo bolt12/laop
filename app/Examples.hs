@@ -1,3 +1,4 @@
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeOperators #-}
@@ -15,13 +16,13 @@ import LAoP.Utils
 import LAoP.Dist
 import GHC.TypeLits
 import Data.Coerce
-import GHC.Generics
+import qualified GHC.Generics as G
 import Control.Category hiding (id)
 import Prelude hiding ((.))
 
 -- Monty Hall Problem
 data Outcome = Win | Lose
-    deriving (Bounded, Enum, Eq, Show, Generic)
+    deriving (Bounded, Enum, Eq, Show, G.Generic)
 
 switch :: Outcome -> Outcome
 switch Win = Lose
@@ -56,32 +57,41 @@ die :: Matrix Double () SS
 die = col $ map (const (1/6)) [nat @1 @6 1 .. nat 6]
 
 -- Sprinkler
+data G = Dry | Wet
+    deriving (Bounded, Enum, Eq, Show, G.Generic)
 
-rain :: Matrix Double () Bool
+data S = Off | On
+    deriving (Bounded, Enum, Eq, Show, G.Generic)
+
+data R = No | Yes
+    deriving (Bounded, Enum, Eq, Show, G.Generic)
+
+rain :: Matrix Double () R
 rain = col [0.8, 0.2]
 
-sprinkler :: Matrix Double Bool Bool
+sprinkler :: Matrix Double R S
 sprinkler = fromLists [[0.6, 0.99], [0.4, 0.01]]
 
-grass :: Matrix Double (Bool, Bool) Bool
+grass :: Matrix Double (S, R) G
 grass = fromLists [[1, 0.2, 0.1, 0.01], [0, 0.8, 0.9, 0.99]]
 
-state :: Matrix Double () (Bool, (Bool, Bool))
-state = khatri grass identity . khatri sprinkler identity . rain
+tag f = khatri f identity
 
-grass_wet :: Matrix Double (Bool, (Bool, Bool)) One
+state g s r = tag g `comp` tag s `comp` r
+
+grass_wet :: Matrix Double (G, (S, R)) One
 grass_wet = row [0,1] . kp1
 
-rainning :: Matrix Double (Bool, (Bool, Bool)) One
+rainning :: Matrix Double (G, (S, R)) One
 rainning = row [0,1] . kp2 . kp2 
 
 -- Alcuin Puzzle
 
 data Being = Farmer | Fox | Goose | Beans
-  deriving (Bounded, Enum, Eq, Show, Generic)
+  deriving (Bounded, Enum, Eq, Show, G.Generic)
 
 data Bank = LeftB | RightB
-  deriving (Bounded, Enum, Eq, Show, Generic)
+  deriving (Bounded, Enum, Eq, Show, G.Generic)
 
 eats :: Being -> Being -> Bool
 eats Fox Goose   = True
@@ -152,8 +162,8 @@ exec = do
     putStrLn "\n Checking that the last result is indeed a distribution: "
     prettyPrint (bang . sumSSM . khatri die die)
     putStrLn "\n Probability of grass being wet:"
-    prettyPrint (grass_wet . state)
+    prettyPrint (grass_wet . state grass sprinkler rain)
     putStrLn "\n Probability of rain:"
-    prettyPrint (rainning . state)
+    prettyPrint (rainning . state grass sprinkler rain)
     putStrLn "\n Is the arbitrary state a valid state? (Alcuin Puzzle)"
     print (inv bankStateR)

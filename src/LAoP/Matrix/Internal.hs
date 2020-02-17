@@ -92,6 +92,9 @@ module LAoP.Matrix.Internal
     abideJS,
     abideSJ,
 
+    -- ** Zip matrices
+    zipWithM,
+
     -- * Biproduct approach
     -- ** Split
     (===),
@@ -244,26 +247,11 @@ instance Eq e => Eq (Matrix e cols rows) where
 
 instance Num e => Num (Matrix e cols rows) where
 
-  Empty + Empty                = Empty
-  (One a) + (One b)            = One (a + b)
-  (Junc a b) + (Junc c d)      = Junc (a + c) (b + d)
-  (Split a b) + (Split c d)    = Split (a + c) (b + d)
-  x@(Split _ _) + y@(Junc _ _) = x + abideJS y
-  x@(Junc _ _) + y@(Split _ _) = abideJS x + y
+  a + b = zipWithM (+) a b
 
-  Empty - Empty             = Empty
-  (One a) - (One b)         = One (a - b)
-  (Junc a b) - (Junc c d)   = Junc (a - c) (b - d)
-  (Split a b) - (Split c d) = Split (a - c) (b - d)
-  x@(Split _ _) - y@(Junc _ _) = x - abideJS y
-  x@(Junc _ _) - y@(Split _ _) = abideJS x - y
+  a - b = zipWithM (-) a b
 
-  Empty * Empty             = Empty
-  (One a) * (One b)         = One (a * b)
-  (Junc a b) * (Junc c d)   = Junc (a * c) (b * d)
-  (Split a b) * (Split c d) = Split (a * c) (b * d)
-  x@(Split _ _) * y@(Junc _ _) = x * abideJS y
-  x@(Junc _ _) * y@(Split _ _) = abideJS x * y
+  a * b = zipWithM (*) a b
 
   abs Empty       = Empty
   abs (One a)     = One (abs a)
@@ -826,6 +814,15 @@ pretty m = concat
 -- | Matrix pretty printer
 prettyPrint :: (CountableDimensions cols rows, Show e) => Matrix e cols rows -> IO ()
 prettyPrint = putStrLn . pretty
+
+-- | Zip two matrices with a given binary function
+zipWithM :: (e -> f -> g) -> Matrix e cols rows -> Matrix f cols rows -> Matrix g cols rows
+zipWithM f Empty Empty                = Empty
+zipWithM f (One a) (One b)            = One (f a b)
+zipWithM f (Junc a b) (Junc c d)      = Junc (zipWithM f a c) (zipWithM f b d)
+zipWithM f (Split a b) (Split c d)    = Split (zipWithM f a c) (zipWithM f b d)
+zipWithM f x@(Split _ _) y@(Junc _ _) = zipWithM f x (abideJS y)
+zipWithM f x@(Junc _ _) y@(Split _ _) = zipWithM f (abideJS x) y
 
 -- Relational operators functions
 

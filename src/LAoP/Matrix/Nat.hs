@@ -108,6 +108,9 @@ module LAoP.Matrix.Nat
     abideJS,
     abideSJ,
 
+    -- ** Zip Matrices
+    zipWithM,
+
     -- * Biproduct approach
     -- ** Split
     (===),
@@ -473,3 +476,7 @@ pretty (M m) = I.pretty m
 
 prettyPrint :: (CountableDimensionsN cols rows, Show e) => Matrix e cols rows -> IO ()
 prettyPrint (M m) = I.prettyPrint m
+
+-- | Zip two matrices with a given binary function
+zipWithM :: (e -> f -> g) -> Matrix e cols rows -> Matrix f cols rows -> Matrix g cols rows
+zipWithM f (M a) (M b) = M (I.zipWithM f a b)

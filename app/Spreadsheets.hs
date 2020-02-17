@@ -1,6 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DeriveGeneric #-}
 
 module Spreadsheets
@@ -42,17 +39,9 @@ xls w m t = junc (split w m) (split zeros r)
   where
     rExam = m `comp` tr w
     rTest = tr t
-    rFinal = rTest `maxPP` rExam
+    rFinal = rTest `maxPW` rExam
     r = (rExam `comp` tr exam) + (rTest `comp` tr test) + (rFinal `comp` tr final)
 
 -- | Overloaded, point-wise 'max' function
-maxPP_ :: Ord e => I.Matrix e a b -> I.Matrix e a b -> I.Matrix e a b
-maxPP_ I.Empty I.Empty = I.Empty
-maxPP_ (I.One a) (I.One b) = I.One (a `max` b)
-maxPP_ (I.Junc a b) (I.Junc c d) = I.Junc (maxPP_ a c) (maxPP_ b d)
-maxPP_ (I.Split a b) (I.Split c d) = I.Split (maxPP_ a c) (maxPP_ b d)
-maxPP_ x@(I.Split _ _) y@(I.Junc _ _) = maxPP_ x (I.abideJS y)
-maxPP_ x@(I.Junc _ _) y@(I.Split _ _) = maxPP_ (I.abideJS x) y
-
-maxPP :: Ord e => Matrix e a b -> Matrix e a b -> Matrix e a b
-maxPP (M a) (M b) = M (maxPP_ a b)
+maxPW :: Ord e => Matrix e a b -> Matrix e a b -> Matrix e a b
+maxPW = zipWithM max
