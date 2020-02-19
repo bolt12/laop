@@ -79,8 +79,8 @@ tag f = khatri f identity
 
 state g s r = tag g `comp` tag s `comp` r
 
-grass_wet :: Matrix Double (G, (S, R)) One
-grass_wet = row [0,1] . kp1
+grass_wet :: Matrix Double () (G, (S, R)) -> Matrix Double One One
+grass_wet state = row [0,1] . kp1 . state
 
 rainning :: Matrix Double (G, (S, R)) One
 rainning = row [0,1] . kp2 . kp2 
@@ -162,7 +162,7 @@ exec = do
     putStrLn "\n Checking that the last result is indeed a distribution: "
     prettyPrint (bang . sumSSM . khatri die die)
     putStrLn "\n Probability of grass being wet:"
-    prettyPrint (grass_wet . state grass sprinkler rain)
+    prettyPrint (grass_wet (state grass sprinkler rain))
     putStrLn "\n Probability of rain:"
     prettyPrint (rainning . state grass sprinkler rain)
     putStrLn "\n Is the arbitrary state a valid state? (Alcuin Puzzle)"
