@@ -35,7 +35,7 @@ xls :: Matrix Float Question One
     -> Matrix Float Question Student
     -> Matrix Float Student One
     -> Matrix Float (Either Question Results) (Either One Student)
-xls w m t = junc (split w m) (split zeros r)
+xls w m t = join (fork w m) (fork zeros r)
   where
     rExam = m `comp` tr w
     rTest = tr t

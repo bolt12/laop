@@ -52,8 +52,8 @@ module LAoP.Matrix.Internal
     -- * Primitives
     empty,
     one,
-    junc,
-    split,
+    join,
+    fork,
 
     -- * Auxiliary type families
     FromNat,
@@ -96,12 +96,12 @@ module LAoP.Matrix.Internal
     zipWithM,
 
     -- * Biproduct approach
-    -- ** Split
+    -- ** Fork
     (===),
     -- *** Projections
     p1,
     p2,
-    -- ** Junc
+    -- ** Join
     (|||),
     -- *** Injections
     i1,
@@ -115,8 +115,8 @@ module LAoP.Matrix.Internal
     -- | Note that given the restrictions imposed it is not possible to
     -- implement the standard type classes present in standard Haskell.
     -- *** Matrix pairing projections
-    kp1,
-    kp2,
+    fstM,
+    sndM,
 
     -- *** Matrix pairing
     khatri,
@@ -127,10 +127,10 @@ module LAoP.Matrix.Internal
 
     -- | Note that given the restrictions imposed it is not possible to
     -- implement the standard type classes present in standard Haskell.
-    identity,
+    iden,
     comp,
-    fromF,
     fromF',
+    fromF,
 
     -- * Matrix printing
     pretty,
@@ -171,8 +171,8 @@ import Prelude hiding ((.))
 data Matrix e cols rows where
   Empty :: Matrix e Void Void
   One :: e -> Matrix e () ()
-  Junc :: Matrix e a rows -> Matrix e b rows -> Matrix e (Either a b) rows
-  Split :: Matrix e cols a -> Matrix e cols b -> Matrix e cols (Either a b)
+  Join :: Matrix e a rows -> Matrix e b rows -> Matrix e (Either a b) rows
+  Fork :: Matrix e cols a -> Matrix e cols b -> Matrix e cols (Either a b)
 
 deriving instance (Show e) => Show (Matrix e cols rows)
 
@@ -226,7 +226,7 @@ type Trivial a = FromNat (Count a) ~ a
 -- implementation is 'undefined'. However 'comp' can be and this partial
 -- class implementation exists just to make the code more readable.
 --
--- Please use 'identity' instead.
+-- Please use 'iden' instead.
 instance (Num e) => Category (Matrix e) where
     id = undefined
     (.) = comp
@@ -234,16 +234,16 @@ instance (Num e) => Category (Matrix e) where
 instance NFData e => NFData (Matrix e cols rows) where
     rnf Empty = ()
     rnf (One e) = rnf e
-    rnf (Junc a b) = rnf a `seq` rnf b
-    rnf (Split a b) = rnf a `seq` rnf b
+    rnf (Join a b) = rnf a `seq` rnf b
+    rnf (Fork a b) = rnf a `seq` rnf b
 
 instance Eq e => Eq (Matrix e cols rows) where
   Empty == Empty                = True
   (One a) == (One b)            = a == b
-  (Junc a b) == (Junc c d)      = a == c && b == d
-  (Split a b) == (Split c d)    = a == c && b == d
-  x@(Split _ _) == y@(Junc _ _) = x == abideJS y
-  x@(Junc _ _) == y@(Split _ _) = abideJS x == y
+  (Join a b) == (Join c d)      = a == c && b == d
+  (Fork a b) == (Fork c d)    = a == c && b == d
+  x@(Fork _ _) == y@(Join _ _) = x == abideJS y
+  x@(Join _ _) == y@(Fork _ _) = abideJS x == y
 
 instance Num e => Num (Matrix e cols rows) where
 
@@ -255,21 +255,21 @@ instance Num e => Num (Matrix e cols rows) where
 
   abs Empty       = Empty
   abs (One a)     = One (abs a)
-  abs (Junc a b)  = Junc (abs a) (abs b)
-  abs (Split a b) = Split (abs a) (abs b)
+  abs (Join a b)  = Join (abs a) (abs b)
+  abs (Fork a b) = Fork (abs a) (abs b)
 
   signum Empty       = Empty
   signum (One a)     = One (signum a)
-  signum (Junc a b)  = Junc (signum a) (signum b)
-  signum (Split a b) = Split (signum a) (signum b)
+  signum (Join a b)  = Join (signum a) (signum b)
+  signum (Fork a b) = Fork (signum a) (signum b)
 
 instance Ord e => Ord (Matrix e cols rows) where
     Empty <= Empty                = True
     (One a) <= (One b)            = a <= b
-    (Junc a b) <= (Junc c d)      = (a <= c) && (b <= d)
-    (Split a b) <= (Split c d)    = (a <= c) && (b <= d)
-    x@(Split _ _) <= y@(Junc _ _) = x <= abideJS y
-    x@(Junc _ _) <= y@(Split _ _) = abideJS x <= y
+    (Join a b) <= (Join c d)      = (a <= c) && (b <= d)
+    (Fork a b) <= (Fork c d)    = (a <= c) && (b <= d)
+    x@(Fork _ _) <= y@(Join _ _) = x <= abideJS y
+    x@(Join _ _) <= y@(Fork _ _) = abideJS x <= y
 
 -- Primitives
 
@@ -281,25 +281,25 @@ empty = Empty
 one :: e -> Matrix e () ()
 one = One
 
--- | Matrix 'Junc' constructor
-junc :: Matrix e a rows -> Matrix e b rows -> Matrix e (Either a b) rows
-junc = Junc
+-- | Matrix 'Join' constructor
+join :: Matrix e a rows -> Matrix e b rows -> Matrix e (Either a b) rows
+join = Join
 
 infixl 3 |||
 
--- | Matrix 'Junc' constructor
+-- | Matrix 'Join' constructor
 (|||) :: Matrix e a rows -> Matrix e b rows -> Matrix e (Either a b) rows
-(|||) = Junc
+(|||) = Join
 
--- | Matrix 'Split' constructor
-split :: Matrix e cols a -> Matrix e cols b -> Matrix e cols (Either a b)
-split = Split
+-- | Matrix 'Fork' constructor
+fork :: Matrix e cols a -> Matrix e cols b -> Matrix e cols (Either a b)
+fork = Fork
 
 infixl 2 ===
 
--- | Matrix 'Split' constructor
+-- | Matrix 'Fork' constructor
 (===) :: Matrix e cols a -> Matrix e cols b -> Matrix e cols (Either a b)
-(===) = Split
+(===) = Fork
 
 -- Construction
 
@@ -321,23 +321,23 @@ instance {-# OVERLAPPING #-} FromLists e () () where
   fromLists _     = error "Wrong dimensions"
 
 instance {-# OVERLAPPING #-} (FromLists e cols ()) => FromLists e (Either () cols) () where
-  fromLists [h : t] = Junc (One h) (fromLists [t])
+  fromLists [h : t] = Join (One h) (fromLists [t])
   fromLists _       = error "Wrong dimensions"
 
 instance {-# OVERLAPPABLE #-} (FromLists e a (), FromLists e b (), Countable a) => FromLists e (Either a b) () where
   fromLists [l] = 
       let rowsA = fromInteger (natVal (Proxy :: Proxy (Count a)))
-       in Junc (fromLists [take rowsA l]) (fromLists [drop rowsA l])
+       in Join (fromLists [take rowsA l]) (fromLists [drop rowsA l])
   fromLists _       = error "Wrong dimensions"
 
 instance {-# OVERLAPPING #-} (FromLists e () rows) => FromLists e () (Either () rows) where
-  fromLists ([h] : t) = Split (One h) (fromLists t)
+  fromLists ([h] : t) = Fork (One h) (fromLists t)
   fromLists _         = error "Wrong dimensions"
 
 instance {-# OVERLAPPABLE #-} (FromLists e () a, FromLists e () b, Countable a) => FromLists e () (Either a b) where
   fromLists l@([_] : _) = 
       let rowsA = fromInteger (natVal (Proxy :: Proxy (Count a)))
-       in Split (fromLists (take rowsA l)) (fromLists (drop rowsA l))
+       in Fork (fromLists (take rowsA l)) (fromLists (drop rowsA l))
   fromLists _         = error "Wrong dimensions"
 
 instance {-# OVERLAPPABLE #-} (FromLists e (Either a b) c, FromLists e (Either a b) d, Countable c) => FromLists e (Either a b) (Either c d) where
@@ -346,7 +346,7 @@ instance {-# OVERLAPPABLE #-} (FromLists e (Either a b) c, FromLists e (Either a
         rowsC     = fromInteger (natVal (Proxy :: Proxy (Count c)))
         condition = all (== lh) (map length t)
      in if lh > 0 && condition
-          then Split (fromLists (take rowsC l)) (fromLists (drop rowsC l))
+          then Fork (fromLists (take rowsC l)) (fromLists (drop rowsC l))
           else error "Not all rows have the same length"
 
 -- | Matrix builder function. Constructs a matrix provided with
@@ -376,7 +376,7 @@ row = fromLists . (: [])
 --
 --   NOTE: Be careful to not ask for a matrix bigger than the cardinality of
 -- types @a@ or @b@ allows.
-fromF ::
+fromF' ::
   forall a b cols rows e.
   ( Liftable e a b,
     CountableDimensions cols rows,
@@ -384,7 +384,7 @@ fromF ::
   ) =>
   (a -> b) ->
   Matrix e cols rows
-fromF f =
+fromF' f =
   let minA         = minBound @a
       maxA         = maxBound @a
       minB         = minBound @b
@@ -405,7 +405,7 @@ fromF f =
 
 -- | Lifts functions to matrices with dimensions matching @a@ and @b@
 -- cardinality's.
-fromF' ::
+fromF ::
   forall a b e.
   ( Liftable e a b,
     CountableDimensionsN a b,
@@ -413,7 +413,7 @@ fromF' ::
   ) =>
   (a -> b) ->
   Matrix e (Normalize a) (Normalize b)
-fromF' f =
+fromF f =
   let minA         = minBound @a
       maxA         = maxBound @a
       minB         = minBound @b
@@ -438,8 +438,8 @@ fromF' f =
 toLists :: Matrix e cols rows -> [[e]]
 toLists Empty       = []
 toLists (One e)     = [[e]]
-toLists (Split l r) = toLists l ++ toLists r
-toLists (Junc l r)  = zipWith (++) (toLists l) (toLists r)
+toLists (Fork l r) = toLists l ++ toLists r
+toLists (Join l r)  = zipWith (++) (toLists l) (toLists r)
 
 -- | Converts a matrix to a list of elements.
 toList :: Matrix e cols rows -> [e]
@@ -474,12 +474,12 @@ bang =
   let c = fromInteger $ natVal (Proxy :: Proxy (Count cols))
    in fromLists [take c [1, 1 ..]]
 
--- Identity Matrix
+-- iden Matrix
 
--- | Identity matrix.
-identity :: (Num e, FromLists e cols cols, Countable cols) => Matrix e cols cols
-identity = matrixBuilder (bool 0 1 . uncurry (==))
-{-# NOINLINE identity #-}
+-- | iden matrix.
+iden :: (Num e, FromLists e cols cols, Countable cols) => Matrix e cols cols
+iden = matrixBuilder (bool 0 1 . uncurry (==))
+{-# NOINLINE iden #-}
 
 -- Matrix composition (MMM)
 
@@ -490,13 +490,13 @@ identity = matrixBuilder (bool 0 1 . uncurry (==))
 comp :: (Num e) => Matrix e cr rows -> Matrix e cols cr -> Matrix e cols rows
 comp Empty Empty            = Empty
 comp (One a) (One b)        = One (a * b)
-comp (Junc a b) (Split c d) = comp a c + comp b d         -- Divide-and-conquer law
-comp (Split a b) c          = Split (comp a c) (comp b c) -- Split fusion law
-comp c (Junc a b)           = Junc (comp c a) (comp c b)  -- Junc fusion law
+comp (Join a b) (Fork c d) = comp a c + comp b d         -- Divide-and-conquer law
+comp (Fork a b) c          = Fork (comp a c) (comp b c) -- Fork fusion law
+comp c (Join a b)           = Join (comp c a) (comp c b)  -- Join fusion law
 {-# NOINLINE comp #-}
 {-# RULES 
-   "comp/identity1" forall m. comp m identity = m ;
-   "comp/identity2" forall m. comp identity m = m
+   "comp/iden1" forall m. comp m iden = m ;
+   "comp/iden2" forall m. comp iden m = m
 #-}
 
 -- Projections
@@ -504,16 +504,16 @@ comp c (Junc a b)           = Junc (comp c a) (comp c b)  -- Junc fusion law
 -- | Biproduct first component projection
 p1 :: forall e m n. (Num e, CountableDimensions n m, FromLists e n m, FromLists e m m) => Matrix e (Either m n) m
 p1 =
-  let iden = identity :: Matrix e m m
+  let iden = iden :: Matrix e m m
       zero = zeros :: Matrix e n m
-   in junc iden zero
+   in join iden zero
 
 -- | Biproduct second component projection
 p2 :: forall e m n. (Num e, CountableDimensions n m, FromLists e m n, FromLists e n n) => Matrix e (Either m n) n
 p2 =
-  let iden = identity :: Matrix e n n
+  let iden = iden :: Matrix e n n
       zero = zeros :: Matrix e m n
-   in junc zero iden
+   in join zero iden
 
 -- Injections
 
@@ -564,19 +564,19 @@ infixl 5 -|-
   Matrix e n k ->
   Matrix e m j ->
   Matrix e (Either n m) (Either k j)
-(-|-) a b = Junc (i1 . a) (i2 . b)
+(-|-) a b = Join (i1 . a) (i2 . b)
 
 -- Khatri Rao Product and projections
 
 -- | Khatri Rao product first component projection matrix.
-kp1 :: 
+fstM :: 
   forall e m k .
   ( Num e,
     CountableDimensions k m,
     FromLists e (Normalize (m, k)) m,
     CountableN (m, k)
   ) => Matrix e (Normalize (m, k)) m
-kp1 = matrixBuilder f
+fstM = matrixBuilder f
   where
     offset = fromInteger (natVal (Proxy :: Proxy (Count k)))
     f (x, y)
@@ -584,14 +584,14 @@ kp1 = matrixBuilder f
       | otherwise = 0
 
 -- | Khatri Rao product second component projection matrix.
-kp2 :: 
+sndM :: 
     forall e m k .
     ( Num e,
       CountableDimensions k m,
       FromLists e (Normalize (m, k)) k,
       CountableN (m, k)
     ) => Matrix e (Normalize (m, k)) k
-kp2 = matrixBuilder f
+sndM = matrixBuilder f
   where
     offset = fromInteger (natVal (Proxy :: Proxy (Count k)))
     f (x, y)
@@ -603,9 +603,9 @@ kp2 = matrixBuilder f
 --   NOTE: That this is not a true categorical product, see for instance:
 -- 
 -- @
---                | kp1 . khatri a b == a 
+--                | fstM . khatri a b == a 
 -- khatri a b ==> |
---                | kp2 . khatri a b == b
+--                | sndM . khatri a b == b
 -- @
 --
 -- __Emphasis__ on the implication symbol.
@@ -618,9 +618,9 @@ khatri ::
          FromLists e (Normalize (a, b)) b
        ) => Matrix e cols a -> Matrix e cols b -> Matrix e cols (Normalize (a, b))
 khatri a b =
-  let kp1' = kp1 @e @a @b
-      kp2' = kp2 @e @a @b
-   in (tr kp1') . a * (tr kp2') . b
+  let fstM' = fstM @e @a @b
+      sndM' = sndM @e @a @b
+   in (tr fstM') . a * (tr sndM') . b
 
 -- Product Bifunctor (Kronecker)
 
@@ -640,39 +640,39 @@ infixl 4 ><
      ) 
      => Matrix e m p -> Matrix e n q -> Matrix e (Normalize (m, n)) (Normalize (p, q))
 (><) a b =
-  let kp1' = kp1 @e @m @n
-      kp2' = kp2 @e @m @n
-   in khatri (a . kp1') (b . kp2')
+  let fstM' = fstM @e @m @n
+      sndM' = sndM @e @m @n
+   in khatri (a . fstM') (b . sndM')
 
--- Matrix abide Junc Split
+-- Matrix abide Join Fork
 
--- | Matrix "abiding" followin the 'Junc'-'Split' abide law.
+-- | Matrix "abiding" followin the 'Join'-'Fork' abide law.
 -- 
 -- Law:
 --
 -- @
--- 'Junc' ('Split' a c) ('Split' b d) == 'Split' ('Junc' a b) ('Junc' c d)
+-- 'Join' ('Fork' a c) ('Fork' b d) == 'Fork' ('Join' a b) ('Join' c d)
 -- @
 abideJS :: Matrix e cols rows -> Matrix e cols rows
-abideJS (Junc (Split a c) (Split b d)) = Split (Junc (abideJS a) (abideJS b)) (Junc (abideJS c) (abideJS d)) -- Junc-Split abide law
+abideJS (Join (Fork a c) (Fork b d)) = Fork (Join (abideJS a) (abideJS b)) (Join (abideJS c) (abideJS d)) -- Join-Fork abide law
 abideJS Empty                          = Empty
 abideJS (One e)                        = One e
-abideJS (Junc a b)                     = Junc (abideJS a) (abideJS b)
-abideJS (Split a b)                    = Split (abideJS a) (abideJS b)
+abideJS (Join a b)                     = Join (abideJS a) (abideJS b)
+abideJS (Fork a b)                    = Fork (abideJS a) (abideJS b)
 
--- Matrix abide Split Junc
+-- Matrix abide Fork Join
 
--- | Matrix "abiding" followin the 'Split'-'Junc' abide law.
+-- | Matrix "abiding" followin the 'Fork'-'Join' abide law.
 -- 
 -- @
--- 'Split' ('Junc' a b) ('Junc' c d) == 'Junc' ('Split' a c) ('Split' b d)
+-- 'Fork' ('Join' a b) ('Join' c d) == 'Join' ('Fork' a c) ('Fork' b d)
 -- @
 abideSJ :: Matrix e cols rows -> Matrix e cols rows
-abideSJ (Split (Junc a b) (Junc c d)) = Junc (Split (abideSJ a) (abideSJ c)) (Split (abideSJ b) (abideSJ d)) -- Split-Junc abide law
+abideSJ (Fork (Join a b) (Join c d)) = Join (Fork (abideSJ a) (abideSJ c)) (Fork (abideSJ b) (abideSJ d)) -- Fork-Join abide law
 abideSJ Empty                         = Empty
 abideSJ (One e)                       = One e
-abideSJ (Junc a b)                    = Junc (abideSJ a) (abideSJ b)
-abideSJ (Split a b)                   = Split (abideSJ a) (abideSJ b)
+abideSJ (Join a b)                    = Join (abideSJ a) (abideSJ b)
+abideSJ (Fork a b)                   = Fork (abideSJ a) (abideSJ b)
 
 -- Matrix transposition
 
@@ -680,17 +680,17 @@ abideSJ (Split a b)                   = Split (abideSJ a) (abideSJ b)
 tr :: Matrix e cols rows -> Matrix e rows cols
 tr Empty       = Empty
 tr (One e)     = One e
-tr (Junc a b)  = Split (tr a) (tr b)
-tr (Split a b) = Junc (tr a) (tr b)
+tr (Join a b)  = Fork (tr a) (tr b)
+tr (Fork a b) = Join (tr a) (tr b)
 
 -- Selective 'select' operator
 
 -- | Selective functors 'select' operator equivalent inspired by the
 -- ArrowMonad solution presented in the paper.
 select :: (Num e, FromLists e b b, Countable b) => Matrix e cols (Either a b) -> Matrix e a b -> Matrix e cols b
-select (Split a b) y                    = y . a + b                     -- Divide-and-conquer law
-select (Junc (Split a c) (Split b d)) y = junc (y . a + c) (y . b + d)  -- Pattern matching + DnC law
-select m y                              = junc y identity . m
+select (Fork a b) y                    = y . a + b                     -- Divide-and-conquer law
+select (Join (Fork a c) (Fork b d)) y = join (y . a + c) (y . b + d)  -- Pattern matching + DnC law
+select m y                              = join y iden . m
 
 branch ::
        ( Num e,
@@ -711,7 +711,7 @@ branch x l r = f x `select` g l `select` r
   where
     f :: (Num e, Countable a, CountableDimensions b c, FromLists e a b, FromLists e c b, FromLists e b b, FromLists e b a, FromLists e a a)
       => Matrix e cols (Either a b) -> Matrix e cols (Either a (Either b c))
-    f m = split (tr i1) (i1 . tr i2) . m
+    f m = fork (tr i1) (i1 . tr i2) . m
     g :: (Num e, CountableDimensions b c, FromLists e b c, FromLists e c c) => Matrix e a c -> Matrix e a (Either b c)
     g m = i2 . m
 
@@ -731,7 +731,7 @@ cond ::
      )
      =>
      (a -> Bool) -> Matrix e cols rows -> Matrix e cols rows -> Matrix e cols rows
-cond p f g = junc f g . grd p
+cond p f g = join f g . grd p
 
 grd :: 
     ( Trivial q,
@@ -746,7 +746,7 @@ grd ::
     )
     =>
     (a -> Bool) -> Matrix e q (Either q q)
-grd f = split (corr f) (corr (not . f))
+grd f = fork (corr f) (corr (not . f))
 
 corr :: 
     forall e a q . 
@@ -758,8 +758,8 @@ corr ::
       Liftable e a Bool
     ) 
      => (a -> Bool) -> Matrix e q q
-corr p = let f = fromF p :: Matrix e q ()
-          in khatri f (identity :: Matrix e q q)
+corr p = let f = fromF' p :: Matrix e q ()
+          in khatri f (iden :: Matrix e q q)
 
 -- Pretty print
 
@@ -819,10 +819,10 @@ prettyPrint = putStrLn . pretty
 zipWithM :: (e -> f -> g) -> Matrix e cols rows -> Matrix f cols rows -> Matrix g cols rows
 zipWithM f Empty Empty                = Empty
 zipWithM f (One a) (One b)            = One (f a b)
-zipWithM f (Junc a b) (Junc c d)      = Junc (zipWithM f a c) (zipWithM f b d)
-zipWithM f (Split a b) (Split c d)    = Split (zipWithM f a c) (zipWithM f b d)
-zipWithM f x@(Split _ _) y@(Junc _ _) = zipWithM f x (abideJS y)
-zipWithM f x@(Junc _ _) y@(Split _ _) = zipWithM f (abideJS x) y
+zipWithM f (Join a b) (Join c d)      = Join (zipWithM f a c) (zipWithM f b d)
+zipWithM f (Fork a b) (Fork c d)    = Fork (zipWithM f a c) (zipWithM f b d)
+zipWithM f x@(Fork _ _) y@(Join _ _) = zipWithM f x (abideJS y)
+zipWithM f x@(Join _ _) y@(Fork _ _) = zipWithM f (abideJS x) y
 
 -- Relational operators functions
 
@@ -845,51 +845,51 @@ negateM :: Relation cols rows -> Relation cols rows
 negateM Empty         = Empty
 negateM (One (Nat 0)) = One (Nat 1)
 negateM (One (Nat 1)) = One (Nat 0)
-negateM (Junc a b)    = Junc (negateM a) (negateM b)
-negateM (Split a b)   = Split (negateM a) (negateM b)
+negateM (Join a b)    = Join (negateM a) (negateM b)
+negateM (Fork a b)   = Fork (negateM a) (negateM b)
 
 -- | Relational addition
 orM :: Relation cols rows -> Relation cols rows -> Relation cols rows
 orM Empty Empty                = Empty
 orM (One a) (One b)            = One (fromBool (toBool a || toBool b))
-orM (Junc a b) (Junc c d)      = Junc (orM a c) (orM b d)
-orM (Split a b) (Split c d)    = Split (orM a c) (orM b d)
-orM x@(Split _ _) y@(Junc _ _) = orM x (abideJS y)
-orM x@(Junc _ _) y@(Split _ _) = orM (abideJS x) y
+orM (Join a b) (Join c d)      = Join (orM a c) (orM b d)
+orM (Fork a b) (Fork c d)    = Fork (orM a c) (orM b d)
+orM x@(Fork _ _) y@(Join _ _) = orM x (abideJS y)
+orM x@(Join _ _) y@(Fork _ _) = orM (abideJS x) y
 
 -- | Relational multiplication
 andM :: Relation cols rows -> Relation cols rows -> Relation cols rows
 andM Empty Empty                = Empty
 andM (One a) (One b)            = One (fromBool (toBool a && toBool b))
-andM (Junc a b) (Junc c d)      = Junc (andM a c) (andM b d)
-andM (Split a b) (Split c d)    = Split (andM a c) (andM b d)
-andM x@(Split _ _) y@(Junc _ _) = andM x (abideJS y)
-andM x@(Junc _ _) y@(Split _ _) = andM (abideJS x) y
+andM (Join a b) (Join c d)      = Join (andM a c) (andM b d)
+andM (Fork a b) (Fork c d)    = Fork (andM a c) (andM b d)
+andM x@(Fork _ _) y@(Join _ _) = andM x (abideJS y)
+andM x@(Join _ _) y@(Fork _ _) = andM (abideJS x) y
 
 -- | Relational subtraction
 subM :: Relation cols rows -> Relation cols rows -> Relation cols rows
 subM Empty Empty                = Empty
 subM (One a) (One b)            = if a - b < nat 0 then One (nat 0) else One (a - b)
-subM (Junc a b) (Junc c d)      = Junc (subM a c) (subM b d)
-subM (Split a b) (Split c d)    = Split (subM a c) (subM b d)
-subM x@(Split _ _) y@(Junc _ _) = subM x (abideJS y)
-subM x@(Junc _ _) y@(Split _ _) = subM (abideJS x) y
+subM (Join a b) (Join c d)      = Join (subM a c) (subM b d)
+subM (Fork a b) (Fork c d)    = Fork (subM a c) (subM b d)
+subM x@(Fork _ _) y@(Join _ _) = subM x (abideJS y)
+subM x@(Join _ _) y@(Fork _ _) = subM (abideJS x) y
 
 -- | Matrix relational composition.
 compRel :: Relation cr rows -> Relation cols cr -> Relation cols rows
 compRel Empty Empty            = Empty
 compRel (One a) (One b)        = One (fromBool (toBool a && toBool b))
-compRel (Junc a b) (Split c d) = orM (compRel a c) (compRel b d)   -- Divide-and-conquer law
-compRel (Split a b) c          = Split (compRel a c) (compRel b c) -- Split fusion law
-compRel c (Junc a b)           = Junc (compRel c a) (compRel c b)  -- Junc fusion law
+compRel (Join a b) (Fork c d) = orM (compRel a c) (compRel b d)   -- Divide-and-conquer law
+compRel (Fork a b) c          = Fork (compRel a c) (compRel b c) -- Fork fusion law
+compRel c (Join a b)           = Join (compRel c a) (compRel c b)  -- Join fusion law
 
 -- | Matrix relational right division
 divR :: Relation b c -> Relation b a -> Relation a c
 divR Empty Empty           = Empty
 divR (One a) (One b)       = One (fromBool (not (toBool b) || toBool a)) -- b implies a
-divR (Junc a b) (Junc c d) = andM (divR a c) (divR b d)
-divR (Split a b) c         = Split (divR a c) (divR b c)
-divR c (Split a b)         = Junc (divR c a) (divR c b)
+divR (Join a b) (Join c d) = andM (divR a c) (divR b d)
+divR (Fork a b) c         = Fork (divR a c) (divR b c)
+divR c (Fork a b)         = Join (divR c a) (divR c b)
 
 -- | Matrix relational left division
 divL :: Relation c b -> Relation a b -> Relation a c
@@ -905,7 +905,7 @@ divS s r = divL r s `intersection` divR (tr r) (tr s)
 --
 --   NOTE: Be careful to not ask for a relation bigger than the cardinality of
 -- types @a@ or @b@ allows.
-fromFRel ::
+fromFRel' ::
   forall a b cols rows.
   ( Liftable Boolean a b,
     CountableDimensions cols rows,
@@ -913,7 +913,7 @@ fromFRel ::
   ) =>
   (a -> b) ->
   Relation cols rows
-fromFRel f =
+fromFRel' f =
   let minA         = minBound @a
       maxA         = maxBound @a
       minB         = minBound @b
@@ -934,7 +934,7 @@ fromFRel f =
 
 -- | Lifts functions to relations with dimensions matching @a@ and @b@
 -- cardinality's.
-fromFRel' ::
+fromFRel ::
   forall a b.
   ( Liftable Boolean a b,
     CountableDimensionsN a b,
@@ -942,7 +942,7 @@ fromFRel' ::
   ) =>
   (a -> b) ->
   Relation (Normalize a) (Normalize b)
-fromFRel' f =
+fromFRel f =
   let minA         = minBound @a
       maxA         = maxBound @a
       minB         = minBound @b

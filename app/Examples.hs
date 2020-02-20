@@ -32,7 +32,7 @@ firstChoice :: Matrix Double () Outcome
 firstChoice = col [1/3, 2/3]
 
 secondChoice :: Matrix Double Outcome Outcome
-secondChoice = fromF' switch 
+secondChoice = fromF switch 
 
 -- Dice sum
 
@@ -41,7 +41,7 @@ type SS = Natural 1 6 -- Sample Space
 sumSS :: SS -> SS -> Natural 2 12
 sumSS = coerceNat (+)
 
-sumSSM = fromF' (uncurry sumSS)
+sumSSM = fromF (uncurry sumSS)
 
 condition :: (Int, Int) -> Int -> Int
 condition (fst, snd) thrd = if fst == snd
@@ -51,7 +51,7 @@ condition (fst, snd) thrd = if fst == snd
 conditionSS :: (SS, SS) -> SS -> Natural 3 18
 conditionSS = coerceNat2 condition
 
-conditionalThrows = fromF' (uncurry conditionSS) . khatri (khatri die die) die
+conditionalThrows = fromF (uncurry conditionSS) . khatri (khatri die die) die
 
 die :: Matrix Double () SS
 die = col $ map (const (1/6)) [nat @1 @6 1 .. nat 6]
@@ -75,15 +75,15 @@ sprinkler = fromLists [[0.6, 0.99], [0.4, 0.01]]
 grass :: Matrix Double (S, R) G
 grass = fromLists [[1, 0.2, 0.1, 0.01], [0, 0.8, 0.9, 0.99]]
 
-tag f = khatri f identity
+tag f = khatri f iden
 
 state g s r = tag g `comp` tag s `comp` r
 
 grass_wet :: Matrix Double () (G, (S, R)) -> Matrix Double One One
-grass_wet state = row [0,1] . kp1 . state
+grass_wet state = row [0,1] . fstM . state
 
 rainning :: Matrix Double (G, (S, R)) One
-rainning = row [0,1] . kp2 . kp2 
+rainning = row [0,1] . sndM . sndM 
 
 -- Alcuin Puzzle
 
@@ -106,21 +106,21 @@ cross LeftB = RightB
 cross RightB = LeftB
 
 crossR :: R.Relation Bank Bank
-crossR = R.fromF' cross
+crossR = R.fromF cross
 
 -- | Initial state, everyone in the left bank
 locationLeft :: Being -> Bank
 locationLeft _ = LeftB
 
 locationLeftR :: R.Relation Being Bank
-locationLeftR = R.fromF' locationLeft
+locationLeftR = R.fromF locationLeft
 
 -- | Initial state, everyone in the right bank
 locationRight :: Being -> Bank
 locationRight _ = RightB
 
 locationRightR :: R.Relation Being Bank
-locationRightR = R.fromF' locationRight
+locationRightR = R.fromF locationRight
 
 -- Properties
 
@@ -137,7 +137,7 @@ inv :: R.Relation Being Bank -> Bool
 inv w = (w `R.comp` canEat w) `R.sse` (w `R.comp` farmer)
   where
     farmer :: R.Relation Being Being
-    farmer = R.fromF' (const Farmer)
+    farmer = R.fromF (const Farmer)
 
 -- Arbitrary state
 bankState :: Being -> Bank -> Bool

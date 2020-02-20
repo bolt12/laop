@@ -118,7 +118,7 @@ branchD ::
        => Dist (Either a b) -> Matrix Prob a c -> Matrix Prob b c -> Dist c
 branchD x l r = f x `selectD` g l `selectD` r
   where
-    f (D m) = D (split (tr i1) (i1 `comp` tr i2) `comp` m)
+    f (D m) = D (fork (tr i1) (i1 `comp` tr i2) `comp` m)
     g m = i2 `comp` m
 
 -- | Branch on a Boolean value, skipping unnecessary computations.

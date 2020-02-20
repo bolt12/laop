@@ -43,9 +43,9 @@ module LAoP.Relation
     -- * Primitives
     empty,
     one,
-    junc,
+    join,
     (|||),
-    split,
+    fork,
     (===),
 
     -- * Auxiliary type families
@@ -108,8 +108,8 @@ module LAoP.Relation
     splitR,
 
     -- ** Projections
-    p1,
-    p2,
+    fstR,
+    sndR,
     -- ** Bifunctor
     (><),
     -- * Relational coproduct
@@ -148,7 +148,7 @@ module LAoP.Relation
     cond,
 
     -- * Relational composition and lifting
-    identity,
+    iden,
     comp,
     fromF,
     fromF',
