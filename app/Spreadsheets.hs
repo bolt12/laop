@@ -4,7 +4,6 @@ module Spreadsheets
   where
 
 import LAoP.Matrix.Type
-import qualified LAoP.Matrix.Internal as I
 import GHC.Generics
 
 data Student = Student1 | Student2 | Student3 | Student4

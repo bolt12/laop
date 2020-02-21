@@ -90,7 +90,7 @@ multD ::
         FromListsN (a, b) b,
         TrivialP a b
       ) => Dist a -> Dist b -> Dist (a, b)
-multD (D a) (D b) = D (khatri a b)
+multD (D a) (D b) = D (kr a b)
 
 -- | Selective instance function
 selectD :: 

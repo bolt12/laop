@@ -105,8 +105,8 @@ module LAoP.Matrix.Nat
     cond,
 
     -- ** Matrix "abiding"
-    abideJS,
-    abideSJ,
+    abideJF,
+    abideFJ,
 
     -- ** Zip Matrices
     zipWithM,
@@ -135,7 +135,7 @@ module LAoP.Matrix.Nat
     sndM,
 
     -- *** Matrix pairing
-    khatri,
+    kr,
 
     -- * Matrix composition and lifting
 
@@ -358,9 +358,9 @@ rows (M m) = I.rows m
 columns :: (CountableN cols) => Matrix e cols rows -> Int
 columns (M m) = I.columns m
 
--- | Coproduct Bifunctor
 infixl 5 -|-
 
+-- | Coproduct Bifunctor (Direct sum)
 (-|-) ::
   ( Num e,
     CountableDimensionsN j k,
@@ -376,8 +376,8 @@ infixl 5 -|-
   Matrix e (n + m) (k + j)
 (-|-) (M a) (M b) = M ((I.-|-) a b)
 
--- | Khatri Rao Product and projections
-fstM :: 
+-- | Khatri Rao Product first projection
+fstM ::
   forall e m k .
   ( Num e,
     CountableDimensionsN m k,
@@ -387,7 +387,8 @@ fstM ::
   ) => Matrix e (m * k) m
 fstM = M (I.fstM @e @(I.FromNat m) @(I.FromNat k))
 
-sndM :: 
+-- | Khatri Rao Product second projection
+sndM ::
     forall e m k.
     ( Num e,
       CountableDimensionsN k m,
@@ -397,7 +398,8 @@ sndM ::
     ) => Matrix e (m * k) k
 sndM = M (I.sndM @e @(I.FromNat m) @(I.FromNat k))
 
-khatri ::
+-- | Khatri Rao Product
+kr ::
   forall e cols a b.
   ( Num e,
     CountableDimensionsN a b,
@@ -406,7 +408,7 @@ khatri ::
     FromListsN e (a * b) b,
     TrivialP a b
   ) => Matrix e cols a -> Matrix e cols b -> Matrix e cols (a * b)
-khatri a b =
+kr a b =
   let fstM' = fstM @e @a @b
       sndM' = sndM @e @a @b
    in comp (tr fstM') a * comp (tr sndM') b
@@ -430,15 +432,15 @@ infixl 4 ><
 (><) a b =
   let fstM' = fstM @e @m @n
       sndM' = sndM @e @m @n
-   in khatri (comp a fstM') (comp b sndM')
+   in kr (comp a fstM') (comp b sndM')
 
 -- | Matrix abide Join Fork
-abideJS :: Matrix e cols rows -> Matrix e cols rows
-abideJS (M m) = M (I.abideJS m)
+abideJF :: Matrix e cols rows -> Matrix e cols rows
+abideJF (M m) = M (I.abideJF m)
 
 -- | Matrix abide Fork Join
-abideSJ :: Matrix e cols rows -> Matrix e cols rows
-abideSJ (M m) = M (I.abideSJ m)
+abideFJ :: Matrix e cols rows -> Matrix e cols rows
+abideFJ (M m) = M (I.abideFJ m)
 
 -- | Matrix transposition
 tr :: Matrix e cols rows -> Matrix e rows cols

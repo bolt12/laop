@@ -742,7 +742,7 @@ splitR ::
          TrivialP a b
        )
        => Relation c a -> Relation c b -> Relation c (a, b)
-splitR (R f) (R g) = R (I.khatri f g)
+splitR (R f) (R g) = R (I.kr f g)
 
 -- | Relational pairing first component projection
 --

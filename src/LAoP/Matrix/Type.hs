@@ -122,8 +122,8 @@ module LAoP.Matrix.Type
     cond,
 
     -- ** Matrix "abiding"
-    abideJS,
-    abideSJ,
+    abideJF,
+    abideFJ,
 
     -- ** Zip Matrices
     zipWithM,
@@ -152,7 +152,7 @@ module LAoP.Matrix.Type
     sndM,
 
     -- *** Matrix pairing
-    khatri,
+    kr,
 
     -- * Matrix composition and lifting
 
@@ -289,7 +289,7 @@ multM ::
         FromListsN e (a, b) b,
         TrivialP a b
       ) => Matrix e c a -> Matrix e c b -> Matrix e c (a, b)
-multM = khatri
+multM = kr
 
 -- | Monad instance equivalent 'return' function,
 returnM :: 
@@ -554,13 +554,13 @@ sndM = M (I.sndM @e @(I.Normalize m) @(I.Normalize k))
 --   NOTE: That this is not a true categorical product, see for instance:
 -- 
 -- @
---                | fstM `comp` khatri a b == a 
--- khatri a b ==> |
---                | sndM `comp` khatri a b == b
+--            | fstM `comp` kr a b == a 
+-- kr a b ==> |
+--            | sndM `comp` kr a b == b
 -- @
 --
 -- __Emphasis__ on the implication symbol.
-khatri ::
+kr ::
   forall e cols a b.
   ( Num e,
     CountableDimensionsN a b,
@@ -569,7 +569,7 @@ khatri ::
     FromListsN e (a, b) b,
     TrivialP a b
   ) => Matrix e cols a -> Matrix e cols b -> Matrix e cols (a, b)
-khatri a b =
+kr a b =
   let fstM' = fstM @e @a @b
       sndM' = sndM @e @a @b
    in comp (tr fstM') a * comp (tr sndM') b
@@ -578,7 +578,7 @@ khatri a b =
 
 infixl 4 ><
 
--- | Matrix product functor also known as kronecker product
+-- | Matrix product functor also known as Kronecker product
 (><) ::
   forall e m p n q.
   ( Num e,
@@ -595,7 +595,7 @@ infixl 4 ><
 (><) a b =
   let fstM' = fstM @e @m @n
       sndM' = sndM @e @m @n
-   in khatri (comp a fstM') (comp b sndM')
+   in kr (comp a fstM') (comp b sndM')
 
 -- Matrix abide Join Fork
 
@@ -606,8 +606,8 @@ infixl 4 ><
 -- @
 -- 'Join' ('Fork' a c) ('Fork' b d) == 'Fork' ('Join' a b) ('Join' c d)
 -- @
-abideJS :: Matrix e cols rows -> Matrix e cols rows
-abideJS (M m) = M (I.abideJS m)
+abideJF :: Matrix e cols rows -> Matrix e cols rows
+abideJF (M m) = M (I.abideJF m)
 
 -- Matrix abide Fork Join
 
@@ -618,8 +618,8 @@ abideJS (M m) = M (I.abideJS m)
 -- @
 -- 'Fork' ('Join' a b) ('Join' c d) == 'Join' ('Fork' a c) ('Fork' b d)
 -- @
-abideSJ :: Matrix e cols rows -> Matrix e cols rows
-abideSJ (M m) = M (I.abideSJ m)
+abideFJ :: Matrix e cols rows -> Matrix e cols rows
+abideFJ (M m) = M (I.abideFJ m)
 
 -- Matrix transposition
 

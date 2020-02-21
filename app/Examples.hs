@@ -51,7 +51,7 @@ condition (fst, snd) thrd = if fst == snd
 conditionSS :: (SS, SS) -> SS -> Natural 3 18
 conditionSS = coerceNat2 condition
 
-conditionalThrows = fromF (uncurry conditionSS) . khatri (khatri die die) die
+conditionalThrows = fromF (uncurry conditionSS) . kr (kr die die) die
 
 die :: Matrix Double () SS
 die = col $ map (const (1/6)) [nat @1 @6 1 .. nat 6]
@@ -75,7 +75,7 @@ sprinkler = fromLists [[0.6, 0.99], [0.4, 0.01]]
 grass :: Matrix Double (S, R) G
 grass = fromLists [[1, 0.2, 0.1, 0.01], [0, 0.8, 0.9, 0.99]]
 
-tag f = khatri f iden
+tag f = kr f iden
 
 state g s r = tag g `comp` tag s `comp` r
 
@@ -156,11 +156,11 @@ exec = do
     putStrLn "Monty Hall Problem solution:"
     prettyPrint (secondChoice . firstChoice)
     putStrLn "\n Sum of dices probability:"
-    prettyPrint (sumSSM `comp` khatri die die)
+    prettyPrint (sumSSM `comp` kr die die)
     putStrLn "\n Conditional dice throw:"
     prettyPrint conditionalThrows
     putStrLn "\n Checking that the last result is indeed a distribution: "
-    prettyPrint (bang . sumSSM . khatri die die)
+    prettyPrint (bang . sumSSM . kr die die)
     putStrLn "\n Probability of grass being wet:"
     prettyPrint (grass_wet (state grass sprinkler rain))
     putStrLn "\n Probability of rain:"
