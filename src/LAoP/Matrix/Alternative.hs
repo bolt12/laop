@@ -70,11 +70,31 @@ instance Cartesian (Matrix e) where
     snd   = Join Zero Identity
     (&&&) = Fork
 
+-- A standard construction for any Cartesian category.
+bimapProduct :: Cartesian k => k a c -> k b d -> Product k a b `k` Product k c d
+bimapProduct f g = (f . fst) &&& (g . snd)
+
+-- For free!
+(><) :: Matrix e a b -> Matrix e c d -> Matrix e (Either a c) (Either b d)
+(><) = bimapProduct
+
+infixl 4 ><
+
 class Category k => CoCartesian k where
     type Sum k :: * -> * -> *
     inl   :: a `k` Sum k a b
     inr   :: b `k` Sum k a b
     (|||) :: k a c -> k b c -> Sum k a b `k` c
+
+-- A standard construction for any CoCartesian category.
+bimapSum :: CoCartesian k => k a c -> k b d -> Sum k a b `k` Sum k c d
+bimapSum f g = (inl . f) ||| (inr . g)
+
+-- For free!
+(-|-) :: Matrix e a b -> Matrix e c d -> Matrix e (Either a c) (Either b d)
+(-|-) = bimapSum
+
+infixl 5 -|-
 
 instance CoCartesian (->) where
     type Sum (->) = Either
@@ -88,6 +108,16 @@ instance CoCartesian (Matrix e) where
     inl = Fork Identity Zero
     inr = Fork Zero Identity
     (|||) = Join
+
+class (Cartesian k, CoCartesian k) => Distributive k where
+    distribute :: Product k a (Sum k b c) `k` Sum k (Product k a b) (Product k a c)
+
+instance Distributive (->) where
+    distribute (a, Left  b) = Left  (a, b)
+    distribute (a, Right c) = Right (a, c)
+
+instance Distributive (Matrix e) where
+    distribute = Fork (id -|- fst) (id -|- snd)
 
 empty :: Matrix e Void Void
 empty = Identity
