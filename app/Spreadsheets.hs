@@ -4,7 +4,6 @@ module Spreadsheets
   where
 
 import LAoP.Matrix.Type
-import qualified LAoP.Matrix.Internal as I
 import GHC.Generics
 
 data Student = Student1 | Student2 | Student3 | Student4
@@ -35,7 +34,7 @@ xls :: Matrix Float Question One
     -> Matrix Float Question Student
     -> Matrix Float Student One
     -> Matrix Float (Either Question Results) (Either One Student)
-xls w m t = junc (split w m) (split zeros r)
+xls w m t = join (fork w m) (fork zeros r)
   where
     rExam = m `comp` tr w
     rTest = tr t

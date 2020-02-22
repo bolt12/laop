@@ -28,16 +28,16 @@ selectM2 ::
          T.FromListsN e b b,
          CountableN b
        ) => Matrix e cols (Either a b) -> Matrix e a b -> Matrix e cols b
-selectM2 m y = junc y identity `comp` m
+selectM2 m y = join y iden `comp` m
 
 selectD2 :: 
        ( FromListsN b b,
          CountableN b
        ) => Dist (Either a b) -> Matrix Prob a b -> Dist b
-selectD2 (D d) m = D (junc m identity `comp` d)
+selectD2 (D d) m = D (join m iden `comp` d)
 
--- Composition with identity
-compId m = comp identity m
+-- Composition with iden
+compId m = comp iden m
 
 randomDist :: forall a . (Countable a, FromListsN () a) => Gen (Dist a)
 randomDist = do
@@ -162,7 +162,7 @@ benchmark = defaultMain [
    , bench "NF - 200x200" $ nf (comp m31) m32
    ],
    bgroup "200x200 - RULES" [
-     bench "No rules - 200x200" $ nf (comp m21) identity
+     bench "No rules - 200x200" $ nf (comp m21) iden
    , bench "Rules - 200x200" $ nf compId m21
    ] ],
    env setupEnv2 $ \ ~(m21, m40, dist, dist2, dl1, dl2) -> bgroup "Matrix vs List - `select`" [

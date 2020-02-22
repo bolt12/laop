@@ -73,8 +73,8 @@ module LAoP.Matrix.Type
     -- * Primitives
     empty,
     one,
-    junc,
-    split,
+    join,
+    fork,
 
     -- * Auxiliary type families
     I.FromNat,
@@ -118,23 +118,27 @@ module LAoP.Matrix.Type
     -- ** Matrix Transposition
     tr,
 
+    -- ** Scalar multiplication/division of matrices
+    (.|),
+    (./),
+
     -- ** McCarthy's Conditional
     cond,
 
     -- ** Matrix "abiding"
-    abideJS,
-    abideSJ,
+    abideJF,
+    abideFJ,
 
     -- ** Zip Matrices
     zipWithM,
 
     -- * Biproduct approach
-    -- ** Split
+    -- ** Fork
     (===),
     -- *** Projections
     p1,
     p2,
-    -- ** Junc
+    -- ** Join
     (|||),
     -- *** Injections
     i1,
@@ -148,11 +152,11 @@ module LAoP.Matrix.Type
     -- | Note that given the restrictions imposed it is not possible to
     -- implement the standard type classes present in standard Haskell.
     -- *** Matrix pairing projections
-    kp1,
-    kp2,
+    fstM,
+    sndM,
 
     -- *** Matrix pairing
-    khatri,
+    kr,
 
     -- * Matrix composition and lifting
 
@@ -160,10 +164,10 @@ module LAoP.Matrix.Type
 
     -- | Note that given the restrictions imposed it is not possible to
     -- implement the standard type classes present in standard Haskell.
-    identity,
+    iden,
     comp,
-    fromF,
     fromF',
+    fromF,
 
     -- * Relation
     toRel,
@@ -202,7 +206,7 @@ type TrivialP a b             = I.Normalize (a, b) ~ I.Normalize (I.Normalize a,
 -- implementation is 'undefined'. However 'comp' can be and this partial
 -- class implementation exists just to make the code more readable.
 --
--- Please use 'identity' instead.
+-- Please use 'iden' instead.
 instance (Num e) => C.Category (Matrix e) where
     id = undefined
     (.) = comp
@@ -216,7 +220,7 @@ bimapM ::
          FromListsN e d c,
          FromListsN e b a
        ) => (a -> b) -> (c -> d) -> Matrix e a c -> Matrix e b d
-bimapM f g m = fromF' g `comp` m `comp` tr (fromF' f)
+bimapM f g m = fromF g `comp` m `comp` tr (fromF f)
 
 -- | Zero type alias
 type Zero = Void
@@ -234,35 +238,35 @@ empty = M I.Empty
 one :: e -> Matrix e One One
 one = M . I.One
 
--- | Matrix 'Junc' constructor
-junc ::
+-- | Matrix 'Join' constructor
+join ::
   Matrix e a rows ->
   Matrix e b rows ->
   Matrix e (Either a b) rows
-junc (M a) (M b) = M (I.Junc a b)
+join (M a) (M b) = M (I.Join a b)
 
 infixl 3 |||
--- | Matrix 'Junc' constructor
+-- | Matrix 'Join' constructor
 (|||) ::
   Matrix e a rows ->
   Matrix e b rows ->
   Matrix e (Either a b) rows
-(|||) = junc
+(|||) = join
 
--- | Matrix 'Split' constructor
-split ::
+-- | Matrix 'Fork' constructor
+fork ::
   Matrix e cols a ->
   Matrix e cols b ->
   Matrix e cols (Either a b)
-split (M a) (M b) = M (I.Split a b)
+fork (M a) (M b) = M (I.Fork a b)
 
 infixl 2 ===
--- | Matrix 'Split' constructor
+-- | Matrix 'Fork' constructor
 (===) ::
   Matrix e cols a ->
   Matrix e cols b ->
   Matrix e cols (Either a b)
-(===) = split
+(===) = fork
 
 -- Functor hierarchy
 
@@ -274,7 +278,7 @@ fmapM ::
      )
      =>
      (a -> b) -> Matrix e c a -> Matrix e c b
-fmapM f m = fromF' f `comp` m
+fmapM f m = fromF f `comp` m
 
 -- | Applicative instance equivalent 'unit' function,
 unitM :: (Num e) => Matrix e () ()
@@ -289,7 +293,7 @@ multM ::
         FromListsN e (a, b) b,
         TrivialP a b
       ) => Matrix e c a -> Matrix e c b -> Matrix e c (a, b)
-multM = khatri
+multM = kr
 
 -- | Monad instance equivalent 'return' function,
 returnM :: 
@@ -336,23 +340,23 @@ row = M . I.row
 --
 --   NOTE: Be careful to not ask for a matrix bigger than the cardinality of
 -- types @a@ or @b@ allows.
-fromF ::
+fromF' ::
   ( Liftable e a b,
     CountableDimensionsN cols rows,
     FromListsN e rows cols
   ) =>
   (a -> b) -> Matrix e cols rows
-fromF = M . I.fromF
+fromF' = M . I.fromF'
 
 -- | Lifts functions to matrices with dimensions matching @a@ and @b@
 -- cardinality's.
-fromF' ::
+fromF ::
   ( Liftable e a b,
     CountableDimensionsN a b,
     FromListsN e b a
   ) =>
   (a -> b) -> Matrix e a b
-fromF' = M . I.fromF'
+fromF = M . I.fromF
 
 -- | Lifts relation functions to Boolean Matrix
 toRel ::
@@ -418,16 +422,16 @@ point ::
         CountableN a,
         FromListsN e a One
       ) => a -> Matrix e One a
-point = fromF' . const
+point = fromF . const
 
--- Identity Matrix
+-- iden Matrix
 
--- | Identity matrix
-identity ::
+-- | iden matrix
+iden ::
   (Num e, FromListsN e a a, CountableN a) =>
   Matrix e a a
-identity = M I.identity
-{-# NOINLINE identity #-}
+iden = M I.iden
+{-# NOINLINE iden #-}
 
 -- Matrix composition (MMM)
 
@@ -439,9 +443,23 @@ comp :: (Num e) => Matrix e cr rows -> Matrix e cols cr -> Matrix e cols rows
 comp (M a) (M b) = M (I.comp a b)
 {-# NOINLINE comp #-}
 {-# RULES 
-   "comp/identity1" forall m. comp m identity = m ;
-   "comp/identity2" forall m. comp identity m = m
+   "comp/iden1" forall m. comp m iden = m ;
+   "comp/iden2" forall m. comp iden m = m
 #-}
+
+-- Scalar multiplication of matrices
+
+infixl 7 .|
+-- | Scalar multiplication of matrices.
+(.|) :: Num e => e -> Matrix e cols rows -> Matrix e cols rows
+(.|) e (M m) = M (e I..| m)
+
+-- Scalar division of matrices
+
+infixl 7 ./
+-- | Scalar multiplication of matrices.
+(./) :: Fractional e => Matrix e cols rows -> e -> Matrix e cols rows
+(./) (M m) e = M (m I../ e)
 
 -- | Biproduct first component projection
 p1 ::
@@ -528,7 +546,7 @@ infixl 5 -|-
 -- Khatri Rao Product and projections
 
 -- | Khatri Rao product first component projection matrix.
-kp1 :: 
+fstM :: 
   forall e m k .
   ( Num e,
     CountableDimensionsN m k,
@@ -536,10 +554,10 @@ kp1 ::
     FromListsN e (m, k) m,
     TrivialP m k
   ) => Matrix e (m, k) m
-kp1 = M (I.kp1 @e @(I.Normalize m) @(I.Normalize k))
+fstM = M (I.fstM @e @(I.Normalize m) @(I.Normalize k))
 
 -- | Khatri Rao product second component projection matrix.
-kp2 :: 
+sndM :: 
     forall e m k.
     ( Num e,
       CountableDimensionsN k m,
@@ -547,20 +565,20 @@ kp2 ::
       FromListsN e (m, k) k,
       TrivialP m k
     ) => Matrix e (m, k) k
-kp2 = M (I.kp2 @e @(I.Normalize m) @(I.Normalize k))
+sndM = M (I.sndM @e @(I.Normalize m) @(I.Normalize k))
 
 -- | Khatri Rao Matrix product also known as matrix pairing.
 --
 --   NOTE: That this is not a true categorical product, see for instance:
 -- 
 -- @
---                | kp1 `comp` khatri a b == a 
--- khatri a b ==> |
---                | kp2 `comp` khatri a b == b
+--            | fstM `comp` kr a b == a 
+-- kr a b ==> |
+--            | sndM `comp` kr a b == b
 -- @
 --
 -- __Emphasis__ on the implication symbol.
-khatri ::
+kr ::
   forall e cols a b.
   ( Num e,
     CountableDimensionsN a b,
@@ -569,16 +587,16 @@ khatri ::
     FromListsN e (a, b) b,
     TrivialP a b
   ) => Matrix e cols a -> Matrix e cols b -> Matrix e cols (a, b)
-khatri a b =
-  let kp1' = kp1 @e @a @b
-      kp2' = kp2 @e @a @b
-   in comp (tr kp1') a * comp (tr kp2') b
+kr a b =
+  let fstM' = fstM @e @a @b
+      sndM' = sndM @e @a @b
+   in comp (tr fstM') a * comp (tr sndM') b
 
 -- Product Bifunctor (Kronecker)
 
 infixl 4 ><
 
--- | Matrix product functor also known as kronecker product
+-- | Matrix product functor also known as Kronecker product
 (><) ::
   forall e m p n q.
   ( Num e,
@@ -593,33 +611,33 @@ infixl 4 ><
     TrivialP p q
   ) => Matrix e m p -> Matrix e n q -> Matrix e (m, n) (p, q)
 (><) a b =
-  let kp1' = kp1 @e @m @n
-      kp2' = kp2 @e @m @n
-   in khatri (comp a kp1') (comp b kp2')
+  let fstM' = fstM @e @m @n
+      sndM' = sndM @e @m @n
+   in kr (comp a fstM') (comp b sndM')
 
--- Matrix abide Junc Split
+-- Matrix abide Join Fork
 
--- | Matrix "abiding" followin the 'Junc'-'Split' abide law.
+-- | Matrix "abiding" followin the 'Join'-'Fork' abide law.
 -- 
 -- Law:
 --
 -- @
--- 'Junc' ('Split' a c) ('Split' b d) == 'Split' ('Junc' a b) ('Junc' c d)
+-- 'Join' ('Fork' a c) ('Fork' b d) == 'Fork' ('Join' a b) ('Join' c d)
 -- @
-abideJS :: Matrix e cols rows -> Matrix e cols rows
-abideJS (M m) = M (I.abideJS m)
+abideJF :: Matrix e cols rows -> Matrix e cols rows
+abideJF (M m) = M (I.abideJF m)
 
--- Matrix abide Split Junc
+-- Matrix abide Fork Join
 
--- | Matrix "abiding" followin the 'Split'-'Junc' abide law.
+-- | Matrix "abiding" followin the 'Fork'-'Join' abide law.
 -- 
 -- Law:
 --
 -- @
--- 'Split' ('Junc' a b) ('Junc' c d) == 'Junc' ('Split' a c) ('Split' b d)
+-- 'Fork' ('Join' a b) ('Join' c d) == 'Join' ('Fork' a c) ('Fork' b d)
 -- @
-abideSJ :: Matrix e cols rows -> Matrix e cols rows
-abideSJ (M m) = M (I.abideSJ m)
+abideFJ :: Matrix e cols rows -> Matrix e cols rows
+abideFJ (M m) = M (I.abideFJ m)
 
 -- Matrix transposition
 
