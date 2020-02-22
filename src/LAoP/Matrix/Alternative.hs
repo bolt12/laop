@@ -1,7 +1,11 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE NoStarIsType #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
-
 -----------------------------------------------------------------------------
 -- |
 -- Module     : LAoP.Matrix.Alternative
@@ -16,18 +20,18 @@
 -- in Haskell. See <https://github.com/bolt12/master-thesis my Msc Thesis> for the
 -- motivation behind the library, the underlying theory, and implementation details.
 --
--- This module defines an alternative matrix data type which has a fully
--- parametric Category instance.
+-- This module defines an alternative matrix data type which has several
+-- category-theoretic instances.
 --
 -----------------------------------------------------------------------------
 module LAoP.Matrix.Alternative where
 
 import Control.Category
+import Data.Kind
 import Data.Void
 import Prelude hiding (id, (.), fst, snd, curry, uncurry)
 
 import qualified Prelude
-
 
 data Matrix e a b where
     Identity :: Matrix e a a
@@ -76,7 +80,7 @@ instance Num e => Category (Matrix e) where
 
 -- Adapted from https://hackage.haskell.org/package/categories
 class Category k => Cartesian k where
-    type Product k :: * -> * -> *
+    type Product k :: Type -> Type -> Type
     fst   :: Product k a b `k` a
     snd   :: Product k a b `k` b
     (&&&) :: (a `k` b) -> (a `k` c) -> a `k` Product k b c
@@ -97,14 +101,8 @@ instance Num e => Cartesian (Matrix e) where
 bimapProduct :: Cartesian k => k a c -> k b d -> Product k a b `k` Product k c d
 bimapProduct f g = (f . fst) &&& (g . snd)
 
--- For free!
-(><) :: Num e => Matrix e a b -> Matrix e c d -> Matrix e (Either a c) (Either b d)
-(><) = bimapProduct
-
-infixl 4 ><
-
 class Category k => CoCartesian k where
-    type Sum k :: * -> * -> *
+    type Sum k :: Type -> Type -> Type
     inl   :: a `k` Sum k a b
     inr   :: b `k` Sum k a b
     (|||) :: k a c -> k b c -> Sum k a b `k` c
@@ -152,6 +150,3 @@ transpose m = case m of
 
 select :: Num e => Matrix e a (Either b c) -> Matrix e b c -> Matrix e a c
 select x y = Join y id . x
-
-kr :: Num e => Matrix e a b -> Matrix e a c -> Matrix e a (Either b c)
-kr a b = (transpose fst . a) * (transpose snd . b)
