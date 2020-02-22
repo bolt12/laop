@@ -21,6 +21,7 @@
 module LAoP.Matrix.Alternative where
 
 import Control.Category
+import Data.Void
 import Prelude hiding (id, (.))
 
 data Matrix e a b where
@@ -42,3 +43,12 @@ instance Category (Matrix e) where
     Join w x  . Fork y z  = Add (w . y) (x . z)
     Fork x y  . z         = Fork (x . z) (y . z)
     x         . Join y z  = Join (x . y) (x . z)
+
+empty :: Matrix e Void Void
+empty = Identity
+
+one :: e -> Matrix e () ()
+one e = Scale e Identity
+
+zeroes :: Num e => Matrix e a a
+zeroes = Scale 0 Identity
