@@ -118,6 +118,10 @@ module LAoP.Matrix.Type
     -- ** Matrix Transposition
     tr,
 
+    -- ** Scalar multiplication/division of matrices
+    (.|),
+    (./),
+
     -- ** McCarthy's Conditional
     cond,
 
@@ -442,6 +446,20 @@ comp (M a) (M b) = M (I.comp a b)
    "comp/iden1" forall m. comp m iden = m ;
    "comp/iden2" forall m. comp iden m = m
 #-}
+
+-- Scalar multiplication of matrices
+
+infixl 7 .|
+-- | Scalar multiplication of matrices.
+(.|) :: Num e => e -> Matrix e cols rows -> Matrix e cols rows
+(.|) e (M m) = M (e I..| m)
+
+-- Scalar division of matrices
+
+infixl 7 ./
+-- | Scalar multiplication of matrices.
+(./) :: Fractional e => Matrix e cols rows -> e -> Matrix e cols rows
+(./) (M m) e = M (m I../ e)
 
 -- | Biproduct first component projection
 p1 ::

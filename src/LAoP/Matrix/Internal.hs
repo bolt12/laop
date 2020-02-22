@@ -81,6 +81,10 @@ module LAoP.Matrix.Internal
     -- ** Matrix Transposition
     tr,
 
+    -- ** Scalar multiplication/division of matrices
+    (.|),
+    (./),
+
     -- ** Selective operator
     select,
     branch,
@@ -344,7 +348,7 @@ instance {-# OVERLAPPABLE #-} (FromLists e (Either a b) c, FromLists e (Either a
   fromLists l@(h : t) =
     let lh        = length h
         rowsC     = fromInteger (natVal (Proxy :: Proxy (Count c)))
-        condition = all (== lh) (map length t)
+        condition = all ((== lh) . length) t
      in if lh > 0 && condition
           then Fork (fromLists (take rowsC l)) (fromLists (drop rowsC l))
           else error "Not all rows have the same length"
@@ -496,6 +500,26 @@ comp c (Join a b)          = Join (comp c a) (comp c b)  -- Join fusion law
    "comp/iden1" forall m. comp m iden = m ;
    "comp/iden2" forall m. comp iden m = m
 #-}
+
+-- Scalar multiplication of matrices
+
+infixl 7 .|
+-- | Scalar multiplication of matrices.
+(.|) :: Num e => e -> Matrix e cols rows -> Matrix e cols rows
+(.|) _ Empty = Empty
+(.|) e (One a) = One (e * a)
+(.|) e (Join a b) = Join (e .| a) (e .| b)
+(.|) e (Fork a b) = Fork (e .| a) (e .| b)
+
+-- Scalar division of matrices
+
+infixl 7 ./
+-- | Scalar multiplication of matrices.
+(./) :: Fractional e => Matrix e cols rows -> e -> Matrix e cols rows
+(./) Empty _ = Empty
+(./) (One a) e = One (a / e)
+(./) (Join a b) e = Join (a ./ e) (b ./ e)
+(./) (Fork a b) e = Fork (a ./ e) (b ./ e)
 
 -- Projections
 

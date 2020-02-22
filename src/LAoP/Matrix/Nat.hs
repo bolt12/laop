@@ -98,6 +98,10 @@ module LAoP.Matrix.Nat
     -- ** Matrix Transposition
     tr,
 
+    -- ** Scalar multiplication/division of matrices
+    (.|),
+    (./),
+
     -- ** Selective operator
     select, 
 
@@ -307,6 +311,20 @@ iden = M I.iden
 
 comp :: (Num e) => Matrix e cr rows -> Matrix e cols cr -> Matrix e cols rows
 comp (M a) (M b) = M (I.comp a b)
+
+-- Scalar multiplication of matrices
+
+infixl 7 .|
+-- | Scalar multiplication of matrices.
+(.|) :: Num e => e -> Matrix e cols rows -> Matrix e cols rows
+(.|) e (M m) = M (e I..| m)
+
+-- Scalar division of matrices
+
+infixl 7 ./
+-- | Scalar multiplication of matrices.
+(./) :: Fractional e => Matrix e cols rows -> e -> Matrix e cols rows
+(./) (M m) e = M (m I../ e)
 
 p1 ::
   ( Num e,

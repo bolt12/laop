@@ -23,9 +23,7 @@ ccnot = kr fstM (fromF f)
     tp f g (a,b) = (f a, g b)
 
 had :: Matrix (Complex Double) Bool Bool
-had = fromLists l
-  where
-    l = map (map (*(1/sqrt 2))) [[1, 1], [1, -1]]
+had = (1/sqrt 2) .| fromLists [[1, 1], [1, -1]]
 
 bell :: Matrix (Complex Double) (Bool, Bool) (Bool, Bool)
 bell = cnot `comp` (had >< iden)
