@@ -1,5 +1,7 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NoStarIsType #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RankNTypes #-}
@@ -27,12 +29,16 @@
 module LAoP.Matrix.Alternative where
 
 import Control.Category
+import Data.Bool
+import Data.Functor.Contravariant
 import Data.Kind
 import Data.Void
 import Prelude hiding (id, (.), fst, snd, curry, uncurry)
 
+import qualified Data.List as List
 import qualified Prelude
 
+--------------------------------- Construction ---------------------------------
 data Matrix e a b where
     Identity :: Matrix e a a
     Zero     :: Matrix e a b
@@ -150,3 +156,81 @@ transpose m = case m of
 
 select :: Num e => Matrix e a (Either b c) -> Matrix e b c -> Matrix e a c
 select x y = Join y id . x
+
+----------------------------------- Semantics ----------------------------------
+newtype Vector e a = Vector { at :: a -> e }
+
+instance Contravariant (Vector e) where
+    contramap f (Vector g) = Vector (g . f)
+
+instance Num e => Num (Vector e a) where
+    fromInteger = Vector . const . fromInteger
+
+    (+)    = liftV2 (+)
+    (-)    = liftV2 (-)
+    (*)    = liftV2 (*)
+    abs    = liftV1 abs
+    negate = liftV1 negate
+    signum = error "No sensible definition"
+
+liftV1 :: (e -> e) -> Vector e a -> Vector e a
+liftV1 f x = Vector (\a -> f (at x a))
+
+liftV2 :: (e -> e -> e) -> Vector e a -> Vector e a -> Vector e a
+liftV2 f x y = Vector (\a -> f (at x a) (at y a))
+
+-- Semantics of Matrix e a b
+type LinearMap e a b = Vector e a -> Vector e b
+
+semantics :: Num e => Matrix e a b -> LinearMap e a b
+semantics m = case m of
+    Identity   -> id
+    Zero       -> const 0
+    Lift f x y -> \v -> liftV2 f (semantics x v) (semantics y v)
+    Join x y   -> \v -> semantics x (Left >$< v) + semantics y (Right >$< v)
+    Fork x y   -> \v -> Vector $ either (at (semantics x v)) (at (semantics y v))
+
+-- These functions are unnecessary for now
+padLeft :: Num e => Vector e b -> Vector e (Either a b)
+padLeft v = Vector $ \case Left _  -> 0
+                           Right b -> at v b
+
+padRight :: Num e => Vector e a -> Vector e (Either a b)
+padRight v = Vector $ \case Left a  -> at v a
+                            Right _ -> 0
+
+curryV :: Vector e (a, b) -> Vector (Vector e b) a
+curryV v = Vector $ \a -> Vector $ \b -> at v (a, b)
+
+uncurryV :: Vector (Vector e b) a -> Vector e (a, b)
+uncurryV v = Vector $ \(a, b) -> at (at v a) b
+
+-------------------------------- Deconstruction --------------------------------
+class Enumerable a where
+    enumerate :: [a]
+    default enumerate :: Enum a => [a]
+    enumerate = enumFrom (toEnum 0)
+
+instance Enumerable Void where
+    enumerate = []
+
+-- 1, 2, 3...
+instance Enumerable ()
+instance Enumerable Bool
+instance Enumerable Ordering
+
+instance (Enumerable a, Enumerable b) => Enumerable (Either a b) where
+    enumerate = (Left <$> enumerate) ++ (Right <$> enumerate)
+
+instance (Enumerable a, Enumerable b) => Enumerable (a, b) where
+    enumerate = [ (a, b) | a <- enumerate, b <- enumerate ]
+
+basis :: (Enumerable a, Eq a, Num e) => [Vector e a]
+basis = [ Vector (bool 0 1 . (==a)) | a <- enumerate ]
+
+toLists :: (Enumerable a, Enumerable b, Eq a, Num e) => Matrix e a b -> [[e]]
+toLists m = List.transpose
+    [ [ at r i | i <- enumerate ] | c <- basis, let r = semantics m c ]
+
+dump :: (Enumerable a, Enumerable b, Eq a, Num e, Show e) => Matrix e a b -> IO ()
+dump = mapM_ print . toLists
