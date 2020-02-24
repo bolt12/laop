@@ -524,18 +524,12 @@ infixl 7 ./
 -- Projections
 
 -- | Biproduct first component projection
-p1 :: forall e m n. (Num e, CountableDimensions n m, FromLists e n m, FromLists e m m) => Matrix e (Either m n) m
-p1 =
-  let iden = iden :: Matrix e m m
-      zero = zeros :: Matrix e n m
-   in join iden zero
+p1 :: (Num e, CountableDimensions n m, FromLists e n m, FromLists e m m) => Matrix e (Either m n) m
+p1 = join iden zeros
 
 -- | Biproduct second component projection
-p2 :: forall e m n. (Num e, CountableDimensions n m, FromLists e m n, FromLists e n n) => Matrix e (Either m n) n
-p2 =
-  let iden = iden :: Matrix e n n
-      zero = zeros :: Matrix e m n
-   in join zero iden
+p2 :: (Num e, CountableDimensions n m, FromLists e m n, FromLists e n n) => Matrix e (Either m n) n
+p2 = join zeros iden
 
 -- Injections
 
@@ -642,7 +636,7 @@ kr ::
 kr a b =
   let fstM' = fstM @e @a @b
       sndM' = sndM @e @a @b
-   in tr fstM' . a * tr sndM' . b
+   in (tr fstM' . a) * (tr sndM' . b)
 
 -- Product Bifunctor (Kronecker)
 
