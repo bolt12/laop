@@ -67,13 +67,30 @@ data R = No | Yes
     deriving (Bounded, Enum, Eq, Show, G.Generic)
 
 rain :: Matrix Double () R
-rain = col [0.8, 0.2]
+rain = matrixBuilder gen
+  where
+    gen (_, No)  = 0.8
+    gen (_, Yes) = 0.2
 
 sprinkler :: Matrix Double R S
-sprinkler = fromLists [[0.6, 0.99], [0.4, 0.01]]
+sprinkler = matrixBuilder gen
+  where
+    gen (No, Off)  = 0.6
+    gen (No, On)   = 0.99
+    gen (Yes, Off) = 0.4
+    gen (Yes, On)  = 0.01
 
 grass :: Matrix Double (S, R) G
-grass = fromLists [[1, 0.2, 0.1, 0.01], [0, 0.8, 0.9, 0.99]]
+grass = matrixBuilder gen
+  where
+    gen ((Off, No), Dry)  = 1
+    gen ((Off, Yes), Dry) = 0.2
+    gen ((On, No), Dry)   = 0.1
+    gen ((On, Yes), Dry)  = 0.01
+    gen ((Off, No), Wet)  = 0
+    gen ((Off, Yes), Wet) = 0.8
+    gen ((On, No), Wet)   = 0.9
+    gen ((On, Yes), Wet)  = 0.99
 
 tag f = kr f iden
 

@@ -372,6 +372,7 @@ matrixBuilder' f =
 matrixBuilder ::
   forall e a b.
   ( FromListsN e a b,
+    CountableN b,
     Enum a,
     Enum b,
     Bounded a,
@@ -380,8 +381,12 @@ matrixBuilder ::
     CountableDimensionsN a b
   ) => ((a, b) -> e) -> Matrix e (Normalize a) (Normalize b)
 matrixBuilder f =
-  let positions = [(a, b) | a <- [minBound .. maxBound], b <- [minBound .. maxBound]]
-   in fromLists . map (map f) . groupBy (\(x, _) (w, _) -> x == w) $ positions
+  let r         = fromInteger $ natVal (Proxy :: Proxy (Count (Normalize b)))
+      positions = [(a, b) | a <- [minBound .. maxBound], b <- [minBound .. maxBound]]
+   in fromLists . map (map f) . transpose . buildList r $ positions
+  where
+    buildList _ [] = []
+    buildList r l  = take r l : buildList r (drop r l)
 
 -- | Constructs a column vector matrix
 col :: (FromLists e () rows) => [e] -> Matrix e () rows
