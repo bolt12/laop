@@ -86,6 +86,7 @@ module LAoP.Matrix.Type
     fromLists,
     toLists,
     toList,
+    matrixBuilder',
     matrixBuilder,
     row,
     col,
@@ -322,11 +323,24 @@ fromLists :: (FromListsN e cols rows) => [[e]] -> Matrix e cols rows
 fromLists = M . I.fromLists
 
 -- | Matrix builder function. Constructs a matrix provided with
--- a construction function.
-matrixBuilder ::
+-- a construction function that operates with indices.
+matrixBuilder' ::
   (FromListsN e cols rows, CountableDimensionsN cols rows )
   => ((Int, Int) -> e) -> Matrix e cols rows
-matrixBuilder = M . I.matrixBuilder
+matrixBuilder' = M . I.matrixBuilder'
+
+-- | Matrix builder function. Constructs a matrix provided with
+-- a construction function that operates with arbitrary types.
+matrixBuilder ::
+  ( FromListsN e a b,
+    Enum a,
+    Enum b,
+    Bounded a,
+    Bounded b,
+    Eq a,
+    CountableDimensionsN a b
+  ) => ((a, b) -> e) -> Matrix e a b
+matrixBuilder f = M (I.matrixBuilder f)
 
 -- | Constructs a column vector matrix
 col :: (FromListsN e () rows) => [e] -> Matrix e One rows

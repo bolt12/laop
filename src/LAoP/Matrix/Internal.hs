@@ -66,6 +66,7 @@ module LAoP.Matrix.Internal
     toLists,
     toList,
     matrixBuilder,
+    matrixBuilder',
     row,
     col,
     zeros,
@@ -354,16 +355,32 @@ instance {-# OVERLAPPABLE #-} (FromLists e (Either a b) c, FromLists e (Either a
           else error "Not all rows have the same length"
 
 -- | Matrix builder function. Constructs a matrix provided with
--- a construction function.
-matrixBuilder ::
+-- a construction function that operates with indices.
+matrixBuilder' ::
   forall e cols rows.
   ( FromLists e cols rows,
     CountableDimensions cols rows
   ) => ((Int, Int) -> e) -> Matrix e cols rows
-matrixBuilder f =
+matrixBuilder' f =
   let c         = fromInteger $ natVal (Proxy :: Proxy (Count cols))
       r         = fromInteger $ natVal (Proxy :: Proxy (Count rows))
       positions = [(a, b) | a <- [0 .. (r - 1)], b <- [0 .. (c - 1)]]
+   in fromLists . map (map f) . groupBy (\(x, _) (w, _) -> x == w) $ positions
+
+-- | Matrix builder function. Constructs a matrix provided with
+-- a construction function that operates with arbitrary types.
+matrixBuilder ::
+  forall e a b.
+  ( FromListsN e a b,
+    Enum a,
+    Enum b,
+    Bounded a,
+    Bounded b,
+    Eq a,
+    CountableDimensionsN a b
+  ) => ((a, b) -> e) -> Matrix e (Normalize a) (Normalize b)
+matrixBuilder f =
+  let positions = [(a, b) | a <- [minBound .. maxBound], b <- [minBound .. maxBound]]
    in fromLists . map (map f) . groupBy (\(x, _) (w, _) -> x == w) $ positions
 
 -- | Constructs a column vector matrix
@@ -451,7 +468,7 @@ toList = concat . toLists
 
 -- | The zero matrix. A matrix wholly filled with zeros.
 zeros :: (Num e, FromLists e cols rows, CountableDimensions cols rows) => Matrix e cols rows
-zeros = matrixBuilder (const 0)
+zeros = matrixBuilder' (const 0)
 
 -- Ones Matrix
 
@@ -459,14 +476,14 @@ zeros = matrixBuilder (const 0)
 --
 --   Also known as T (Top) matrix.
 ones :: (Num e, FromLists e cols rows, CountableDimensions cols rows) => Matrix e cols rows
-ones = matrixBuilder (const 1)
+ones = matrixBuilder' (const 1)
 
 -- Const Matrix
 
 -- | The constant matrix constructor. A matrix wholly filled with a given
 -- value.
 constant :: (Num e, FromLists e cols rows, CountableDimensions cols rows) => e -> Matrix e cols rows
-constant e = matrixBuilder (const e)
+constant e = matrixBuilder' (const e)
 
 -- Bang Matrix
 
@@ -480,7 +497,7 @@ bang =
 
 -- | iden matrix.
 iden :: (Num e, FromLists e cols cols, Countable cols) => Matrix e cols cols
-iden = matrixBuilder (bool 0 1 . uncurry (==))
+iden = matrixBuilder' (bool 0 1 . uncurry (==))
 {-# NOINLINE iden #-}
 
 -- Matrix composition (MMM)
@@ -592,7 +609,7 @@ fstM ::
     FromLists e (Normalize (m, k)) m,
     CountableN (m, k)
   ) => Matrix e (Normalize (m, k)) m
-fstM = matrixBuilder f
+fstM = matrixBuilder' f
   where
     offset = fromInteger (natVal (Proxy :: Proxy (Count k)))
     f (x, y)
@@ -607,7 +624,7 @@ sndM ::
       FromLists e (Normalize (m, k)) k,
       CountableN (m, k)
     ) => Matrix e (Normalize (m, k)) k
-sndM = matrixBuilder f
+sndM = matrixBuilder' f
   where
     offset = fromInteger (natVal (Proxy :: Proxy (Count k)))
     f (x, y)

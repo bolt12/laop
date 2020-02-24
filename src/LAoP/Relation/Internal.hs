@@ -74,6 +74,7 @@ module LAoP.Relation.Internal
     toBool,
     pt,
     belongs,
+    relationBuilder',
     relationBuilder,
     zeros,
     ones,
@@ -272,11 +273,24 @@ infixl 2 ===
 fromLists :: (FromListsN a b) => [[Boolean]] -> Relation a b
 fromLists = R . I.fromLists
 
--- | Matrix builder function. Constructs a matrix provided with
--- a construction function.
-relationBuilder ::
+-- | Relation builder function. Constructs a relation provided with
+-- a construction function that operates with indices.
+relationBuilder' ::
   (FromListsN a b, CountableDimensionsN a b) =>
   ((Int, Int) -> Boolean) -> Relation a b
+relationBuilder' = R . I.matrixBuilder'
+
+-- | Relation builder function. Constructs a relation provided with
+-- a construction function that operates with arbitrary types.
+relationBuilder ::
+  ( FromListsN a b,
+    Enum a,
+    Enum b,
+    Bounded a,
+    Bounded b,
+    Eq a,
+    CountableDimensionsN a b
+  ) => ((a, b) -> Boolean) -> Relation a b
 relationBuilder = R . I.matrixBuilder
 
 -- | Lifts functions to matrices with arbitrary dimensions.
@@ -379,7 +393,7 @@ belongs = toRel elemR
 zeros ::
   (FromListsN a b, CountableDimensionsN a b) =>
   Relation a b
-zeros = relationBuilder (const (nat 0))
+zeros = relationBuilder' (const (nat 0))
 
 -- Ones Matrix
 
@@ -394,7 +408,7 @@ zeros = relationBuilder (const (nat 0))
 ones ::
   (FromListsN a b, CountableDimensionsN a b) =>
   Relation a b
-ones = relationBuilder (const (nat 1))
+ones = relationBuilder' (const (nat 1))
 
 -- Bang Matrix
 
@@ -423,7 +437,7 @@ point = fromF . const
 -- @
 iden ::
   (FromListsN a a, CountableN a) => Relation a a
-iden = relationBuilder (bool (nat 0) (nat 1) . uncurry (==))
+iden = relationBuilder' (bool (nat 0) (nat 1) . uncurry (==))
 
 -- | Relational composition
 --

@@ -82,7 +82,7 @@ module LAoP.Matrix.Nat
     fromLists,
     toLists,
     toList,
-    matrixBuilder,
+    matrixBuilder',
     row,
     col,
     zeros,
@@ -231,10 +231,12 @@ infixl 2 ===
 fromLists :: (FromListsN e cols rows) => [[e]] -> Matrix e cols rows
 fromLists = M . I.fromLists
 
-matrixBuilder ::
+-- | Matrix builder function. Constructs a matrix provided with
+-- a construction function that operates with indices.
+matrixBuilder' ::
   (FromListsN e cols rows, CountableN cols, CountableN rows) 
   => ((Int, Int) -> e) -> Matrix e cols rows
-matrixBuilder = M . I.matrixBuilder
+matrixBuilder' = M . I.matrixBuilder'
 
 col :: (I.FromLists e () (I.FromNat rows)) => [e] -> Matrix e 1 rows
 col = M . I.col
