@@ -49,6 +49,15 @@ module LAoP.Matrix.Internal
     -- * Type safe matrix representation
     Matrix (..),
 
+    -- * Constraint type aliases
+    Countable,
+    CountableDimensions,
+    CountableN,
+    CountableDimensionsN,
+    FromListsN,
+    Liftable,
+    Trivial,
+
     -- * Primitives
     empty,
     one,
