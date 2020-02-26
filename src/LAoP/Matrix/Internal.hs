@@ -119,6 +119,7 @@ module LAoP.Matrix.Internal
 
     -- | Note that given the restrictions imposed it is not possible to
     -- implement the standard type classes present in standard Haskell.
+
     -- *** Matrix pairing projections
     fstM,
     sndM,
@@ -169,8 +170,8 @@ import GHC.TypeLits
 import Data.Type.Equality
 import GHC.Generics
 import Control.DeepSeq
-import Control.Category
-import Prelude hiding ((.))
+import Prelude hiding (id, (.))
+import qualified Prelude (id, (.))
 
 -- | LAoP (Linear Algebra of Programming) Inductive Matrix definition.
 data Matrix e cols rows where
@@ -227,14 +228,12 @@ type FromListsN e a b = FromLists e (Normalize a) (Normalize b)
 type Liftable e a b = (Bounded a, Bounded b, Enum a, Enum b, Eq b, Num e, Ord e)
 type Trivial a = FromNat (Count a) ~ a
 
--- | It isn't possible to implement the 'id' function so it's
--- implementation is 'undefined'. However 'comp' can be and this partial
--- class implementation exists just to make the code more readable.
---
--- Please use 'iden' instead.
+-- | It is possible to implement a constrained version of the category type
+-- class.
 instance (Num e) => Category (Matrix e) where
-    id  = undefined
-    (.) = comp
+  type Object (Matrix e) a = (FromLists e a a, Countable a)
+  id = iden
+  (.) = comp
 
 instance NFData e => NFData (Matrix e cols rows) where
     rnf Empty      = ()
@@ -501,7 +500,7 @@ bang =
 -- iden Matrix
 
 -- | iden matrix.
-iden :: (Num e, FromLists e cols cols, Countable cols) => Matrix e cols cols
+iden :: forall e cols . (Num e, FromLists e cols cols, Countable cols) => Matrix e cols cols
 iden = matrixBuilder' (bool 0 1 . uncurry (==))
 {-# NOINLINE iden #-}
 
@@ -547,11 +546,11 @@ infixl 7 ./
 
 -- | Biproduct first component projection
 p1 :: (Num e, CountableDimensions n m, FromLists e n m, FromLists e m m) => Matrix e (Either m n) m
-p1 = join iden zeros
+p1 = join id zeros
 
 -- | Biproduct second component projection
 p2 :: (Num e, CountableDimensions n m, FromLists e m n, FromLists e n n) => Matrix e (Either m n) n
-p2 = join zeros iden
+p2 = join zeros id
 
 -- Injections
 
@@ -728,7 +727,7 @@ tr (Fork a b) = Join (tr a) (tr b)
 select :: (Num e, FromLists e b b, Countable b) => Matrix e cols (Either a b) -> Matrix e a b -> Matrix e cols b
 select (Fork a b) y                   = y . a + b                     -- Divide-and-conquer law
 select (Join (Fork a c) (Fork b d)) y = join (y . a + c) (y . b + d)  -- Pattern matching + DnC law
-select m y                            = join y iden . m
+select m y                            = join y id . m
 
 branch ::
        ( Num e,
@@ -797,7 +796,7 @@ corr ::
     )
      => (a -> Bool) -> Matrix e q q
 corr p = let f = fromF' p :: Matrix e q ()
-          in kr f (iden :: Matrix e q q)
+          in kr f (id :: Matrix e q q)
 
 -- Pretty print
 

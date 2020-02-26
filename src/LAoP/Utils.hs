@@ -96,7 +96,10 @@ module LAoP.Utils
     coerceNat3,
 
     -- * List data type
-    List (..)
+    List (..),
+
+    -- * Category type-class
+    Category(..)
   )
 where
 

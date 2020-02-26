@@ -1,4 +1,5 @@
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DerivingVia #-}
@@ -185,8 +186,8 @@ import Data.Kind
 import GHC.TypeLits 
 import Control.DeepSeq
 import LAoP.Utils
-import qualified Control.Category as C
 import qualified LAoP.Matrix.Internal as I
+import Prelude hiding (id, (.))
 
 newtype Matrix e (cols :: Type) (rows :: Type) = M (I.Matrix e (I.Normalize cols) (I.Normalize rows))
   deriving (Show, Num, Eq, Ord, NFData) via (I.Matrix e (I.Normalize cols) (I.Normalize rows))
@@ -203,14 +204,12 @@ type Trivial2 a               = I.Normalize a ~ I.Normalize (I.Normalize a)
 type Trivial3 a               = I.FromNat (I.Count (I.Normalize (I.Normalize a))) ~ I.Normalize (I.Normalize a)
 type TrivialP a b             = I.Normalize (a, b) ~ I.Normalize (I.Normalize a, I.Normalize b)
 
--- | It isn't possible to implement the 'id' function so it's
--- implementation is 'undefined'. However 'comp' can be and this partial
--- class implementation exists just to make the code more readable.
---
--- Please use 'iden' instead.
-instance (Num e) => C.Category (Matrix e) where
-    id = undefined
-    (.) = comp
+-- | It is possible to implement a constrained version of the category type
+-- class.
+instance (Num e) => Category (Matrix e) where
+  type Object (Matrix e) a = (FromListsN e a a, CountableN a)
+  id = iden
+  (.) = comp
 
 -- | Bifunctor equivalent function
 bimapM ::
@@ -221,7 +220,7 @@ bimapM ::
          FromListsN e d c,
          FromListsN e b a
        ) => (a -> b) -> (c -> d) -> Matrix e a c -> Matrix e b d
-bimapM f g m = fromF g `comp` m `comp` tr (fromF f)
+bimapM f g m = fromF g . m . tr (fromF f)
 
 -- | Zero type alias
 type Zero = Void
@@ -279,7 +278,7 @@ fmapM ::
      )
      =>
      (a -> b) -> Matrix e c a -> Matrix e c b
-fmapM f m = fromF f `comp` m
+fmapM f m = fromF f . m
 
 -- | Applicative instance equivalent 'unit' function,
 unitM :: (Num e) => Matrix e () ()
@@ -586,9 +585,9 @@ sndM = M (I.sndM @e @(I.Normalize m) @(I.Normalize k))
 --   NOTE: That this is not a true categorical product, see for instance:
 -- 
 -- @
---            | fstM `comp` kr a b == a 
+--            | fstM . kr a b == a 
 -- kr a b ==> |
---            | sndM `comp` kr a b == b
+--            | sndM . kr a b == b
 -- @
 --
 -- __Emphasis__ on the implication symbol.

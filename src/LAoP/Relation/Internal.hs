@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -178,9 +179,9 @@ import Data.Void
 import qualified LAoP.Matrix.Internal as I
 import LAoP.Utils.Internal
 import Control.DeepSeq
-import qualified Control.Category as C
 import Data.Bool
 import GHC.TypeLits
+import Prelude hiding (id, (.))
 
 -- | Boolean type synonym for working with boolean matrices
 type Boolean = Natural 0 1
@@ -202,14 +203,12 @@ type Liftable a b             = (Bounded a, Bounded b, Enum a, Enum b, Eq b, Num
 type Trivial a                = I.Normalize a ~ I.Normalize (I.Normalize a)
 type TrivialP a b             = I.Normalize (a, b) ~ I.Normalize (I.Normalize a, I.Normalize b)
 
--- | It isn't possible to implement the 'id' function so it's
--- implementation is 'undefined'. However 'comp' can be and this partial
--- class implementation exists just to make the code more readable.
---
--- Please use 'iden' instead.
-instance C.Category Relation where
-    id = undefined
-    (.) = comp
+-- | It is possible to implement a constrained version of the category type
+-- class.
+instance Category Relation where
+  type Object Relation a = (FromListsN a a, CountableN a)
+  id = iden
+  (.) = comp
 
 instance Num (Relation a b) where
     -- | Matrix addition becomes Boolean matrix disjointion
@@ -387,7 +386,7 @@ belongs = toRel elemR
 --   Also known as ⊥ (Bottom) Relation or empty Relation.
 --
 --   @
---   r ``comp`` ⊥ == ⊥ ``comp`` r == ⊥
+--   r `.` ⊥ == ⊥ `.` r == ⊥
 --   ⊥ ``sse`` R && R ``sse`` T == True
 --   @
 zeros ::
@@ -433,7 +432,7 @@ point = fromF . const
 -- | iden matrix
 --
 -- @
--- 'iden' ``comp`` r == r == r ``comp`` 'iden'
+-- 'iden' `.` r == r == r `.` 'iden'
 -- @
 iden ::
   (FromListsN a a, CountableN a) => Relation a a
@@ -442,7 +441,7 @@ iden = relationBuilder' (bool (nat 0) (nat 1) . uncurry (==))
 -- | Relational composition
 --
 -- @
--- r ``comp`` (s ``comp`` p) = (r ``comp`` s) ``comp`` p
+-- r `.` (s `.` p) = (r `.` s) `.` p
 -- @
 comp :: Relation b c -> Relation a b -> Relation a c
 comp (R a) (R b) = R (I.compRel a b)
@@ -506,7 +505,7 @@ pointAp ::
           FromListsN a One,
           FromListsN b One
         ) => a -> b -> Relation a b -> Relation One One
-pointAp a b r = conv (point b) `comp` r `comp` point a
+pointAp a b r = conv (point b) . r . point a
 
 -- | Relational application
 --
@@ -518,7 +517,7 @@ pointApBool ::
           FromListsN a One,
           FromListsN b One
         ) => a -> b -> Relation a b -> Bool
-pointApBool a b r = toBool $ conv (point b) `comp` r `comp` point a
+pointApBool a b r = toBool $ conv (point b) . r . point a
 
 -- | Relational converse
 --
@@ -560,8 +559,8 @@ intersection a b = a * b
 -- @
 -- (r ``union`` s) ``union`` t == r `'union' (s ``union`` t)
 -- r ``union`` s ``sse`` x == r ``sse`` x && s ``sse`` x
--- r ``comp`` (s ``union`` t) == (r ``comp`` s) ``union`` (r ``comp`` t)
--- (s ``union`` t) ``comp`` r ==  (s ``comp`` r) ``union`` (t ``comp`` r)
+-- r `.` (s ``union`` t) == (r `.` s) ``union`` (r `.` t)
+-- (s ``union`` t) `.` r ==  (s `.` r) ``union`` (t `.` r)
 -- @
 union :: Relation a b -> Relation a b -> Relation a b
 union a b = a + b
@@ -569,29 +568,29 @@ union a b = a + b
 -- | Relation Kernel
 --
 -- @
--- 'ker' r == 'conv' r ``comp`` r
+-- 'ker' r == 'conv' r `.` r
 -- 'ker' r == 'img' ('conv' r)
 -- @
 ker :: Relation a b -> Relation a a
-ker r = conv r `comp` r
+ker r = conv r . r
 
 -- | Relation Image
 --
 -- @
--- 'img' r == r ``comp`` conv r
+-- 'img' r == r `.` conv r
 -- 'img' r == 'ker' ('conv' r)
 -- @
 img :: Relation a b -> Relation b b
-img r = r `comp` conv r
+img r = r . conv r
 
 -- | Function division. Special case of 'divS'.
 --
 -- NOTE: _This is only valid_ if @f@ and @g@ are 'function's, i.e. 'simple' and
 -- 'entire'.
 --
--- @'divisionF' f g == 'conv' g ``comp`` f@
+-- @'divisionF' f g == 'conv' g `.` f@
 divisionF :: Relation a c -> Relation b c -> Relation a b
-divisionF f g = conv g `comp` f
+divisionF f g = conv g . f
 
 -- Taxonomy of binary relations
 
@@ -617,8 +616,8 @@ surjective = reflexive . img
 -- relations:
 --
 -- @
--- f ``comp`` r ``sse`` s == r ``sse`` f ``comp`` s
--- r ``comp`` f ``sse`` s == r ``sse`` s ``comp`` f
+-- f `.` r ``sse`` s == r ``sse`` f `.` s
+-- r `.` f ``sse`` s == r ``sse`` s `.` f
 -- @
 function :: 
          ( CountableDimensionsN a b,
@@ -672,29 +671,29 @@ bijection r = injection r && surjection r
 
 -- Properties of relations
 
--- | A 'Relation' @r@ is 'reflexive' 'iff' @'iden' ``sse`` r@
+-- | A 'Relation' @r@ is 'reflexive' 'iff' @'id' ``sse`` r@
 reflexive :: (CountableN a, FromListsN a a) => Relation a a -> Bool
-reflexive r = iden <= r
+reflexive r = id <= r
 
--- | A 'Relation' @r@ is 'coreflexive' 'iff' @r ``sse`` 'iden'@
+-- | A 'Relation' @r@ is 'coreflexive' 'iff' @r ``sse`` 'id'@
 coreflexive :: (CountableN a, FromListsN a a) => Relation a a -> Bool
-coreflexive r = r <= iden
+coreflexive r = r <= id
 
--- | A 'Relation' @r@ is 'transitive' 'iff' @(r ``comp`` r) ``sse`` r@
+-- | A 'Relation' @r@ is 'transitive' 'iff' @(r `.` r) ``sse`` r@
 transitive :: Relation a a -> Bool
-transitive r = (r `comp` r) `sse` r
+transitive r = (r . r) `sse` r
 
 -- | A 'Relation' @r@ is 'symmetric' 'iff' @r == 'conv' r@
 symmetric :: Relation a a -> Bool
 symmetric r = r == conv r
 
--- | A 'Relation' @r@ is anti-symmetric 'iff' @(r ``intersection`` 'conv' r) ``sse`` 'iden'@
+-- | A 'Relation' @r@ is anti-symmetric 'iff' @(r ``intersection`` 'conv' r) ``sse`` 'id'@
 antiSymmetric :: (CountableN a, FromListsN a a) => Relation a a -> Bool
-antiSymmetric r = (r `intersection` conv r) `sse` iden
+antiSymmetric r = (r `intersection` conv r) `sse` id
 
--- | A 'Relation' @r@ is 'irreflexive' 'iff' @(r ``intersection`` 'iden') == 'zeros'@
+-- | A 'Relation' @r@ is 'irreflexive' 'iff' @(r ``intersection`` 'id') == 'zeros'@
 irreflexive :: (CountableN a, FromListsN a a) => Relation a a -> Bool
-irreflexive r = (r `intersection` iden) == zeros
+irreflexive r = (r `intersection` id) == zeros
 
 -- | A 'Relation' @r@ is 'connected' 'iff' @(r ``union`` 'conv' r) == 'ones'@
 connected :: (CountableN a, FromListsN a a) => Relation a a -> Bool
@@ -721,9 +720,9 @@ partialEquivalence :: (CountableN a, FromListsN a a) => Relation a a -> Bool
 partialEquivalence r = partialOrder r && equivalence r
 
 -- | A 'Relation' @r@ is 'difunctional' or regular wherever 
--- @r ``comp`` 'conv' r ``comp`` r == r@
+-- @r `.` 'conv' r `.` r == r@
 difunctional :: Relation a b -> Bool
-difunctional r = r `comp` conv r `comp` r == r
+difunctional r = r . conv r . r == r
 
 -- Relational pairing
 
@@ -732,17 +731,17 @@ difunctional r = r `comp` conv r `comp` r == r
 --   NOTE: That this is not a true categorical product, see for instance:
 --
 -- @
---                | 'fstR' ``comp`` 'splitR' a b ``sse`` a 
+--                | 'fstR' `.` 'splitR' a b ``sse`` a 
 -- 'splitR' a b <=>   |
---                | 'sndR' ``comp`` 'splitR' a b ``sse`` b
+--                | 'sndR' `.` 'splitR' a b ``sse`` b
 -- @
 --
 -- __Emphasis__ on the 'sse'.
 --
 -- @
--- 'splitR' r s ``comp`` f == 'splitR' (r ``comp`` f) (s ``comp`` f)
--- (R '><' S) ``comp`` 'splitR' p q == 'splitR' (r ``comp`` p) (s ``comp`` q)
--- 'conv' ('splitR' r s) ``comp`` 'splitR' x y == ('conv' r ``comp`` x) ``intersection`` ('conv' s ``comp`` y)
+-- 'splitR' r s `.` f == 'splitR' (r `.` f) (s `.` f)
+-- (R '><' S) `.` 'splitR' p q == 'splitR' (r `.` p) (s `.` q)
+-- 'conv' ('splitR' r s) `.` 'splitR' x y == ('conv' r `.` x) ``intersection`` ('conv' s `.` y)
 -- @
 --
 -- @
@@ -761,7 +760,7 @@ splitR (R f) (R g) = R (I.kr f g)
 -- | Relational pairing first component projection
 --
 -- @
--- 'fstR' ``comp`` 'splitR' r s ``sse`` r
+-- 'fstR' `.` 'splitR' r s ``sse`` r
 -- @
 fstR ::
    forall a b .
@@ -776,7 +775,7 @@ fstR = R (I.fstM @Boolean @(I.Normalize a) @(I.Normalize b))
 -- | Relational pairing second component projection
 --
 -- @
--- 'sndR' ``comp`` 'splitR' r s ``sse`` s
+-- 'sndR' `.` 'splitR' r s ``sse`` s
 -- @
 sndR ::
    forall a b .
@@ -794,8 +793,8 @@ infixl 4 ><
 -- | Relational pairing functor
 --
 -- @
--- r '><' s == 'splitR' (r ``comp`` fstR) (s ``comp`` sndR)
--- (r '><' s) ``comp`` (p '><' q) == (r ``comp`` p) '><' (s ``comp`` q)
+-- r '><' s == 'splitR' (r `.` fstR) (s `.` sndR)
+-- (r '><' s) `.` (p '><' q) == (r `.` p) '><' (s `.` q)
 -- @
 (><) ::
      ( CountableDimensionsN a b,
@@ -816,13 +815,13 @@ infixl 4 ><
 -- | Relational coproduct.
 --
 -- @
---                | 'eitherR' a b ``comp`` 'i1' == a
+--                | 'eitherR' a b `.` 'i1' == a
 -- 'eitherR' a b <=>  |
---                | 'eitherR' a b ``comp`` 'i2' == b
+--                | 'eitherR' a b `.` 'i2' == b
 -- @
 --
 -- @
--- 'eitherR' r s ``comp`` 'conv' ('eitherR' t u) == (r ``comp`` 'conv' t) ``union`` (s ``comp`` 'conv' u)
+-- 'eitherR' r s `.` 'conv' ('eitherR' t u) == (r `.` 'conv' t) ``union`` (s `.` 'conv' u)
 -- @
 --
 -- @
@@ -834,8 +833,8 @@ eitherR = join
 -- | Relational coproduct first component injection
 --
 -- @
--- 'img' 'i1' ``union`` 'img' 'i2' == 'iden'
--- 'i1' ``comp`` 'i2' = 'zeros'
+-- 'img' 'i1' ``union`` 'img' 'i2' == 'id'
+-- 'i1' `.` 'i2' = 'zeros'
 -- @
 i1 :: 
    ( CountableDimensionsN a b,
@@ -848,8 +847,8 @@ i1 = R I.i1
 -- | Relational coproduct second component injection
 --
 -- @
--- 'img' 'i1' ``union`` 'img' 'i2' == 'iden'
--- 'i1' ``comp`` 'i2' = 'zeros'
+-- 'img' 'i1' ``union`` 'img' 'i2' == 'id'
+-- 'i1' `.` 'i2' = 'zeros'
 -- @
 i2 :: 
    ( CountableDimensionsN a b,
@@ -864,7 +863,7 @@ infixl 5 -|-
 -- | Relational coproduct functor.
 --
 -- @
--- r '-|-' s == 'eitherR' ('i1' ``comp`` r) ('i2' ``comp`` s)
+-- r '-|-' s == 'eitherR' ('i1' `.` r) ('i2' `.` s)
 -- @
 (-|-) ::
   ( CountableDimensionsN b d,
@@ -897,7 +896,7 @@ trans ::
         TrivialP c b
       )
       => Relation (a, b) c -> Relation a (c, b)
-trans r = splitR r sndR `comp` conv fstR
+trans r = splitR r sndR . conv fstR
 
 -- | Relational 'untrans'
 --
@@ -918,17 +917,17 @@ untrans ::
           TrivialP c b
         )
          => Relation a (c, b) -> Relation (a, b) c
-untrans s = fstR `comp` conv (splitR (conv s) sndR)
+untrans s = fstR . conv (splitR (conv s) sndR)
 
 -- | Transforms predicate @p@ into a correflexive relation.
 --
 -- @
--- 'predR' ('const' True) == 'iden'
+-- 'predR' ('const' True) == 'id'
 -- 'predR' ('const' False) == 'zeros'
 -- @
 --
 -- @
--- 'predR' q ``comp`` 'predR' p == 'predR' q ``union`` 'predR' p
+-- 'predR' q `.` 'predR' p == 'predR' q ``union`` 'predR' p
 -- @
 predR :: 
       ( Bounded a,
@@ -938,14 +937,14 @@ predR ::
         FromListsN Bool a
       )
       => Relation a Bool -> Relation a a
-predR p = iden `intersection` divisionF (fromF (const True)) p
+predR p = id `intersection` divisionF (fromF (const True)) p
 
 -- | Equalizes functions @f@ and @g@.
 -- That is, @'equalizer' f g@ is the largest coreflexive
 -- that restricts @g@ so that @f@ and @g@ yield the same outputs.
 --
 -- @
--- 'equalizer' r r == 'iden'
+-- 'equalizer' r r == 'id'
 -- 'equalizer' ('point' True) ('point' False) == 'zeros'
 -- @
 equalizer ::
@@ -953,12 +952,12 @@ equalizer ::
             FromListsN a a
           )
           => Relation a b -> Relation a b -> Relation a a
-equalizer f g = iden `intersection` divisionF f g
+equalizer f g = id `intersection` divisionF f g
 
 -- | Relational conditional guard.
 --
 -- @
--- 'guard' p = 'i2' ``overriddenBy`` 'i1' ``comp`` 'predR' p
+-- 'guard' p = 'i2' ``overriddenBy`` 'i1' `.` 'predR' p
 -- @
 guard :: 
      ( Bounded b,
@@ -978,27 +977,27 @@ cond ::
        FromListsN Bool b
      ) 
      => Relation b Bool -> Relation b c -> Relation b c -> Relation b c
-cond p r s = eitherR r s `comp` guard p
+cond p r s = eitherR r s . guard p
 
 -- | Relational domain.
 --
 -- For injective relations, 'domain' and 'ker'nel coincide,
--- since @'ker' r ``sse`` 'iden'@ in such situations.
+-- since @'ker' r ``sse`` 'id'@ in such situations.
 domain :: 
        ( CountableN a,
          FromListsN a a
        ) => Relation a b -> Relation a a
-domain r = ker r `intersection` iden
+domain r = ker r `intersection` id
 
 -- | Relational range.
 --
 -- For functions, 'range' and 'img' (image) coincide,
--- since @'img' f ``sse`` 'iden'@ for any @f@.
+-- since @'img' f ``sse`` id@ for any @f@.
 range :: 
       ( CountableN b,
         FromListsN b b
       ) => Relation a b -> Relation b b
-range r = img r `intersection` iden
+range r = img r `intersection` id
 
 -- Relation pretty print
 

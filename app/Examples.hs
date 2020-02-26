@@ -17,8 +17,7 @@ import LAoP.Dist
 import GHC.TypeLits
 import Data.Coerce
 import qualified GHC.Generics as G
-import Control.Category hiding (id)
-import Prelude hiding ((.))
+import Prelude hiding (id, (.))
 
 -- Monty Hall Problem
 data Outcome = Win | Lose
@@ -76,8 +75,8 @@ sprinkler :: Matrix Double R S
 sprinkler = matrixBuilder gen
   where
     gen (No, Off)  = 0.6
-    gen (No, On)   = 0.99
-    gen (Yes, Off) = 0.4
+    gen (No, On)   = 0.4
+    gen (Yes, Off) = 0.99
     gen (Yes, On)  = 0.01
 
 grass :: Matrix Double (S, R) G
@@ -92,9 +91,9 @@ grass = matrixBuilder gen
     gen ((On, No), Wet)   = 0.9
     gen ((On, Yes), Wet)  = 0.99
 
-tag f = kr f iden
+tag f = kr f id
 
-state g s r = tag g `comp` tag s `comp` r
+state g s r = tag g . tag s . r
 
 grass_wet :: Matrix Double () (G, (S, R)) -> Matrix Double One One
 grass_wet state = row [0,1] . fstM . state
@@ -173,7 +172,7 @@ exec = do
     putStrLn "Monty Hall Problem solution:"
     prettyPrint (secondChoice . firstChoice)
     putStrLn "\n Sum of dices probability:"
-    prettyPrint (sumSSM `comp` kr die die)
+    prettyPrint (sumSSM . kr die die)
     putStrLn "\n Conditional dice throw:"
     prettyPrint conditionalThrows
     putStrLn "\n Checking that the last result is indeed a distribution: "
