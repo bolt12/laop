@@ -161,7 +161,6 @@ where
 import Data.Proxy
 import GHC.TypeLits
 import Control.DeepSeq
-import qualified Control.Category as C
 import qualified LAoP.Matrix.Internal as I
 
 newtype Matrix e (cols :: Nat) (rows :: Nat) = M (I.Matrix e (I.FromNat cols) (I.FromNat rows))
@@ -178,15 +177,6 @@ type FromListsNz e a b        = I.FromLists e (I.Normalize a) (I.Normalize b)
 type Liftable e a b           = (Bounded a, Bounded b, Enum a, Enum b, Eq b, Num e, Ord e)
 type TrivialE a b             = I.FromNat (a + b) ~ Either (I.FromNat a) (I.FromNat b)
 type TrivialP a b             = I.FromNat (a * b) ~ I.FromNat (I.Count (I.FromNat a) * I.Count (I.FromNat b))
-
--- | It isn't possible to implement the 'id' function so it's
--- implementation is 'undefined'. However 'comp' can be and this partial
--- class implementation exists just to make the code more readable.
---
--- Please use 'iden' instead.
-instance (Num e) => C.Category (Matrix e) where
-    id = undefined
-    (.) = comp
 
 -- Primitives
 

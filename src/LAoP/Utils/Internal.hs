@@ -1,9 +1,9 @@
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module LAoP.Utils.Internal
@@ -19,7 +19,10 @@ module LAoP.Utils.Internal
     coerceNat3,
 
     -- * 'List' data type
-    List (..)
+    List (..),
+
+    -- * Category type class
+    Category(..)
   )
 where
 
@@ -30,6 +33,9 @@ import Data.Maybe
 import GHC.TypeLits
 import Control.DeepSeq
 import GHC.Generics
+import Data.Kind
+import Prelude hiding (id, (.))
+import qualified Prelude
 
 -- | Wrapper around 'Int's that have a restrictive semantic associated.
 -- A value of type @'Natural' n m@ can only be instanciated with some 'Int'
@@ -168,3 +174,23 @@ instance
   fromEnum (L x) = 
     let as = [minBound .. maxBound]
         in fromMaybe (error "Does not exist") $ elemIndex x (powerset as)
+
+-- | Constrained category instance
+class Category k where
+  type Object k o :: Constraint
+  type Object k o = ()
+  id :: Object k a => k a a
+  (.) :: k b c -> k a b -> k a c
+
+{-# RULES
+"identity/left" forall p .
+                id . p = p
+"identity/right"        forall p .
+                p . id = p
+"association"   forall p q r .
+                (p . q) . r = p . (q . r)
+ #-}
+
+instance Category (->) where
+  id = Prelude.id
+  (.) = (Prelude..)

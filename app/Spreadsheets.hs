@@ -3,8 +3,10 @@
 module Spreadsheets
   where
 
+import LAoP.Utils
 import LAoP.Matrix.Type
 import GHC.Generics
+import Prelude hiding (id, (.))
 
 data Student = Student1 | Student2 | Student3 | Student4
   deriving (Eq, Show, Enum, Bounded, Generic)
@@ -36,10 +38,10 @@ xls :: Matrix Float Question One
     -> Matrix Float (Either Question Results) (Either One Student)
 xls w m t = join (fork w m) (fork zeros r)
   where
-    rExam = m `comp` tr w
+    rExam = m . tr w
     rTest = tr t
     rFinal = rTest `maxPW` rExam
-    r = (rExam `comp` tr exam) + (rTest `comp` tr test) + (rFinal `comp` tr final)
+    r = (rExam . tr exam) + (rTest . tr test) + (rFinal . tr final)
 
 -- | Overloaded, point-wise 'max' function
 maxPW :: Ord e => Matrix e a b -> Matrix e a b -> Matrix e a b

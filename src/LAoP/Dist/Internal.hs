@@ -44,6 +44,7 @@ module LAoP.Dist.Internal
     where
 
 import LAoP.Matrix.Type hiding (TrivialP, Countable, CountableDimensions, CountableN, CountableDimensionsN, Liftable, FromListsN)
+import Prelude hiding (id, (.))
 import qualified LAoP.Matrix.Internal as I
 import LAoP.Utils
 import GHC.TypeLits

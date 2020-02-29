@@ -1,8 +1,10 @@
 {-# LANGUAGE StandaloneDeriving #-}
 module Quantum where
 
+import LAoP.Utils
 import LAoP.Matrix.Type
 import Data.Complex
+import Prelude hiding (id, (.))
 
 deriving instance Ord a => Ord (Complex a)
 
@@ -11,7 +13,7 @@ xor (False, b) = b
 xor (True, b) = not b
 
 ker :: Num e => Matrix e a b -> Matrix e a a
-ker m = tr m `comp` m
+ker m = tr m . m
 
 cnot :: Matrix (Complex Double) (Bool, Bool) (Bool, Bool)
 cnot = kr fstM (fromF xor)
@@ -26,4 +28,4 @@ had :: Matrix (Complex Double) Bool Bool
 had = (1/sqrt 2) .| fromLists [[1, 1], [1, -1]]
 
 bell :: Matrix (Complex Double) (Bool, Bool) (Bool, Bool)
-bell = cnot `comp` (had >< iden)
+bell = cnot . (had >< iden)
