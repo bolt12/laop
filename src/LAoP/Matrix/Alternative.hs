@@ -157,7 +157,10 @@ module LAoP.Matrix.Alternative
     negateM,
     orM,
     andM,
-    subM
+    subM,
+
+    -- * Semantics
+    Construct
   )
     where
 
@@ -223,8 +226,8 @@ type family Normalize (d :: Type) :: Type where
 
 -- | Constraint type synonyms to keep the type signatures less convoluted
 type Countable a             = KnownNat (Count a)
-type CountableN a            = KnownNat (Count (Normalize a))
 type CountableDimensions a b = (Countable a, Countable b)
+type Liftable a b            = (Eq b, Constructable a b, Enumerable a)
 type Enumerable a            = (Enum a, Bounded a)
 type ConstructNorm a         = (Enum a, Enum (Normalize a))
 type ConstructableNorm a b   = (ConstructNorm a, ConstructNorm b)
@@ -232,15 +235,15 @@ type ConstructN a            = Construct (Normalize a)
 type Constructable a b       = (Construct a, Construct b)
 type ConstructableN a b      = (Construct (Normalize a), Construct (Normalize b))
 
-
 -- | It isn't possible to implement the 'id' function so it's
 -- implementation is 'undefined'. However 'comp' can be and this partial
 -- class implementation exists just to make the code more readable.
 --
 -- Please use 'iden' instead.
 instance (Num e) => Category (Matrix e) where
-    id  = undefined
-    (.) = comp
+  type Object (Matrix e) a = Liftable a a
+  id = iden
+  (.) = comp
 
 instance NFData e => NFData (Matrix e cols rows) where
     rnf Empty      = ()
@@ -314,52 +317,6 @@ infixl 2 ===
 
 -- Construction
 
--- | Type class for defining the 'fromList' conversion function.
---
---   Given that it is not possible to branch on types at the term level type
--- classes are needed very much like an inductive definition but on types.
-class FromLists e cols rows where
-  -- | Build a matrix out of a list of list of elements. Throws a runtime
-  -- error if the dimensions do not match.
-  fromLists :: [[e]] -> Matrix e cols rows
-
-instance FromLists e Void Void where
-  fromLists [] = Empty
-  fromLists _  = error "Wrong dimensions"
-
-instance {-# OVERLAPPING #-} FromLists e () () where
-  fromLists [[e]] = One e
-  fromLists _     = error "Wrong dimensions"
-
-instance {-# OVERLAPPING #-} (FromLists e cols ()) => FromLists e (Either () cols) () where
-  fromLists [h : t] = Join (One h) (fromLists [t])
-  fromLists _       = error "Wrong dimensions"
-
-instance {-# OVERLAPPABLE #-} (FromLists e a (), FromLists e b (), Countable a) => FromLists e (Either a b) () where
-  fromLists [l] =
-      let rowsA = fromInteger (natVal (Proxy :: Proxy (Count a)))
-       in Join (fromLists [take rowsA l]) (fromLists [drop rowsA l])
-  fromLists _       = error "Wrong dimensions"
-
-instance {-# OVERLAPPING #-} (FromLists e () rows) => FromLists e () (Either () rows) where
-  fromLists ([h] : t) = Fork (One h) (fromLists t)
-  fromLists _         = error "Wrong dimensions"
-
-instance {-# OVERLAPPABLE #-} (FromLists e () a, FromLists e () b, Countable a) => FromLists e () (Either a b) where
-  fromLists l@([_] : _) =
-      let rowsA = fromInteger (natVal (Proxy :: Proxy (Count a)))
-       in Fork (fromLists (take rowsA l)) (fromLists (drop rowsA l))
-  fromLists _         = error "Wrong dimensions"
-
-instance {-# OVERLAPPABLE #-} (FromLists e (Either a b) c, FromLists e (Either a b) d, Countable c) => FromLists e (Either a b) (Either c d) where
-  fromLists l@(h : t) =
-    let lh        = length h
-        rowsC     = fromInteger (natVal (Proxy :: Proxy (Count c)))
-        condition = all ((== lh) . length) t
-     in if lh > 0 && condition
-          then Fork (fromLists (take rowsC l)) (fromLists (drop rowsC l))
-          else error "Not all rows have the same length"
-
 -- | Constructs a column vector matrix
 colL :: (FromLists e () rows) => [e] -> Matrix e () rows
 colL = fromLists . map (: [])
@@ -409,13 +366,13 @@ bang :: (Num e, Constructable cols rows, Enumerable cols) => Matrix e cols ()
 bang = ones
 
 -- | Point constant matrix
-point :: (Num e, Eq a, Construct a) => a -> Matrix e () a
+point :: (Num e, Liftable () a) => a -> Matrix e () a
 point = fromF . const
 
 -- iden Matrix
 
 -- | iden matrix.
-iden :: (Num e, Eq cols, Construct cols, Enumerable cols) => Matrix e cols cols
+iden :: (Num e, Liftable cols cols) => Matrix e cols cols
 iden = fromF id
 
 -- Matrix composition (MMM)
@@ -646,7 +603,7 @@ tr (Fork a b) = Join (tr a) (tr b)
 
 -- | Selective functors 'select' operator equivalent inspired by the
 -- ArrowMonad solution presented in the paper.
-select :: (Num e) => Matrix e cols (Either a b) -> Matrix e a b -> Matrix e cols b
+select :: (Num e, Liftable b b) => Matrix e cols (Either a b) -> Matrix e a b -> Matrix e cols b
 select (Fork a b) y                   = y . a + b                     -- Divide-and-conquer law
 select (Join (Fork a c) (Fork b d)) y = join (y . a + c) (y . b + d)  -- Pattern matching + DnC law
 select m y                            = join y id . m
@@ -896,7 +853,7 @@ matrixBuilder :: (Num e, Constructable a b, Enumerable a) => ((a, b) -> e) -> Ma
 matrixBuilder f = linearMap $ \v -> Vector $ \b -> dot v $ Vector $ \a -> f (a, b)
 
 -- | Lifts functions to matrices.
-fromF :: (Num e, Eq b, Constructable a b, Enumerable a) => (a -> b) -> Matrix e a b
+fromF :: (Num e, Liftable a b) => (a -> b) -> Matrix e a b
 fromF f = matrixBuilder (\(a, b) -> if f a == b then 1 else 0)
 
 -------------------------------- Deconstruction --------------------------------
@@ -947,3 +904,51 @@ matrixBuilderN f = linearMapN $ \v -> Vector $ \b -> dot v $ Vector $ \a -> f (a
 fromFN :: (Num e, Eq b, ConstructableN a b, ConstructableNorm a b, Enumerable a)
        => (a -> b) -> Matrix e (Normalize a) (Normalize b)
 fromFN f = matrixBuilderN (\(a, b) -> if f a == b then 1 else 0)
+
+------------------------------- Unsafe fromLists matrix construction -------------------------------
+
+-- | Type class for defining the 'fromList' conversion function.
+--
+--   Given that it is not possible to branch on types at the term level type
+-- classes are needed very much like an inductive definition but on types.
+class FromLists e cols rows where
+  -- | Build a matrix out of a list of list of elements. Throws a runtime
+  -- error if the dimensions do not match.
+  fromLists :: [[e]] -> Matrix e cols rows
+
+instance FromLists e Void Void where
+  fromLists [] = Empty
+  fromLists _  = error "Wrong dimensions"
+
+instance {-# OVERLAPPING #-} FromLists e () () where
+  fromLists [[e]] = One e
+  fromLists _     = error "Wrong dimensions"
+
+instance {-# OVERLAPPING #-} (FromLists e cols ()) => FromLists e (Either () cols) () where
+  fromLists [h : t] = Join (One h) (fromLists [t])
+  fromLists _       = error "Wrong dimensions"
+
+instance {-# OVERLAPPABLE #-} (FromLists e a (), FromLists e b (), Countable a) => FromLists e (Either a b) () where
+  fromLists [l] =
+      let rowsA = fromInteger (natVal (Proxy :: Proxy (Count a)))
+       in Join (fromLists [take rowsA l]) (fromLists [drop rowsA l])
+  fromLists _       = error "Wrong dimensions"
+
+instance {-# OVERLAPPING #-} (FromLists e () rows) => FromLists e () (Either () rows) where
+  fromLists ([h] : t) = Fork (One h) (fromLists t)
+  fromLists _         = error "Wrong dimensions"
+
+instance {-# OVERLAPPABLE #-} (FromLists e () a, FromLists e () b, Countable a) => FromLists e () (Either a b) where
+  fromLists l@([_] : _) =
+      let rowsA = fromInteger (natVal (Proxy :: Proxy (Count a)))
+       in Fork (fromLists (take rowsA l)) (fromLists (drop rowsA l))
+  fromLists _         = error "Wrong dimensions"
+
+instance {-# OVERLAPPABLE #-} (FromLists e (Either a b) c, FromLists e (Either a b) d, Countable c) => FromLists e (Either a b) (Either c d) where
+  fromLists l@(h : t) =
+    let lh        = length h
+        rowsC     = fromInteger (natVal (Proxy :: Proxy (Count c)))
+        condition = all ((== lh) . length) t
+     in if lh > 0 && condition
+          then Fork (fromLists (take rowsC l)) (fromLists (drop rowsC l))
+          else error "Not all rows have the same length"
