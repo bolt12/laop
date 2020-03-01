@@ -425,7 +425,7 @@ bang ::
   Matrix e cols One
 bang = M I.bang
 
--- | Point constant relation
+-- | Point constant matrix
 point :: 
       ( Bounded a,
         Enum a,
