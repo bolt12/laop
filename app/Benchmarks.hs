@@ -24,16 +24,19 @@ import GHC.TypeLits
 import Data.Proxy
 import Prelude hiding (id, (.))
 
-selectM2 :: 
+selectM2 ::
        ( Num e,
-         T.FromListsN e b b,
-         CountableN b
+         EqN b,
+         ConstructN b,
+         EnumerableN b
        ) => Matrix e cols (Either a b) -> Matrix e a b -> Matrix e cols b
 selectM2 m y = join y iden `comp` m
 
 selectD2 :: 
-       ( FromListsN b b,
-         CountableN b
+       ( Num e,
+         EqN b,
+         ConstructN b,
+         EnumerableN b
        ) => Dist (Either a b) -> Matrix Prob a b -> Dist b
 selectD2 (D d) m = D (join m iden `comp` d)
 

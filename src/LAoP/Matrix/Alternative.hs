@@ -160,6 +160,8 @@ module LAoP.Matrix.Alternative
     subM,
 
     -- * Semantics
+    Vector(..),
+    LinearMap,
     Construct
   )
     where

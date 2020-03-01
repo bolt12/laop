@@ -6,7 +6,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NoStarIsType #-}
 {-# LANGUAGE RankNTypes #-}
@@ -65,7 +64,18 @@ module LAoP.Matrix.Type
     FromListsN,
     Liftable,
     Trivial,
+    Trivial2,
     TrivialP,
+    EqN,
+    EnumN,
+    Enumerable,
+    EnumerableN,
+    ConstructNorm,
+    ConstructN,
+    ConstructableN,
+    FstM,
+    SndM,
+    Kronecker,
 
     -- * Type aliases
     Zero,
@@ -89,7 +99,9 @@ module LAoP.Matrix.Type
     toList,
     matrixBuilder,
     rowL,
+    row,
     colL,
+    col,
     zeros,
     ones,
     bang,
@@ -180,7 +192,7 @@ where
 
 import Data.Void
 import Data.Kind
-import GHC.TypeLits 
+import GHC.TypeLits
 import Control.DeepSeq
 import LAoP.Utils
 import qualified LAoP.Matrix.Alternative as I
@@ -271,42 +283,30 @@ infixl 2 ===
 -- Functor hierarchy
 
 -- | Functor instance equivalent function
-fmapM :: 
-     ( Num e,
-       Liftable a b
-     )
-     =>
-     (a -> b) -> Matrix e c a -> Matrix e c b
+fmapM :: (Num e, Liftable a b) => (a -> b) -> Matrix e c a -> Matrix e c b
 fmapM f m = fromF f . m
 
 -- | Applicative instance equivalent 'unit' function,
-unitM :: (Num e) => Matrix e () ()
+unitM :: Num e => Matrix e () ()
 unitM = one 1
 
 -- | Applicative instance equivalent 'unit' function,
-multM :: 
-      ( Num e,
-        FstM a b,
-        SndM a b
-      ) => Matrix e c a -> Matrix e c b -> Matrix e c (a, b)
+multM :: (Num e, FstM a b, SndM a b) => Matrix e c a -> Matrix e c b -> Matrix e c (a, b)
 multM = kr
 
 -- | Monad instance equivalent 'return' function,
-returnM ::
-        ( Num e,
-          Liftable () a
-        ) => a -> Matrix e One a
+returnM :: (Num e, Liftable () a) => a -> Matrix e One a
 returnM = point
 
 -- | Monad instance equivalent '(>>=)' function,
-bindM :: (Num e) => Matrix e a b -> Matrix e b c -> Matrix e a c
+bindM :: Num e => Matrix e a b -> Matrix e b c -> Matrix e a c
 bindM = flip comp
 
 -- Construction
 
 -- | Build a matrix out of a list of list of elements. Throws a runtime
 -- error if the dimensions do not match.
-fromLists :: (FromListsN e cols rows) => [[e]] -> Matrix e cols rows
+fromLists :: FromListsN e cols rows => [[e]] -> Matrix e cols rows
 fromLists = M . I.fromLists
 
 -- | Matrix builder function. Constructs a matrix provided with
@@ -323,19 +323,24 @@ matrixBuilder ::
 matrixBuilder = M . I.matrixBuilderN
 
 -- | Constructs a column vector matrix
-colL :: (FromListsN e () rows) => [e] -> Matrix e One rows
+colL :: FromListsN e () rows => [e] -> Matrix e One rows
 colL = M . I.colL
 
+-- | Constructs a column vector matrix
+col :: (Num e, Enum a, EnumN a, ConstructN a) => (a -> e) -> Matrix e One a
+col = M . I.colN . I.Vector
+
 -- | Constructs a row vector matrix
-rowL :: (FromListsN e cols ()) => [e] -> Matrix e cols One
+rowL :: FromListsN e cols () => [e] -> Matrix e cols One
 rowL = M . I.rowL
+
+-- | Constructs a row vector matrix
+row :: (Num e, Enum a, EnumN a, ConstructN a) => (a -> e) -> Matrix e a One
+row = M . I.rowN . I.Vector
 
 -- | Lifts functions to matrices with dimensions matching @a@ and @b@
 -- cardinality's.
-fromF ::
-      ( Num e,
-        Liftable a b
-      )
+fromF :: (Num e, Liftable a b)
       => (a -> b) -> Matrix e a b
 fromF = M . I.fromFN
 
@@ -401,10 +406,7 @@ bang ::
 bang = ones
 
 -- | Point constant matrix
-point ::
-      ( Num e,
-        Liftable () a
-      ) => a -> Matrix e One a
+point :: (Num e, Liftable () a) => a -> Matrix e One a
 point = fromF . const
 
 -- iden Matrix
@@ -426,7 +428,7 @@ iden = M I.iden
 --
 --   This definition takes advantage of divide-and-conquer and fusion laws
 -- from LAoP.
-comp :: (Num e) => Matrix e cr rows -> Matrix e cols cr -> Matrix e cols rows
+comp :: Num e => Matrix e cr rows -> Matrix e cols cr -> Matrix e cols rows
 comp (M a) (M b) = M (I.comp a b)
 {-# NOINLINE comp #-}
 {-# RULES 
