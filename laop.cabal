@@ -1,0 +1,79 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.31.2.
+--
+-- see: https://github.com/sol/hpack
+--
+-- hash: c53e5ac8b0734f570fcea8d217d84e401323172c60a00eee9d60ffbaef505191
+
+name:           laop
+version:        0.1.0.7
+description:    Please see the README on GitHub at <https://github.com/xxxx/laop#readme>
+category:       Data
+homepage:       https://github.com/xxxx/laop#readme
+bug-reports:    https://github.com/xxxx/laop/issues
+author:         Armando Santos
+maintainer:     armandoifsantos@gmail.com
+copyright:      MIT
+license:        BSD3
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    README.md
+    ChangeLog.md
+
+source-repository head
+  type: git
+  location: https://github.com/xxxx/laop
+
+library
+  exposed-modules:
+      LAoP.Dist
+      LAoP.Dist.Internal
+      LAoP.Matrix.Internal
+      LAoP.Matrix.Nat
+      LAoP.Matrix.Type
+      LAoP.Relation
+      LAoP.Relation.Internal
+      LAoP.Utils
+      LAoP.Utils.Internal
+  other-modules:
+      Paths_laop
+  hs-source-dirs:
+      src
+  build-depends:
+      base >=4.7 && <5
+    , deepseq
+  default-language: Haskell2010
+
+executable laop-exe
+  main-is: Main.hs
+  other-modules:
+      Benchmarks
+      Examples
+      Spreadsheets
+      Paths_laop
+  hs-source-dirs:
+      app
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N2 -funfolding-use-threshold=16 -fexcess-precision -optc-O3 -optc-ffast-math
+  build-depends:
+      QuickCheck
+    , base >=4.7 && <5
+    , criterion
+    , deepseq
+    , laop
+  default-language: Haskell2010
+
+test-suite laop-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      Paths_laop
+  hs-source-dirs:
+      test
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base >=4.7 && <5
+    , deepseq
+    , laop
+  default-language: Haskell2010
