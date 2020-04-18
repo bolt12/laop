@@ -28,7 +28,7 @@ switch Win = Lose
 switch Lose = Win
 
 firstChoice :: Matrix Double () Outcome
-firstChoice = col [1/3, 2/3]
+firstChoice = colL [1/3, 2/3]
 
 secondChoice :: Matrix Double Outcome Outcome
 secondChoice = fromF switch 
@@ -53,7 +53,7 @@ conditionSS = coerceNat2 condition
 conditionalThrows = fromF (uncurry conditionSS) . kr (kr die die) die
 
 die :: Matrix Double () SS
-die = col $ map (const (1/6)) [nat @1 @6 1 .. nat 6]
+die = colL $ map (const (1/6)) [nat @1 @6 1 .. nat 6]
 
 -- Sprinkler
 data G = Dry | Wet
@@ -96,10 +96,10 @@ tag f = kr f id
 state g s r = tag g . tag s . r
 
 grass_wet :: Matrix Double () (G, (S, R)) -> Matrix Double One One
-grass_wet state = row [0,1] . fstM . state
+grass_wet state = rowL [0,1] . fstM . state
 
 rainning :: Matrix Double (G, (S, R)) One
-rainning = row [0,1] . sndM . sndM 
+rainning = rowL [0,1] . sndM . sndM 
 
 -- Alcuin Puzzle
 

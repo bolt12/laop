@@ -43,9 +43,9 @@ module LAoP.Dist.Internal
         )
     where
 
-import LAoP.Matrix.Type hiding (TrivialP, Countable, CountableDimensions, CountableN, CountableDimensionsN, Liftable, FromListsN)
+import LAoP.Matrix.Type hiding (TrivialP, Countable, CountableDimensions, CountableN, CountableDimensionsN, FromListsN)
 import Prelude hiding (id, (.))
-import qualified LAoP.Matrix.Internal as I
+import qualified LAoP.Matrix.Alternative as I
 import LAoP.Utils
 import GHC.TypeLits
 import Data.Proxy
@@ -66,37 +66,26 @@ type Countable a              = KnownNat (I.Count a)
 type CountableN a             = KnownNat (I.Count (I.Normalize a))
 type CountableDimensionsN a b = (CountableN a, CountableN b)
 type FromListsN a b           = I.FromLists Prob (I.Normalize a) (I.Normalize b)
-type Liftable a b             = (Bounded a, Bounded b, Enum a, Enum b, Eq b, Num Prob, Ord Prob)
 type TrivialP a b             = Normalize (a, b) ~ Normalize (Normalize a, Normalize b)
 
 -- | Functor instance
-fmapD :: 
-     ( Liftable a b,
-       CountableDimensionsN a b,
-       FromListsN b a
-     )
-     =>
-     (a -> b) -> Dist a -> Dist b
-fmapD f (D m) = D (fromF' f `comp` m)
+fmapD :: Liftable a b => (a -> b) -> Dist a -> Dist b
+fmapD f (D m) = D (fromF f `comp` m)
 
 -- | Applicative/Monoidal instance 'unit' function
 unitD :: Dist ()
 unitD = D (one 1)
 
 -- | Applicative/Monoidal instance 'mult' function
-multD :: 
-      ( CountableDimensionsN a b,
-        CountableN (a, b),
-        FromListsN (a, b) a,
-        FromListsN (a, b) b,
-        TrivialP a b
-      ) => Dist a -> Dist b -> Dist (a, b)
+multD :: (FstM a b, SndM a b) => Dist a -> Dist b -> Dist (a, b)
 multD (D a) (D b) = D (kr a b)
 
 -- | Selective instance function
-selectD :: 
-       ( FromListsN b b,
-         CountableN b
+selectD ::
+       ( EqN a,
+         EqN b,
+         EnumerableN b,
+         ConstructN b
        ) => Dist (Either a b) -> Matrix Prob a b -> Dist b
 selectD (D d) m = D (selectM d m)
 
@@ -104,17 +93,14 @@ selectD (D d) m = D (selectM d m)
 -- functions to apply to a given argument; 
 branchD ::
        ( Num e,
-         CountableDimensionsN a b,
-         CountableDimensionsN c (Either b c),
-         FromListsN c b,
-         FromListsN a b,
-         FromListsN a a,
-         FromListsN b b,
-         FromListsN c c,
-         FromListsN b a,
-         FromListsN b c,
-         FromListsN (Either b c) b,
-         FromListsN (Either b c) c
+         EqN a,
+         EqN b,
+         EqN c,
+         ConstructableN a b,
+         ConstructN c,
+         EnumerableN a,
+         EnumerableN b,
+         EnumerableN c
        )
        => Dist (Either a b) -> Matrix Prob a c -> Matrix Prob b c -> Dist c
 branchD x l r = f x `selectD` g l `selectD` r
@@ -124,11 +110,10 @@ branchD x l r = f x `selectD` g l `selectD` r
 
 -- | Branch on a Boolean value, skipping unnecessary computations.
 ifD ::
-    ( CountableDimensionsN a (Either () a),
-      FromListsN a a,
-      FromListsN a (),
-      FromListsN () a,
-      FromListsN (Either () a) a
+    ( Num e,
+      EqN a,
+      ConstructN a,
+      EnumerableN a
     )
     => Dist Bool -> Dist a -> Dist a -> Dist a
 ifD x (D t) (D e) = branchD x' t e
@@ -136,12 +121,8 @@ ifD x (D t) (D e) = branchD x' t e
     x' = bool (Right ()) (Left ()) `fmapD` x
 
 -- | Monad instance 'return' function
-returnD :: forall a . (Enum a, FromListsN () a, Countable a) => a -> Dist a
-returnD a = D (col l)
-    where
-        i = fromInteger $ natVal (Proxy :: Proxy (Count a))
-        x = fromEnum a
-        l = take x [0,0..] ++ [1] ++ take (i - x - 1) [0,0..]
+returnD :: Liftable () a => a -> Dist a
+returnD = D . returnM
 
 -- | Monad instance '(>>=)' function
 bindD :: Dist a -> Matrix Prob a b -> Dist b
@@ -162,7 +143,7 @@ bindD (D d) m = D (m `comp` d)
 
 -- | Constructs a Bernoulli distribution
 choose :: (FromListsN () a) => Prob -> Dist a
-choose prob = D (col [prob, 1 - prob])
+choose prob = D (colL [prob, 1 - prob])
 
 -- | Creates a distribution given a shape function
 shape :: (FromListsN () a) => (Prob -> Prob) -> [a] -> Dist a
@@ -215,7 +196,7 @@ prettyPrintDist = putStrLn . prettyDist @a
 -- Auxiliary functions
 
 fromFreqs :: (FromListsN () a) => [(a,Prob)] -> Dist a
-fromFreqs xs = D (col (map (\(x,p) -> p/q) xs))
+fromFreqs xs = D (colL (map (\(x,p) -> p/q) xs))
            where q = sum $ map snd xs
 
 normalCurve :: Prob -> Prob -> Prob -> Prob
