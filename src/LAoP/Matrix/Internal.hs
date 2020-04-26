@@ -276,6 +276,8 @@ instance Num e => Num (Matrix e cols rows) where
   signum (Join a b) = Join (signum a) (signum b)
   signum (Fork a b) = Fork (signum a) (signum b)
 
+  negate a = (-1) .| a
+
 instance Ord e => Ord (Matrix e cols rows) where
     Empty <= Empty               = True
     (One a) <= (One b)           = a <= b
@@ -331,35 +333,45 @@ instance FromLists e Void Void where
 
 instance {-# OVERLAPPING #-} FromLists e () () where
   fromLists [[e]] = One e
-  fromLists _     = error "Wrong dimensions"
+  fromLists a     = error "Wrong dimensions"
 
 instance {-# OVERLAPPING #-} (FromLists e cols ()) => FromLists e (Either () cols) () where
   fromLists [h : t] = Join (One h) (fromLists [t])
-  fromLists _       = error "Wrong dimensions"
+  fromLists _       = error "Wrong row dimensions"
 
 instance {-# OVERLAPPABLE #-} (FromLists e a (), FromLists e b (), Countable a) => FromLists e (Either a b) () where
   fromLists [l] =
       let rowsA = fromInteger (natVal (Proxy :: Proxy (Count a)))
        in Join (fromLists [take rowsA l]) (fromLists [drop rowsA l])
-  fromLists _       = error "Wrong dimensions"
+  fromLists _       = error "Wrong row dimensions"
 
 instance {-# OVERLAPPING #-} (FromLists e () rows) => FromLists e () (Either () rows) where
   fromLists ([h] : t) = Fork (One h) (fromLists t)
-  fromLists _         = error "Wrong dimensions"
+  fromLists _         = error "Wrong column dimensions"
 
 instance {-# OVERLAPPABLE #-} (FromLists e () a, FromLists e () b, Countable a) => FromLists e () (Either a b) where
   fromLists l@([_] : _) = 
       let rowsA = fromInteger (natVal (Proxy :: Proxy (Count a)))
        in Fork (fromLists (take rowsA l)) (fromLists (drop rowsA l))
-  fromLists _         = error "Wrong dimensions"
+  fromLists _         = error "Wrong column dimensions"
 
-instance {-# OVERLAPPABLE #-} (FromLists e (Either a b) c, FromLists e (Either a b) d, Countable c) => FromLists e (Either a b) (Either c d) where
+instance 
+  {-# OVERLAPPABLE #-}
+  ( FromLists e a c,
+    FromLists e a d,
+    FromLists e b c,
+    FromLists e b d,
+    CountableDimensions a c
+  ) => FromLists e (Either a b) (Either c d) where
   fromLists l@(h : t) =
     let lh        = length h
+        colsC     = fromInteger (natVal (Proxy :: Proxy (Count a)))
         rowsC     = fromInteger (natVal (Proxy :: Proxy (Count c)))
         condition = all ((== lh) . length) t
      in if lh > 0 && condition
-          then Fork (fromLists (take rowsC l)) (fromLists (drop rowsC l))
+          -- then Fork (fromLists (take rowsC l)) (fromLists (drop rowsC l))
+          then Fork (Join (fromLists (map (take colsC) $ take rowsC l)) (fromLists (map (drop colsC) $ take rowsC l)))
+                    (Join (fromLists (map (take colsC) $ drop rowsC l)) (fromLists (map (drop colsC) $ drop rowsC l)))
           else error "Not all rows have the same length"
 
 -- | Matrix builder function. Constructs a matrix provided with
@@ -806,6 +818,32 @@ corr ::
      => (a -> Bool) -> Matrix e q q
 corr p = let f = fromF' p :: Matrix e q ()
           in kr f (id :: Matrix e q q)
+
+-- | Matrix inversion (experimental)
+-- 
+-- Assumes correct internal representation.
+inv :: Fractional e => Matrix e a a -> Matrix e a a
+inv Empty                        = Empty
+inv (One e)                      = One (1 / e)
+inv (Join (Fork a c) (Fork b d)) = Join
+  (Fork
+    (inv a + inv a . b . inv (d - c . inv a . b) . c . inv a)
+    (negate (inv (d - c . inv a . b)) . c . inv a)
+  )
+  (Fork
+    (negate (inv a) . b . inv (d - c . inv a . b))
+    (inv (d - c . inv a . b))
+  )
+inv (Fork (Join a b) (Join c d)) = Fork
+  (Join
+    (inv a + inv a . b . inv (d - c . inv a . b) . c . inv a)
+    (negate (inv a) . b . inv (d - c . inv a . b))
+  )
+  (Join
+    (negate (inv (d - c . inv a . b)) . c . inv a)
+    (inv (d - c . inv a . b))
+  )
+inv a                            = a
 
 -- Pretty print
 

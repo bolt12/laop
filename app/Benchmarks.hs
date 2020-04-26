@@ -22,6 +22,7 @@ import Control.DeepSeq
 import Test.QuickCheck
 import GHC.TypeLits
 import Data.Proxy
+import Prelude hiding (id, (.))
 
 selectM2 :: 
        ( Num e,
