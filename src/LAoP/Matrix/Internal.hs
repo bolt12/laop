@@ -51,10 +51,11 @@ module LAoP.Matrix.Internal
 
     -- * Constraint type aliases
     Countable,
-    CountableDimensions,
+    CountableDims,
     CountableN,
-    CountableDimensionsN,
-    FromListsN,
+    CountableDimsN,
+    FL,
+    FLN,
     Liftable,
     Trivial,
 
@@ -231,16 +232,17 @@ type family Normalize (d :: Type) :: Type where
 -- | Constraint type synonyms to keep the type signatures less convoluted
 type Countable a = KnownNat (Count a)
 type CountableN a = KnownNat (Count (Normalize a))
-type CountableDimensions a b = (Countable a, Countable b)
-type CountableDimensionsN a b = (CountableN a, CountableN b)
-type FromListsN e a b = FromLists e (Normalize a) (Normalize b)
+type CountableDims a b = (Countable a, Countable b)
+type CountableDimsN a b = (CountableN a, CountableN b)
+type FL a b = FromLists a b
+type FLN a b = FromLists (Normalize a) (Normalize b)
 type Liftable e a b = (Bounded a, Bounded b, Enum a, Enum b, Eq b, Num e, Ord e)
 type Trivial a = FromNat (Count a) ~ a
 
 -- | It is possible to implement a constrained version of the category type
 -- class.
 instance (Num e) => Category (Matrix e) where
-  type Object (Matrix e) a = (FromLists e a a, Countable a)
+  type Object (Matrix e) a = (FL a a, Countable a)
   id = iden
   (.) = comp
 
@@ -320,40 +322,40 @@ infixl 2 ===
 --
 --   Given that it is not possible to branch on types at the term level type
 -- classes are needed very much like an inductive definition but on types.
-class FromLists e cols rows where
+class FromLists cols rows where
   -- | Build a matrix out of a list of list of elements. Throws a runtime
   -- error if the dimensions do not match.
   fromLists :: [[e]] -> Matrix e cols rows
 
-instance FromLists e Void Void where
+instance FromLists Void Void where
   fromLists [] = Empty
   fromLists _  = error "Wrong dimensions"
 
-instance {-# OVERLAPPING #-} FromLists e () () where
+instance {-# OVERLAPPING #-} FromLists () () where
   fromLists [[e]] = One e
   fromLists _     = error "Wrong dimensions"
 
-instance {-# OVERLAPPING #-} (FromLists e cols ()) => FromLists e (Either () cols) () where
+instance {-# OVERLAPPING #-} (FromLists cols ()) => FromLists (Either () cols) () where
   fromLists [h : t] = Join (One h) (fromLists [t])
   fromLists _       = error "Wrong dimensions"
 
-instance {-# OVERLAPPABLE #-} (FromLists e a (), FromLists e b (), Countable a) => FromLists e (Either a b) () where
+instance {-# OVERLAPPABLE #-} (FromLists a (), FromLists b (), Countable a) => FromLists (Either a b) () where
   fromLists [l] =
       let rowsA = fromInteger (natVal (Proxy :: Proxy (Count a)))
        in Join (fromLists [take rowsA l]) (fromLists [drop rowsA l])
   fromLists _       = error "Wrong dimensions"
 
-instance {-# OVERLAPPING #-} (FromLists e () rows) => FromLists e () (Either () rows) where
+instance {-# OVERLAPPING #-} (FromLists () rows) => FromLists () (Either () rows) where
   fromLists ([h] : t) = Fork (One h) (fromLists t)
   fromLists _         = error "Wrong dimensions"
 
-instance {-# OVERLAPPABLE #-} (FromLists e () a, FromLists e () b, Countable a) => FromLists e () (Either a b) where
+instance {-# OVERLAPPABLE #-} (FromLists () a, FromLists () b, Countable a) => FromLists () (Either a b) where
   fromLists l@([_] : _) = 
       let rowsA = fromInteger (natVal (Proxy :: Proxy (Count a)))
        in Fork (fromLists (take rowsA l)) (fromLists (drop rowsA l))
   fromLists _         = error "Wrong dimensions"
 
-instance {-# OVERLAPPABLE #-} (FromLists e (Either a b) c, FromLists e (Either a b) d, Countable c) => FromLists e (Either a b) (Either c d) where
+instance {-# OVERLAPPABLE #-} (FromLists (Either a b) c, FromLists (Either a b) d, Countable c) => FromLists (Either a b) (Either c d) where
   fromLists l@(h : t) =
     let lh        = length h
         rowsC     = fromInteger (natVal (Proxy :: Proxy (Count c)))
@@ -366,8 +368,8 @@ instance {-# OVERLAPPABLE #-} (FromLists e (Either a b) c, FromLists e (Either a
 -- a construction function that operates with indices.
 matrixBuilder' ::
   forall e cols rows.
-  ( FromLists e cols rows,
-    CountableDimensions cols rows
+  ( FL cols rows,
+    CountableDims cols rows
   ) => ((Int, Int) -> e) -> Matrix e cols rows
 matrixBuilder' f =
   let c         = fromInteger $ natVal (Proxy :: Proxy (Count cols))
@@ -379,14 +381,14 @@ matrixBuilder' f =
 -- a construction function that operates with arbitrary types.
 matrixBuilder ::
   forall e a b.
-  ( FromListsN e a b,
+  ( FLN a b,
     CountableN b,
     Enum a,
     Enum b,
     Bounded a,
     Bounded b,
     Eq a,
-    CountableDimensionsN a b
+    CountableDimsN a b
   ) => ((a, b) -> e) -> Matrix e (Normalize a) (Normalize b)
 matrixBuilder f =
   let r         = fromInteger $ natVal (Proxy :: Proxy (Count (Normalize b)))
@@ -397,11 +399,11 @@ matrixBuilder f =
     buildList r l  = take r l : buildList r (drop r l)
 
 -- | Constructs a column vector matrix
-col :: (FromLists e () rows) => [e] -> Matrix e () rows
+col :: (FL () rows) => [e] -> Matrix e () rows
 col = fromLists . map (: [])
 
 -- | Constructs a row vector matrix
-row :: (FromLists e cols ()) => [e] -> Matrix e cols ()
+row :: (FL cols ()) => [e] -> Matrix e cols ()
 row = fromLists . (: [])
 
 -- | Lifts functions to matrices with arbitrary dimensions.
@@ -411,8 +413,8 @@ row = fromLists . (: [])
 fromF' ::
   forall a b cols rows e.
   ( Liftable e a b,
-    CountableDimensions cols rows,
-    FromLists e rows cols
+    CountableDims cols rows,
+    FL rows cols
   ) =>
   (a -> b) ->
   Matrix e cols rows
@@ -440,8 +442,8 @@ fromF' f =
 fromF ::
   forall a b e.
   ( Liftable e a b,
-    CountableDimensionsN a b,
-    FromListsN e b a
+    CountableDimsN a b,
+    FLN b a
   ) =>
   (a -> b) ->
   Matrix e (Normalize a) (Normalize b)
@@ -480,7 +482,7 @@ toList = concat . toLists
 -- Zeros Matrix
 
 -- | The zero matrix. A matrix wholly filled with zeros.
-zeros :: (Num e, FromLists e cols rows, CountableDimensions cols rows) => Matrix e cols rows
+zeros :: (Num e, FL cols rows, CountableDims cols rows) => Matrix e cols rows
 zeros = matrixBuilder' (const 0)
 
 -- Ones Matrix
@@ -488,20 +490,20 @@ zeros = matrixBuilder' (const 0)
 -- | The ones matrix. A matrix wholly filled with ones.
 --
 --   Also known as T (Top) matrix.
-ones :: (Num e, FromLists e cols rows, CountableDimensions cols rows) => Matrix e cols rows
+ones :: (Num e, FL cols rows, CountableDims cols rows) => Matrix e cols rows
 ones = matrixBuilder' (const 1)
 
 -- Const Matrix
 
 -- | The constant matrix constructor. A matrix wholly filled with a given
 -- value.
-constant :: (Num e, FromLists e cols rows, CountableDimensions cols rows) => e -> Matrix e cols rows
+constant :: (Num e, FL cols rows, CountableDims cols rows) => e -> Matrix e cols rows
 constant e = matrixBuilder' (const e)
 
 -- Bang Matrix
 
 -- | The T (Top) row vector matrix.
-bang :: forall e cols. (Num e, Enum e, FromLists e cols (), Countable cols) => Matrix e cols ()
+bang :: forall e cols. (Num e, Enum e, FL cols (), Countable cols) => Matrix e cols ()
 bang =
   let c = fromInteger $ natVal (Proxy :: Proxy (Count cols))
    in fromLists [take c [1, 1 ..]]
@@ -509,7 +511,7 @@ bang =
 -- iden Matrix
 
 -- | iden matrix.
-iden :: forall e cols . (Num e, FromLists e cols cols, Countable cols) => Matrix e cols cols
+iden :: forall e cols . (Num e, FL cols cols, Countable cols) => Matrix e cols cols
 iden = matrixBuilder' (bool 0 1 . uncurry (==))
 {-# NOINLINE iden #-}
 
@@ -554,21 +556,21 @@ infixl 7 ./
 -- Projections
 
 -- | Biproduct first component projection
-p1 :: (Num e, CountableDimensions n m, FromLists e n m, FromLists e m m) => Matrix e (Either m n) m
+p1 :: (Num e, CountableDims n m, FL n m, FL m m) => Matrix e (Either m n) m
 p1 = join id zeros
 
 -- | Biproduct second component projection
-p2 :: (Num e, CountableDimensions n m, FromLists e m n, FromLists e n n) => Matrix e (Either m n) n
+p2 :: (Num e, CountableDims n m, FL m n, FL n n) => Matrix e (Either m n) n
 p2 = join zeros id
 
 -- Injections
 
 -- | Biproduct first component injection
-i1 :: (Num e, CountableDimensions n m, FromLists e n m, FromLists e m m) => Matrix e m (Either m n)
+i1 :: (Num e, CountableDims n m, FL n m, FL m m) => Matrix e m (Either m n)
 i1 = tr p1
 
 -- | Biproduct second component injection
-i2 :: (Num e, CountableDimensions n m, FromLists e m n, FromLists e n n) => Matrix e n (Either m n)
+i2 :: (Num e, CountableDims n m, FL m n, FL n n) => Matrix e n (Either m n)
 i2 = tr p2
 
 -- Dimensions
@@ -601,11 +603,11 @@ infixl 5 -|-
 (-|-) ::
   forall e n k m j.
   ( Num e,
-    CountableDimensions j k,
-    FromLists e k k,
-    FromLists e j k,
-    FromLists e k j,
-    FromLists e j j
+    CountableDims j k,
+    FL k k,
+    FL j k,
+    FL k j,
+    FL j j
   ) =>
   Matrix e n k ->
   Matrix e m j ->
@@ -618,8 +620,8 @@ infixl 5 -|-
 fstM ::
   forall e m k .
   ( Num e,
-    CountableDimensions k m,
-    FromLists e (Normalize (m, k)) m,
+    CountableDims k m,
+    FL (Normalize (m, k)) m,
     CountableN (m, k)
   ) => Matrix e (Normalize (m, k)) m
 fstM = matrixBuilder' f
@@ -633,8 +635,8 @@ fstM = matrixBuilder' f
 sndM ::
     forall e m k .
     ( Num e,
-      CountableDimensions k m,
-      FromLists e (Normalize (m, k)) k,
+      CountableDims k m,
+      FL (Normalize (m, k)) k,
       CountableN (m, k)
     ) => Matrix e (Normalize (m, k)) k
 sndM = matrixBuilder' f
@@ -658,10 +660,10 @@ sndM = matrixBuilder' f
 kr ::
        forall e cols a b.
        ( Num e,
-         CountableDimensions a b,
+         CountableDims a b,
          CountableN (a, b),
-         FromLists e (Normalize (a, b)) a,
-         FromLists e (Normalize (a, b)) b
+         FL (Normalize (a, b)) a,
+         FL (Normalize (a, b)) b
        ) => Matrix e cols a -> Matrix e cols b -> Matrix e cols (Normalize (a, b))
 kr a b =
   let fstM' = fstM @e @a @b
@@ -676,13 +678,13 @@ infixl 4 ><
 (><) ::
      forall e m p n q.
      ( Num e,
-       CountableDimensions m n,
-       CountableDimensions p q,
-       CountableDimensionsN (m, n) (p, q),
-       FromLists e (Normalize (m, n)) m,
-       FromLists e (Normalize (m, n)) n,
-       FromLists e (Normalize (p, q)) p,
-       FromLists e (Normalize (p, q)) q
+       CountableDims m n,
+       CountableDims p q,
+       CountableDimsN (m, n) (p, q),
+       FL (Normalize (m, n)) m,
+       FL (Normalize (m, n)) n,
+       FL (Normalize (p, q)) p,
+       FL (Normalize (p, q)) q
      ) 
      => Matrix e m p -> Matrix e n q -> Matrix e (Normalize (m, n)) (Normalize (p, q))
 (><) a b =
@@ -733,32 +735,32 @@ tr (Fork a b) = Join (tr a) (tr b)
 
 -- | Selective functors 'select' operator equivalent inspired by the
 -- ArrowMonad solution presented in the paper.
-select :: (Num e, FromLists e b b, Countable b) => Matrix e cols (Either a b) -> Matrix e a b -> Matrix e cols b
+select :: (Num e, FL b b, Countable b) => Matrix e cols (Either a b) -> Matrix e a b -> Matrix e cols b
 select (Fork a b) y                   = y . a + b                     -- Divide-and-conquer law
 select (Join (Fork a c) (Fork b d)) y = join (y . a + c) (y . b + d)  -- Pattern matching + DnC law
 select m y                            = join y id . m
 
 branch ::
        ( Num e,
-         CountableDimensions a b,
-         CountableDimensions c (Either b c),
-         FromLists e c b,
-         FromLists e a b,
-         FromLists e a a,
-         FromLists e b b,
-         FromLists e c c,
-         FromLists e b a,
-         FromLists e b c,
-         FromLists e (Either b c) b,
-         FromLists e (Either b c) c
+         CountableDims a b,
+         CountableDims c (Either b c),
+         FL c b,
+         FL a b,
+         FL a a,
+         FL b b,
+         FL c c,
+         FL b a,
+         FL b c,
+         FL (Either b c) b,
+         FL (Either b c) c
        )
        => Matrix e cols (Either a b) -> Matrix e a c -> Matrix e b c -> Matrix e cols c
 branch x l r = f x `select` g l `select` r
   where
-    f :: (Num e, Countable a, CountableDimensions b c, FromLists e a b, FromLists e c b, FromLists e b b, FromLists e b a, FromLists e a a)
+    f :: (Num e, Countable a, CountableDims b c, FL a b, FL c b, FL b b, FL b a, FL a a)
       => Matrix e cols (Either a b) -> Matrix e cols (Either a (Either b c))
     f m = fork (tr i1) (i1 . tr i2) . m
-    g :: (Num e, CountableDimensions b c, FromLists e b c, FromLists e c c) => Matrix e a c -> Matrix e a (Either b c)
+    g :: (Num e, CountableDims b c, FL b c, FL c c) => Matrix e a c -> Matrix e a (Either b c)
     g m = i2 . m
 
 -- McCarthy's Conditional
@@ -767,9 +769,9 @@ branch x l r = f x `select` g l `select` r
 cond ::
      ( Trivial cols,
        Countable cols,
-       FromLists e () cols,
-       FromLists e cols (),
-       FromLists e cols cols,
+       FL () cols,
+       FL cols (),
+       FL cols cols,
        Bounded a,
        Enum a,
        Num e,
@@ -782,9 +784,9 @@ cond p f g = join f g . grd p
 grd ::
     ( Trivial q,
       Countable q,
-      FromLists e () q,
-      FromLists e q (),
-      FromLists e q q,
+      FL () q,
+      FL q (),
+      FL q q,
       Bounded a,
       Enum a,
       Num e,
@@ -798,9 +800,9 @@ corr ::
     forall e a q .
     ( Trivial q,
       Countable q,
-      FromLists e () q,
-      FromLists e q (),
-      FromLists e q q,
+      FL () q,
+      FL q (),
+      FL q q,
       Liftable e a Bool
     )
      => (a -> Bool) -> Matrix e q q
@@ -829,7 +831,7 @@ prettyAux (h : t) l = "│ " ++ fill (unwords $ map show h) ++ " │\n" ++
    fill str = replicate (widest - length str - 2) ' ' ++ str
 
 -- | Matrix pretty printer
-pretty :: (CountableDimensions cols rows, Show e) => Matrix e cols rows -> String
+pretty :: (CountableDims cols rows, Show e) => Matrix e cols rows -> String
 pretty m = concat
    [ "┌ ", unwords (replicate (columns m) blank), " ┐\n"
    , unlines
@@ -858,7 +860,7 @@ pretty m = concat
        (safeGet i j m)
 
 -- | Matrix pretty printer
-prettyPrint :: (CountableDimensions cols rows, Show e) => Matrix e cols rows -> IO ()
+prettyPrint :: (CountableDims cols rows, Show e) => Matrix e cols rows -> IO ()
 prettyPrint = putStrLn . pretty
 
 -- | Zip two matrices with a given binary function
@@ -953,8 +955,8 @@ divS s r = divL r s `intersection` divR (tr r) (tr s)
 fromFRel' ::
   forall a b cols rows.
   ( Liftable Boolean a b,
-    CountableDimensions cols rows,
-    FromLists Boolean rows cols
+    CountableDims cols rows,
+    FL rows cols
   ) =>
   (a -> b) ->
   Relation cols rows
@@ -982,8 +984,8 @@ fromFRel' f =
 fromFRel ::
   forall a b.
   ( Liftable Boolean a b,
-    CountableDimensionsN a b,
-    FromLists Boolean (Normalize b) (Normalize a)
+    CountableDimsN a b,
+    FL (Normalize b) (Normalize a)
   ) =>
   (a -> b) ->
   Relation (Normalize a) (Normalize b)
@@ -1014,8 +1016,8 @@ toRel ::
         Enum a,
         Enum b,
         Eq b,
-        CountableDimensionsN a b,
-        FromListsN Boolean b a
+        CountableDimsN a b,
+        FLN b a
       ) 
       => (a -> b -> Bool) -> Relation (Normalize a) (Normalize b)
 toRel f =

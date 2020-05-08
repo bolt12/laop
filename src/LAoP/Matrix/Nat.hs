@@ -56,12 +56,12 @@ module LAoP.Matrix.Nat
 
     -- * Constraint type synonyms
     Countable,
-    CountableDimensions,
+    CountableDims,
     CountableN,
     CountableNz,
-    CountableDimensionsN,
-    FromListsN,
-    FromListsNz,
+    CountableDimsN,
+    FLN,
+    FLNz,
     Liftable,
     TrivialE,
     TrivialP,
@@ -78,7 +78,7 @@ module LAoP.Matrix.Nat
     I.Normalize,
 
     -- * Matrix construction and conversion
-    I.FromLists,
+    I.FL,
     fromLists,
     toLists,
     toList,
@@ -167,16 +167,16 @@ newtype Matrix e (cols :: Nat) (rows :: Nat) = M (I.Matrix e (I.FromNat cols) (I
   deriving (Show, Num, Eq, Ord, NFData) via (I.Matrix e (I.FromNat cols) (I.FromNat rows))
 
 -- | Constraint type synonyms to keep the type signatures less convoluted
-type Countable a              = KnownNat (I.Count a)
-type CountableDimensions a b  = (Countable a, Countable b)
-type CountableN a             = KnownNat (I.Count (I.FromNat a))
-type CountableNz a            = KnownNat (I.Count (I.Normalize a))
-type CountableDimensionsN a b = (CountableN a, CountableN b)
-type FromListsN e a b         = I.FromLists e (I.FromNat a) (I.FromNat b)
-type FromListsNz e a b        = I.FromLists e (I.Normalize a) (I.Normalize b)
-type Liftable e a b           = (Bounded a, Bounded b, Enum a, Enum b, Eq b, Num e, Ord e)
-type TrivialE a b             = I.FromNat (a + b) ~ Either (I.FromNat a) (I.FromNat b)
-type TrivialP a b             = I.FromNat (a * b) ~ I.FromNat (I.Count (I.FromNat a) * I.Count (I.FromNat b))
+type Countable a        = KnownNat (I.Count a)
+type CountableDims a b  = (Countable a, Countable b)
+type CountableN a       = KnownNat (I.Count (I.FromNat a))
+type CountableNz a      = KnownNat (I.Count (I.Normalize a))
+type CountableDimsN a b = (CountableN a, CountableN b)
+type FLN e a b          = I.FL (I.FromNat a) (I.FromNat b)
+type FLNz e a b         = I.FL (I.Normalize a) (I.Normalize b)
+type Liftable e a b     = (Bounded a, Bounded b, Enum a, Enum b, Eq b, Num e, Ord e)
+type TrivialE a b       = I.FromNat (a + b) ~ Either (I.FromNat a) (I.FromNat b)
+type TrivialP a b       = I.FromNat (a * b) ~ I.FromNat (I.Count (I.FromNat a) * I.Count (I.FromNat b))
 
 -- Primitives
 
@@ -218,27 +218,27 @@ infixl 2 ===
 
 -- Construction
 
-fromLists :: (FromListsN e cols rows) => [[e]] -> Matrix e cols rows
+fromLists :: (FLN e cols rows) => [[e]] -> Matrix e cols rows
 fromLists = M . I.fromLists
 
 -- | Matrix builder function. Constructs a matrix provided with
 -- a construction function that operates with indices.
 matrixBuilder' ::
-  (FromListsN e cols rows, CountableN cols, CountableN rows) 
+  (FLN e cols rows, CountableN cols, CountableN rows) 
   => ((Int, Int) -> e) -> Matrix e cols rows
 matrixBuilder' = M . I.matrixBuilder'
 
-col :: (I.FromLists e () (I.FromNat rows)) => [e] -> Matrix e 1 rows
+col :: (I.FL () (I.FromNat rows)) => [e] -> Matrix e 1 rows
 col = M . I.col
 
-row :: (I.FromLists e (I.FromNat cols) ()) => [e] -> Matrix e cols 1
+row :: (I.FL (I.FromNat cols) ()) => [e] -> Matrix e cols 1
 row = M . I.row
 
 fromF' ::
   ( Liftable e a b,
     CountableN cols,
     CountableN rows,
-    FromListsN e rows cols
+    FLN e rows cols
   ) =>
   (a -> b) ->
   Matrix e cols rows
@@ -248,7 +248,7 @@ fromF ::
   ( Liftable e a b,
     CountableNz a,
     CountableNz b,
-    FromListsNz e b a
+    FLNz e b a
   ) =>
   (a -> b) ->
   Matrix e (I.Count a) (I.Count b)
@@ -265,21 +265,21 @@ toList (M m) = I.toList m
 -- Zeros Matrix
 
 zeros ::
-  (Num e, FromListsN e cols rows, CountableN cols, CountableN rows) =>
+  (Num e, FLN e cols rows, CountableN cols, CountableN rows) =>
   Matrix e cols rows
 zeros = M I.zeros
 
 -- Ones Matrix
 
 ones ::
-  (Num e, FromListsN e cols rows, CountableN cols, CountableN rows) =>
+  (Num e, FLN e cols rows, CountableN cols, CountableN rows) =>
   Matrix e cols rows
 ones = M I.ones
 
 -- Const Matrix
 
 constant ::
-  (Num e, FromListsN e cols rows, CountableN cols, CountableN rows) =>
+  (Num e, FLN e cols rows, CountableN cols, CountableN rows) =>
   e ->
   Matrix e cols rows
 constant = M . I.constant
@@ -288,14 +288,14 @@ constant = M . I.constant
 
 bang ::
   forall e cols.
-  (Num e, Enum e, I.FromLists e (I.FromNat cols) (), CountableN cols) =>
+  (Num e, Enum e, I.FL (I.FromNat cols) (), CountableN cols) =>
   Matrix e cols 1
 bang = M I.bang
 
 -- iden Matrix
 
 iden ::
-  (Num e, FromListsN e cols cols, CountableN cols) =>
+  (Num e, FLN e cols cols, CountableN cols) =>
   Matrix e cols cols
 iden = M I.iden
 
@@ -320,9 +320,9 @@ infixl 7 ./
 
 p1 ::
   ( Num e,
-    CountableDimensionsN n m,
-    FromListsN e n m,
-    FromListsN e m m,
+    CountableDimsN n m,
+    FLN e n m,
+    FLN e m m,
     TrivialE m n
   ) =>
   Matrix e (m + n) m
@@ -330,9 +330,9 @@ p1 = M I.p1
 
 p2 ::
   ( Num e,
-    CountableDimensionsN n m,
-    FromListsN e m n,
-    FromListsN e n n,
+    CountableDimsN n m,
+    FLN e m n,
+    FLN e n n,
     TrivialE m n
   ) =>
   Matrix e (m + n) n
@@ -342,9 +342,9 @@ p2 = M I.p2
 
 i1 ::
   ( Num e,
-    CountableDimensionsN n rows,
-    FromListsN e n rows,
-    FromListsN e rows rows,
+    CountableDimsN n rows,
+    FLN e n rows,
+    FLN e rows rows,
     TrivialE rows n
   ) =>
   Matrix e rows (rows + n)
@@ -352,9 +352,9 @@ i1 = tr p1
 
 i2 ::
   ( Num e,
-    CountableDimensionsN rows m,
-    FromListsN e m rows,
-    FromListsN e rows rows,
+    CountableDimsN rows m,
+    FLN e m rows,
+    FLN e rows rows,
     TrivialE m rows
   ) =>
   Matrix e rows (m + rows)
@@ -373,11 +373,11 @@ infixl 5 -|-
 -- | Coproduct Bifunctor (Direct sum)
 (-|-) ::
   ( Num e,
-    CountableDimensionsN j k,
-    FromListsN e k k,
-    FromListsN e j k,
-    FromListsN e k j,
-    FromListsN e j j,
+    CountableDimsN j k,
+    FLN e k k,
+    FLN e j k,
+    FLN e k j,
+    FLN e j j,
     TrivialE n m,
     TrivialE k j
   ) =>
@@ -390,9 +390,9 @@ infixl 5 -|-
 fstM ::
   forall e m k .
   ( Num e,
-    CountableDimensionsN m k,
+    CountableDimsN m k,
     CountableN (m * k),
-    FromListsN e (m * k) m,
+    FLN e (m * k) m,
     TrivialP m k
   ) => Matrix e (m * k) m
 fstM = M (I.fstM @e @(I.FromNat m) @(I.FromNat k))
@@ -401,8 +401,8 @@ fstM = M (I.fstM @e @(I.FromNat m) @(I.FromNat k))
 sndM ::
     forall e m k.
     ( Num e,
-      CountableDimensionsN k m,
-      FromListsN e (m * k) k,
+      CountableDimsN k m,
+      FLN e (m * k) k,
       CountableN (m * k),
       TrivialP m k
     ) => Matrix e (m * k) k
@@ -412,10 +412,10 @@ sndM = M (I.sndM @e @(I.FromNat m) @(I.FromNat k))
 kr ::
   forall e cols a b.
   ( Num e,
-    CountableDimensionsN a b,
+    CountableDimsN a b,
     CountableN (a * b),
-    FromListsN e (a * b) a,
-    FromListsN e (a * b) b,
+    FLN e (a * b) a,
+    FLN e (a * b) b,
     TrivialP a b
   ) => Matrix e cols a -> Matrix e cols b -> Matrix e cols (a * b)
 kr a b =
@@ -429,13 +429,13 @@ infixl 4 ><
 (><) ::
   forall e m p n q.
   ( Num e,
-    CountableDimensionsN m n,
-    CountableDimensionsN p q,
-    CountableDimensionsN (m * n) (p * q),
-    FromListsN e (m * n) m,
-    FromListsN e (m * n) n,
-    FromListsN e (p * q) p,
-    FromListsN e (p * q) q,
+    CountableDimsN m n,
+    CountableDimsN p q,
+    CountableDimsN (m * n) (p * q),
+    FLN e (m * n) m,
+    FLN e (m * n) n,
+    FLN e (p * q) p,
+    FLN e (p * q) q,
     TrivialP m n,
     TrivialP p q
   ) => Matrix e m p -> Matrix e n q -> Matrix e (m * n) (p * q)
@@ -459,7 +459,7 @@ tr (M m) = M (I.tr m)
 -- Selective 'select' operator
 select :: 
        ( Num e,
-         FromListsN e rows1 rows1,
+         FLN e rows1 rows1,
          CountableN rows1,
          I.FromNat rows2 ~ I.FromNat rows1,
          I.FromNat cols1 ~ I.FromNat cols2,
@@ -472,9 +472,9 @@ select (M m) (M y) = M (I.select m y)
 cond ::
      ( I.FromNat (I.Count (I.FromNat cols)) ~ I.FromNat cols,
        CountableN cols,
-       I.FromLists e () (I.FromNat cols),
-       I.FromLists e (I.FromNat cols) (),
-       FromListsN e cols cols,
+       I.FL () (I.FromNat cols),
+       I.FL (I.FromNat cols) (),
+       FLN e cols cols,
        Liftable e a Bool
      )
      =>
@@ -483,10 +483,10 @@ cond p (M a) (M b) = M (I.cond p a b)
 
 -- Pretty print
 
-pretty :: (CountableDimensionsN cols rows, Show e) => Matrix e cols rows -> String
+pretty :: (CountableDimsN cols rows, Show e) => Matrix e cols rows -> String
 pretty (M m) = I.pretty m
 
-prettyPrint :: (CountableDimensionsN cols rows, Show e) => Matrix e cols rows -> IO ()
+prettyPrint :: (CountableDimsN cols rows, Show e) => Matrix e cols rows -> IO ()
 prettyPrint (M m) = I.prettyPrint m
 
 -- | Zip two matrices with a given binary function

@@ -16,8 +16,8 @@ module LAoP.Dist.Internal
 
         Countable,
         CountableN,
-        CountableDimensionsN,
-        FromListsN,
+        CountableDimsN,
+        FLN,
         Liftable,
         TrivialP,
 
@@ -43,7 +43,7 @@ module LAoP.Dist.Internal
         )
     where
 
-import LAoP.Matrix.Type hiding (TrivialP, Countable, CountableDimensions, CountableN, CountableDimensionsN, Liftable, FromListsN)
+import LAoP.Matrix.Type hiding (TrivialP, Countable, CountableDims, CountableN, CountableDimsN, Liftable, FLN)
 import Prelude hiding (id, (.))
 import qualified LAoP.Matrix.Internal as I
 import LAoP.Utils
@@ -62,18 +62,18 @@ newtype Dist a = D (Matrix Prob () a)
   deriving (Show, Num, Eq, Ord, NFData) via (Matrix Prob () a)
 
 -- | Constraint type synonyms to keep the type signatures less convoluted
-type Countable a              = KnownNat (I.Count a)
-type CountableN a             = KnownNat (I.Count (I.Normalize a))
-type CountableDimensionsN a b = (CountableN a, CountableN b)
-type FromListsN a b           = I.FromLists Prob (I.Normalize a) (I.Normalize b)
-type Liftable a b             = (Bounded a, Bounded b, Enum a, Enum b, Eq b, Num Prob, Ord Prob)
-type TrivialP a b             = Normalize (a, b) ~ Normalize (Normalize a, Normalize b)
+type Countable a        = KnownNat (I.Count a)
+type CountableN a       = KnownNat (I.Count (I.Normalize a))
+type CountableDimsN a b = (CountableN a, CountableN b)
+type FLN a b            = I.FL (I.Normalize a) (I.Normalize b)
+type Liftable a b       = (Bounded a, Bounded b, Enum a, Enum b, Eq b, Num Prob, Ord Prob)
+type TrivialP a b       = Normalize (a, b) ~ Normalize (Normalize a, Normalize b)
 
 -- | Functor instance
 fmapD :: 
      ( Liftable a b,
-       CountableDimensionsN a b,
-       FromListsN b a
+       CountableDimsN a b,
+       FLN b a
      )
      =>
      (a -> b) -> Dist a -> Dist b
@@ -85,17 +85,17 @@ unitD = D (one 1)
 
 -- | Applicative/Monoidal instance 'mult' function
 multD :: 
-      ( CountableDimensionsN a b,
+      ( CountableDimsN a b,
         CountableN (a, b),
-        FromListsN (a, b) a,
-        FromListsN (a, b) b,
+        FLN (a, b) a,
+        FLN (a, b) b,
         TrivialP a b
       ) => Dist a -> Dist b -> Dist (a, b)
 multD (D a) (D b) = D (kr a b)
 
 -- | Selective instance function
 selectD :: 
-       ( FromListsN b b,
+       ( FLN b b,
          CountableN b
        ) => Dist (Either a b) -> Matrix Prob a b -> Dist b
 selectD (D d) m = D (selectM d m)
@@ -104,17 +104,17 @@ selectD (D d) m = D (selectM d m)
 -- functions to apply to a given argument; 
 branchD ::
        ( Num e,
-         CountableDimensionsN a b,
-         CountableDimensionsN c (Either b c),
-         FromListsN c b,
-         FromListsN a b,
-         FromListsN a a,
-         FromListsN b b,
-         FromListsN c c,
-         FromListsN b a,
-         FromListsN b c,
-         FromListsN (Either b c) b,
-         FromListsN (Either b c) c
+         CountableDimsN a b,
+         CountableDimsN c (Either b c),
+         FLN c b,
+         FLN a b,
+         FLN a a,
+         FLN b b,
+         FLN c c,
+         FLN b a,
+         FLN b c,
+         FLN (Either b c) b,
+         FLN (Either b c) c
        )
        => Dist (Either a b) -> Matrix Prob a c -> Matrix Prob b c -> Dist c
 branchD x l r = f x `selectD` g l `selectD` r
@@ -124,11 +124,11 @@ branchD x l r = f x `selectD` g l `selectD` r
 
 -- | Branch on a Boolean value, skipping unnecessary computations.
 ifD ::
-    ( CountableDimensionsN a (Either () a),
-      FromListsN a a,
-      FromListsN a (),
-      FromListsN () a,
-      FromListsN (Either () a) a
+    ( CountableDimsN a (Either () a),
+      FLN a a,
+      FLN a (),
+      FLN () a,
+      FLN (Either () a) a
     )
     => Dist Bool -> Dist a -> Dist a -> Dist a
 ifD x (D t) (D e) = branchD x' t e
@@ -136,7 +136,7 @@ ifD x (D t) (D e) = branchD x' t e
     x' = bool (Right ()) (Left ()) `fmapD` x
 
 -- | Monad instance 'return' function
-returnD :: forall a . (Enum a, FromListsN () a, Countable a) => a -> Dist a
+returnD :: forall a . (Enum a, FLN () a, Countable a) => a -> Dist a
 returnD a = D (col l)
     where
         i = fromInteger $ natVal (Proxy :: Proxy (Count a))
@@ -151,7 +151,7 @@ bindD (D d) m = D (m `comp` d)
 (??) :: 
      ( Enum a, 
        Countable a,
-       FromListsN () a
+       FLN () a
      ) => (a -> Bool) -> Dist a -> Prob
 (??) p d =
     let l = toValues d
@@ -161,11 +161,11 @@ bindD (D d) m = D (m `comp` d)
 -- Distribution Construction
 
 -- | Constructs a Bernoulli distribution
-choose :: (FromListsN () a) => Prob -> Dist a
+choose :: (FLN () a) => Prob -> Dist a
 choose prob = D (col [prob, 1 - prob])
 
 -- | Creates a distribution given a shape function
-shape :: (FromListsN () a) => (Prob -> Prob) -> [a] -> Dist a
+shape :: (FLN () a) => (Prob -> Prob) -> [a] -> Dist a
 shape _ [] = error "Probability.shape: empty list"
 shape f xs =
    let incr = 1 / fromIntegral (length xs - 1)
@@ -173,23 +173,23 @@ shape f xs =
    in  fromFreqs (zip xs ps)
 
 -- | Constructs a Linear distribution
-linear :: (FromListsN () a) => [a] -> Dist a
+linear :: (FLN () a) => [a] -> Dist a
 linear = shape id
 
 -- | Constructs an Uniform distribution
-uniform :: (FromListsN () a) => [a] -> Dist a
+uniform :: (FLN () a) => [a] -> Dist a
 uniform = shape (const 1)
 
 -- | Constructs an Negative Exponential distribution
-negExp :: (FromListsN () a) => [a] -> Dist a
+negExp :: (FLN () a) => [a] -> Dist a
 negExp = shape (\x -> exp (-x))
 
 -- | Constructs an Normal distribution
-normal :: (FromListsN () a) => [a] -> Dist a
+normal :: (FLN () a) => [a] -> Dist a
 normal = shape (normalCurve 0.5 0.5)
 
 -- | Transforms a 'Dist' into a list of pairs.
-toValues :: forall a . (Enum a, Countable a, FromListsN () a) => Dist a -> [(a, Prob)]
+toValues :: forall a . (Enum a, Countable a, FLN () a) => Dist a -> [(a, Prob)]
 toValues (D d) =
     let rows = fromInteger (natVal (Proxy :: Proxy (Count a)))
         probs = toList d
@@ -197,7 +197,7 @@ toValues (D d) =
      in res
 
 -- | Pretty a distribution
-prettyDist :: forall a. (Show a, Enum a, Countable a, FromListsN () a) => Dist a -> String
+prettyDist :: forall a. (Show a, Enum a, Countable a, FLN () a) => Dist a -> String
 prettyDist d =
     let values = sortBy (\(a, p1) (b, p2) -> compare p2 p1) (toValues @a d)
         w = maximum (map (length . show . fst) values)
@@ -209,12 +209,12 @@ prettyDist d =
     showR n x = show x ++ " " 
 
 -- | Pretty Print a distribution
-prettyPrintDist :: forall a . (Show a, Enum a, Countable a, FromListsN () a) => Dist a -> IO ()
+prettyPrintDist :: forall a . (Show a, Enum a, Countable a, FLN () a) => Dist a -> IO ()
 prettyPrintDist = putStrLn . prettyDist @a
 
 -- Auxiliary functions
 
-fromFreqs :: (FromListsN () a) => [(a,Prob)] -> Dist a
+fromFreqs :: (FLN () a) => [(a,Prob)] -> Dist a
 fromFreqs xs = D (col (map (\(x,p) -> p/q) xs))
            where q = sum $ map snd xs
 

@@ -39,8 +39,8 @@ module LAoP.Dist
     -- * Constraint type synonyms
     Countable,
     CountableN,
-    CountableDimensionsN,
-    FromListsN,
+    CountableDimsN,
+    FLN,
     Liftable,
     TrivialP,
 

@@ -15,8 +15,8 @@ module Benchmarks
 
 import LAoP.Dist.Internal
 import LAoP.Utils
-import LAoP.Matrix.Type hiding (CountableN, Countable, FromListsN)
-import qualified LAoP.Matrix.Type as T (FromListsN)
+import LAoP.Matrix.Type hiding (CountableN, Countable, FLN)
+import qualified LAoP.Matrix.Type as T (FLN)
 import Criterion.Main
 import Control.DeepSeq
 import Test.QuickCheck
@@ -26,13 +26,13 @@ import Prelude hiding (id, (.))
 
 selectM2 :: 
        ( Num e,
-         T.FromListsN e b b,
+         T.FLN b b,
          CountableN b
        ) => Matrix e cols (Either a b) -> Matrix e a b -> Matrix e cols b
 selectM2 m y = join y iden `comp` m
 
 selectD2 :: 
-       ( FromListsN b b,
+       ( FLN b b,
          CountableN b
        ) => Dist (Either a b) -> Matrix Prob a b -> Dist b
 selectD2 (D d) m = D (join m iden `comp` d)
@@ -40,7 +40,7 @@ selectD2 (D d) m = D (join m iden `comp` d)
 -- Composition with iden
 compId m = comp iden m
 
-randomDist :: forall a . (Countable a, FromListsN () a) => Gen (Dist a)
+randomDist :: forall a . (Countable a, FLN () a) => Gen (Dist a)
 randomDist = do
   let size = fromInteger (natVal (Proxy :: Proxy (Count a)))
   l <- vectorOf size (arbitrary :: Gen Prob)
@@ -49,7 +49,7 @@ randomDist = do
       m  = fromLists lr
   return (D m)
 
-randomMatrix :: forall a b . (CountableDimensions a b, FromListsN a b) => Gen (Matrix Prob a b)
+randomMatrix :: forall a b . (CountableDims a b, FLN a b) => Gen (Matrix Prob a b)
 randomMatrix = do
   let cols = fromInteger (natVal (Proxy :: Proxy (Count a)))
       rows = fromInteger (natVal (Proxy :: Proxy (Count b)))
@@ -108,7 +108,7 @@ normalize3 as l = let s  = sum l
                       probs = map (/ s) l
                    in zip as probs
 
-randomDistF :: forall a b . (CountableDimensions a b, CoArbitrary a, Arbitrary b) => Gen (Dist' (a -> b))
+randomDistF :: forall a b . (CountableDims a b, CoArbitrary a, Arbitrary b) => Gen (Dist' (a -> b))
 randomDistF = do
   let a = fromInteger (natVal (Proxy :: Proxy (Count a)))
       b = fromInteger (natVal (Proxy :: Proxy (Count b)))

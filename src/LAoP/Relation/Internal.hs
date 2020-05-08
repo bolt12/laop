@@ -43,10 +43,10 @@ module LAoP.Relation.Internal
 
     -- * Constraint type synonyms
     Countable,
-    CountableDimensions,
+    CountableDims,
     CountableN,
-    CountableDimensionsN,
-    FromListsN,
+    CountableDimsN,
+    FLN,
     Liftable,
     Trivial,
     TrivialP,
@@ -194,19 +194,19 @@ newtype Relation a b = R (I.Matrix Boolean (I.Normalize a) (I.Normalize b))
 deriving instance (Read (I.Matrix Boolean (I.Normalize a) (I.Normalize b))) => Read (Relation a b)
 
 -- | Constraint type synonyms to keep the type signatures less convoluted
-type Countable a              = KnownNat (I.Count a)
-type CountableDimensions a b  = (Countable a, Countable b)
-type CountableN a             = KnownNat (I.Count (I.Normalize a))
-type CountableDimensionsN a b = (CountableN a, CountableN b)
-type FromListsN a b           = I.FromLists Boolean (I.Normalize a) (I.Normalize b)
-type Liftable a b             = (Bounded a, Bounded b, Enum a, Enum b, Eq b, Num Boolean, Ord Boolean)
-type Trivial a                = I.Normalize a ~ I.Normalize (I.Normalize a)
-type TrivialP a b             = I.Normalize (a, b) ~ I.Normalize (I.Normalize a, I.Normalize b)
+type Countable a        = KnownNat (I.Count a)
+type CountableDims a b  = (Countable a, Countable b)
+type CountableN a       = KnownNat (I.Count (I.Normalize a))
+type CountableDimsN a b = (CountableN a, CountableN b)
+type FLN a b            = I.FromLists (I.Normalize a) (I.Normalize b)
+type Liftable a b       = (Bounded a, Bounded b, Enum a, Enum b, Eq b, Num Boolean, Ord Boolean)
+type Trivial a          = I.Normalize a ~ I.Normalize (I.Normalize a)
+type TrivialP a b       = I.Normalize (a, b) ~ I.Normalize (I.Normalize a, I.Normalize b)
 
 -- | It is possible to implement a constrained version of the category type
 -- class.
 instance Category Relation where
-  type Object Relation a = (FromListsN a a, CountableN a)
+  type Object Relation a = (FLN a a, CountableN a)
   id = iden
   (.) = comp
 
@@ -269,26 +269,26 @@ infixl 2 ===
 
 -- | Build a matrix out of a list of list of elements. Throws a runtime
 -- error if the dimensions do not match.
-fromLists :: (FromListsN a b) => [[Boolean]] -> Relation a b
+fromLists :: (FLN a b) => [[Boolean]] -> Relation a b
 fromLists = R . I.fromLists
 
 -- | Relation builder function. Constructs a relation provided with
 -- a construction function that operates with indices.
 relationBuilder' ::
-  (FromListsN a b, CountableDimensionsN a b) =>
+  (FLN a b, CountableDimsN a b) =>
   ((Int, Int) -> Boolean) -> Relation a b
 relationBuilder' = R . I.matrixBuilder'
 
 -- | Relation builder function. Constructs a relation provided with
 -- a construction function that operates with arbitrary types.
 relationBuilder ::
-  ( FromListsN a b,
+  ( FLN a b,
     Enum a,
     Enum b,
     Bounded a,
     Bounded b,
     Eq a,
-    CountableDimensionsN a b
+    CountableDimsN a b
   ) => ((a, b) -> Boolean) -> Relation a b
 relationBuilder = R . I.matrixBuilder
 
@@ -298,8 +298,8 @@ relationBuilder = R . I.matrixBuilder
 -- types @a@ or @b@ allows.
 fromF' :: 
       ( Liftable a b,
-        CountableDimensionsN c d,
-        FromListsN d c
+        CountableDimsN c d,
+        FLN d c
       )
       => (a -> b) -> Relation c d
 fromF' f = R (I.fromFRel' f)
@@ -308,8 +308,8 @@ fromF' f = R (I.fromFRel' f)
 -- cardinality's.
 fromF :: 
       ( Liftable a b,
-        CountableDimensionsN a b,
-        FromListsN b a
+        CountableDimsN a b,
+        FLN b a
       )
       => (a -> b) -> Relation a b
 fromF f = R (I.fromFRel f)
@@ -317,8 +317,8 @@ fromF f = R (I.fromFRel f)
 -- | Lifts relation functions to 'Relation'
 toRel ::
       ( Liftable a b,
-        CountableDimensionsN a b,
-        FromListsN b a
+        CountableDimsN a b,
+        FLN b a
       )
       => (a -> b -> Bool) -> Relation a b
 toRel = R . I.toRel
@@ -327,9 +327,9 @@ toRel = R . I.toRel
 fromRel ::
         ( Liftable a b,
           Eq a,
-          CountableDimensionsN a b,
-          FromListsN a One,
-          FromListsN b One
+          CountableDimsN a b,
+          FLN a One,
+          FLN b One
         )
         => Relation a b -> (a -> b -> Bool)
 fromRel r a b = pointApBool a b r
@@ -356,9 +356,9 @@ toBool r = case toList r of
 pt :: 
    ( Liftable a b,
      Eq a,
-     CountableDimensionsN a b,
-     FromListsN a One,
-     FromListsN b One
+     CountableDimsN a b,
+     FLN a One,
+     FLN b One
    )
    => Relation a b -> (a -> List b)
 pt r a =
@@ -370,8 +370,8 @@ belongs ::
         ( Bounded a,
           Enum a,
           Eq a,
-          CountableDimensionsN (List a) a,
-          FromListsN a (List a)
+          CountableDimsN (List a) a,
+          FLN a (List a)
         )
         => Relation (List a) a
 belongs = toRel elemR
@@ -390,7 +390,7 @@ belongs = toRel elemR
 --   ⊥ ``sse`` R && R ``sse`` T == True
 --   @
 zeros ::
-  (FromListsN a b, CountableDimensionsN a b) =>
+  (FLN a b, CountableDimsN a b) =>
   Relation a b
 zeros = relationBuilder' (const (nat 0))
 
@@ -405,7 +405,7 @@ zeros = relationBuilder' (const (nat 0))
 --   ⊥ ``sse`` R && R ``sse`` T == True
 --   @
 ones ::
-  (FromListsN a b, CountableDimensionsN a b) =>
+  (FLN a b, CountableDimsN a b) =>
   Relation a b
 ones = relationBuilder' (const (nat 1))
 
@@ -413,7 +413,7 @@ ones = relationBuilder' (const (nat 1))
 
 -- | The T (Top) row vector relation.
 bang ::
-  (FromListsN a One, CountableN a) =>
+  (FLN a One, CountableN a) =>
   Relation a One
 bang = ones
 
@@ -423,7 +423,7 @@ point ::
         Enum a,
         Eq a,
         CountableN a,
-        FromListsN a One
+        FLN a One
       ) => a -> Relation One a
 point = fromF . const
 
@@ -435,7 +435,7 @@ point = fromF . const
 -- 'iden' `.` r == r == r `.` 'iden'
 -- @
 iden ::
-  (FromListsN a a, CountableN a) => Relation a a
+  (FLN a a, CountableN a) => Relation a a
 iden = relationBuilder' (bool (nat 0) (nat 1) . uncurry (==))
 
 -- | Relational composition
@@ -489,7 +489,7 @@ shrunkBy r s = r `intersection` divR s (conv r)
 -- r ``overriddenBy`` r       == r
 -- @
 overriddenBy :: 
-             ( FromListsN b b,
+             ( FLN b b,
                CountableN b
              ) => Relation a b -> Relation a b -> Relation a b
 overriddenBy r s = s `union` r `intersection` divR zeros (conv s)
@@ -501,9 +501,9 @@ overriddenBy r s = s `union` r `intersection` divR zeros (conv s)
 pointAp ::
         ( Liftable a b,
           Eq a,
-          CountableDimensionsN a b,
-          FromListsN a One,
-          FromListsN b One
+          CountableDimsN a b,
+          FLN a One,
+          FLN b One
         ) => a -> b -> Relation a b -> Relation One One
 pointAp a b r = conv (point b) . r . point a
 
@@ -513,9 +513,9 @@ pointAp a b r = conv (point b) . r . point a
 pointApBool ::
         ( Liftable a b,
           Eq a,
-          CountableDimensionsN a b,
-          FromListsN a One,
-          FromListsN b One
+          CountableDimsN a b,
+          FLN a One,
+          FLN b One
         ) => a -> b -> Relation a b -> Bool
 pointApBool a b r = toBool $ conv (point b) . r . point a
 
@@ -595,19 +595,19 @@ divisionF f g = conv g . f
 -- Taxonomy of binary relations
 
 -- | A 'Relation' @r@ is 'simple' 'iff' @'coreflexive' ('img' r)@
-simple :: (CountableN b, FromListsN b b) => Relation a b -> Bool
+simple :: (CountableN b, FLN b b) => Relation a b -> Bool
 simple = coreflexive . img
 
 -- | A 'Relation' @r@ is 'injective' 'iff' @'coreflexive' ('ker' r)@
-injective :: (CountableN a, FromListsN a a) => Relation a b -> Bool
+injective :: (CountableN a, FLN a a) => Relation a b -> Bool
 injective = coreflexive . ker
 
 -- | A 'Relation' @r@ is 'entire' 'iff' @'reflexive' ('ker' r)@
-entire :: (CountableN a, FromListsN a a) => Relation a b -> Bool
+entire :: (CountableN a, FLN a a) => Relation a b -> Bool
 entire = reflexive . ker
 
 -- | A 'Relation' @r@ is 'surjective' 'iff' @'reflexive' ('img' r)@
-surjective :: (CountableN b, FromListsN b b) => Relation a b -> Bool
+surjective :: (CountableN b, FLN b b) => Relation a b -> Bool
 surjective = reflexive . img
 
 -- | A 'Relation' @r@ is a 'function' 'iff' @'simple' r && 'entire' r@
@@ -620,9 +620,9 @@ surjective = reflexive . img
 -- r `.` f ``sse`` s == r ``sse`` s `.` f
 -- @
 function :: 
-         ( CountableDimensionsN a b,
-           FromListsN a a,
-           FromListsN b b
+         ( CountableDimsN a b,
+           FLN a a,
+           FLN b b
          ) 
          => Relation a b -> Bool
 function r = simple r && entire r
@@ -630,7 +630,7 @@ function r = simple r && entire r
 -- | A 'Relation' @r@ is a 'representation' 'iff' @'injective' r && 'entire' r@
 representation ::
                ( CountableN a,
-                 FromListsN a a
+                 FLN a a
                )
                => Relation a b -> Bool
 representation r = injective r && entire r
@@ -638,45 +638,45 @@ representation r = injective r && entire r
 -- | A 'Relation' @r@ is an 'abstraction' 'iff' @'surjective' r && 'simple' r@
 abstraction ::
             ( CountableN b,
-              FromListsN b b
+              FLN b b
             )
             => Relation a b -> Bool
 abstraction r = surjective r && simple r
 
 -- | A 'Relation' @r@ is a 'surjection' 'iff' @'function' r && 'abstraction' r@
 surjection ::
-           ( CountableDimensionsN a b,
-             FromListsN a a,
-             FromListsN b b
+           ( CountableDimsN a b,
+             FLN a a,
+             FLN b b
            )
            => Relation a b -> Bool
 surjection r = function r && abstraction r
 
 -- | A 'Relation' @r@ is a 'injection' 'iff' @'function' r && 'representation' r@
 injection ::
-           ( CountableDimensionsN a b,
-             FromListsN a a,
-             FromListsN b b
+           ( CountableDimsN a b,
+             FLN a a,
+             FLN b b
            )
            => Relation a b -> Bool
 injection r = function r && representation r
 
 -- | A 'Relation' @r@ is an 'bijection' 'iff' @'injection' r && 'surjection' r@
 bijection :: 
-          ( CountableDimensionsN a b,
-            FromListsN b b,
-            FromListsN a a
+          ( CountableDimsN a b,
+            FLN b b,
+            FLN a a
           ) => Relation a b -> Bool
 bijection r = injection r && surjection r
 
 -- Properties of relations
 
 -- | A 'Relation' @r@ is 'reflexive' 'iff' @'id' ``sse`` r@
-reflexive :: (CountableN a, FromListsN a a) => Relation a a -> Bool
+reflexive :: (CountableN a, FLN a a) => Relation a a -> Bool
 reflexive r = id <= r
 
 -- | A 'Relation' @r@ is 'coreflexive' 'iff' @r ``sse`` 'id'@
-coreflexive :: (CountableN a, FromListsN a a) => Relation a a -> Bool
+coreflexive :: (CountableN a, FLN a a) => Relation a a -> Bool
 coreflexive r = r <= id
 
 -- | A 'Relation' @r@ is 'transitive' 'iff' @(r `.` r) ``sse`` r@
@@ -688,35 +688,35 @@ symmetric :: Relation a a -> Bool
 symmetric r = r == conv r
 
 -- | A 'Relation' @r@ is anti-symmetric 'iff' @(r ``intersection`` 'conv' r) ``sse`` 'id'@
-antiSymmetric :: (CountableN a, FromListsN a a) => Relation a a -> Bool
+antiSymmetric :: (CountableN a, FLN a a) => Relation a a -> Bool
 antiSymmetric r = (r `intersection` conv r) `sse` id
 
 -- | A 'Relation' @r@ is 'irreflexive' 'iff' @(r ``intersection`` 'id') == 'zeros'@
-irreflexive :: (CountableN a, FromListsN a a) => Relation a a -> Bool
+irreflexive :: (CountableN a, FLN a a) => Relation a a -> Bool
 irreflexive r = (r `intersection` id) == zeros
 
 -- | A 'Relation' @r@ is 'connected' 'iff' @(r ``union`` 'conv' r) == 'ones'@
-connected :: (CountableN a, FromListsN a a) => Relation a a -> Bool
+connected :: (CountableN a, FLN a a) => Relation a a -> Bool
 connected r = (r `union` conv r) == ones
 
 -- | A 'Relation' @r@ is a 'preorder' 'iff' @'reflexive' r && 'transitive' r@
-preorder :: (CountableN a, FromListsN a a) => Relation a a -> Bool
+preorder :: (CountableN a, FLN a a) => Relation a a -> Bool
 preorder r = reflexive r && transitive r
 
 -- | A 'Relation' @r@ is a partial-order 'iff' @'antiSymmetric' r && 'preorder' r@
-partialOrder :: (CountableN a, FromListsN a a) => Relation a a -> Bool
+partialOrder :: (CountableN a, FLN a a) => Relation a a -> Bool
 partialOrder r = antiSymmetric r && preorder r
 
 -- | A 'Relation' @r@ is a linear-order 'iff' @'connected' r && 'partialOrder' r@
-linearOrder :: (CountableN a, FromListsN a a) => Relation a a -> Bool
+linearOrder :: (CountableN a, FLN a a) => Relation a a -> Bool
 linearOrder r = connected r && partialOrder r
 
 -- | A 'Relation' @r@ is an 'equivalence' 'iff' @'symmetric' r && 'preorder' r@
-equivalence :: (CountableN a, FromListsN a a) => Relation a a -> Bool
+equivalence :: (CountableN a, FLN a a) => Relation a a -> Bool
 equivalence r = symmetric r && preorder r
 
 -- | A 'Relation' @r@ is a partial-equivalence 'iff' @'partialOrder' r && 'equivalence' r@
-partialEquivalence :: (CountableN a, FromListsN a a) => Relation a a -> Bool
+partialEquivalence :: (CountableN a, FLN a a) => Relation a a -> Bool
 partialEquivalence r = partialOrder r && equivalence r
 
 -- | A 'Relation' @r@ is 'difunctional' or regular wherever 
@@ -748,10 +748,10 @@ difunctional r = r . conv r . r == r
 -- 'eitherR' ('splitR' r s) ('splitR' t v) == 'splitR' ('eitherR' r t) ('eitherR' s v)
 -- @
 splitR :: 
-       ( CountableDimensionsN a b,
+       ( CountableDimsN a b,
          CountableN (a, b),
-         FromListsN (a, b) a,
-         FromListsN (a, b) b,
+         FLN (a, b) a,
+         FLN (a, b) b,
          TrivialP a b
        )
        => Relation c a -> Relation c b -> Relation c (a, b)
@@ -764,9 +764,9 @@ splitR (R f) (R g) = R (I.kr f g)
 -- @
 fstR ::
    forall a b .
-   ( CountableDimensionsN a b,
+   ( CountableDimsN a b,
      CountableN (a, b),
-     FromListsN (a, b) a,
+     FLN (a, b) a,
      TrivialP a b
    )
    => Relation (a, b) a
@@ -779,9 +779,9 @@ fstR = R (I.fstM @Boolean @(I.Normalize a) @(I.Normalize b))
 -- @
 sndR ::
    forall a b .
-   ( CountableDimensionsN a b,
+   ( CountableDimsN a b,
      CountableN (a, b),
-     FromListsN (a, b) b,
+     FLN (a, b) b,
      TrivialP a b
    )
    => Relation (a, b) b
@@ -797,13 +797,13 @@ infixl 4 ><
 -- (r '><' s) `.` (p '><' q) == (r `.` p) '><' (s `.` q)
 -- @
 (><) ::
-     ( CountableDimensionsN a b,
-       CountableDimensionsN c d,
-       CountableDimensionsN (a, c) (b, d),
-       FromListsN (a, c) a,
-       FromListsN (a, c) c,
-       FromListsN (b, d) b,
-       FromListsN (b, d) d,
+     ( CountableDimsN a b,
+       CountableDimsN c d,
+       CountableDimsN (a, c) (b, d),
+       FLN (a, c) a,
+       FLN (a, c) c,
+       FLN (b, d) b,
+       FLN (b, d) d,
        TrivialP a c,
        TrivialP b d
      )
@@ -837,9 +837,9 @@ eitherR = join
 -- 'i1' `.` 'i2' = 'zeros'
 -- @
 i1 :: 
-   ( CountableDimensionsN a b,
-     FromListsN b a,
-     FromListsN a a
+   ( CountableDimsN a b,
+     FLN b a,
+     FLN a a
    )
    => Relation a (Either a b)
 i1 = R I.i1
@@ -851,9 +851,9 @@ i1 = R I.i1
 -- 'i1' `.` 'i2' = 'zeros'
 -- @
 i2 :: 
-   ( CountableDimensionsN a b,
-     FromListsN a b,
-     FromListsN b b
+   ( CountableDimsN a b,
+     FLN a b,
+     FLN b b
    )
    => Relation b (Either a b)
 i2 = R I.i2
@@ -866,11 +866,11 @@ infixl 5 -|-
 -- r '-|-' s == 'eitherR' ('i1' `.` r) ('i2' `.` s)
 -- @
 (-|-) ::
-  ( CountableDimensionsN b d,
-    FromListsN b b,
-    FromListsN d b,
-    FromListsN b d,
-    FromListsN d d
+  ( CountableDimsN b d,
+    FLN b b,
+    FLN d b,
+    FLN b d,
+    FLN d d
   ) 
   => Relation a b -> Relation c d -> Relation (Either a c) (Either b d)
 (-|-) (R a) (R b) = R ((I.-|-) a b)
@@ -883,13 +883,13 @@ infixl 5 -|-
 -- 'trans'/'untrans';
 -- more-over, where each particular attribute is placed (input/output) is irrelevant.
 trans :: 
-      ( CountableDimensionsN a b,
+      ( CountableDimsN a b,
         CountableN c,
-        CountableDimensionsN (a, b) (c, b),
-        FromListsN (c, b) c,
-        FromListsN (c, b) b,
-        FromListsN (a, b) a,
-        FromListsN (a, b) b,
+        CountableDimsN (a, b) (c, b),
+        FLN (c, b) c,
+        FLN (c, b) b,
+        FLN (a, b) a,
+        FLN (a, b) b,
         Trivial (a, b),
         Trivial (c, b),
         TrivialP a b,
@@ -904,13 +904,13 @@ trans r = splitR r sndR . conv fstR
 -- 'trans'/'untrans';
 -- more-over, where each particular attribute is placed (input/output) is irrelevant.
 untrans ::
-        ( CountableDimensionsN a b,
+        ( CountableDimsN a b,
           CountableN c,
-          CountableDimensionsN (a, b) (c, b),
-          FromListsN (c, b) c,
-          FromListsN (c, b) b,
-          FromListsN (a, b) b,
-          FromListsN (a, b) a,
+          CountableDimsN (a, b) (c, b),
+          FLN (c, b) c,
+          FLN (c, b) b,
+          FLN (a, b) b,
+          FLN (a, b) a,
           Trivial (a, b),
           Trivial (c, b),
           TrivialP a b,
@@ -933,8 +933,8 @@ predR ::
       ( Bounded a,
         Enum a,
         CountableN a,
-        FromListsN a a,
-        FromListsN Bool a
+        FLN a a,
+        FLN Bool a
       )
       => Relation a Bool -> Relation a a
 predR p = id `intersection` divisionF (fromF (const True)) p
@@ -949,7 +949,7 @@ predR p = id `intersection` divisionF (fromF (const True)) p
 -- @
 equalizer ::
           ( CountableN a,
-            FromListsN a a
+            FLN a a
           )
           => Relation a b -> Relation a b -> Relation a a
 equalizer f g = id `intersection` divisionF f g
@@ -963,8 +963,8 @@ guard ::
      ( Bounded b,
        Enum b,
        CountableN b,
-       FromListsN b b,
-       FromListsN Bool b
+       FLN b b,
+       FLN Bool b
      ) => Relation b Bool -> Relation b (Either b b)
 guard p = conv (eitherR (predR p) (predR (negate p)))
 
@@ -973,8 +973,8 @@ cond ::
      ( Bounded b,
        Enum b,
        CountableN b,
-       FromListsN b b,
-       FromListsN Bool b
+       FLN b b,
+       FLN Bool b
      ) 
      => Relation b Bool -> Relation b c -> Relation b c -> Relation b c
 cond p r s = eitherR r s . guard p
@@ -985,7 +985,7 @@ cond p r s = eitherR r s . guard p
 -- since @'ker' r ``sse`` 'id'@ in such situations.
 domain :: 
        ( CountableN a,
-         FromListsN a a
+         FLN a a
        ) => Relation a b -> Relation a a
 domain r = ker r `intersection` id
 
@@ -995,16 +995,16 @@ domain r = ker r `intersection` id
 -- since @'img' f ``sse`` id@ for any @f@.
 range :: 
       ( CountableN b,
-        FromListsN b b
+        FLN b b
       ) => Relation a b -> Relation b b
 range r = img r `intersection` id
 
 -- Relation pretty print
 
 -- | Relation pretty printing
-pretty :: (CountableDimensionsN a b) => Relation a b -> String
+pretty :: (CountableDimsN a b) => Relation a b -> String
 pretty (R a) = I.pretty a
 
 -- | Relation pretty printing
-prettyPrint :: (CountableDimensionsN a b) => Relation a b -> IO ()
+prettyPrint :: (CountableDimsN a b) => Relation a b -> IO ()
 prettyPrint (R a) = I.prettyPrint a

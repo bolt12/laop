@@ -32,10 +32,10 @@ module LAoP.Relation
 
     -- * Constraint type synonyms
     Countable,
-    CountableDimensions,
+    CountableDims,
     CountableN,
-    CountableDimensionsN,
-    FromListsN,
+    CountableDimsN,
+    FLN,
     Liftable,
     Trivial,
     TrivialP,

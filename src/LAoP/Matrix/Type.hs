@@ -6,7 +6,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NoStarIsType #-}
 {-# LANGUAGE RankNTypes #-}
@@ -59,10 +58,10 @@ module LAoP.Matrix.Type
 
     -- * Constraint type aliases
     Countable,
-    CountableDimensions,
+    CountableDims,
     CountableN,
-    CountableDimensionsN,
-    FromListsN,
+    CountableDimsN,
+    FLN,
     Liftable,
     Trivial,
     TrivialP,
@@ -183,7 +182,7 @@ where
 import Data.Void
 import Data.Proxy
 import Data.Kind
-import GHC.TypeLits 
+import GHC.TypeLits
 import Control.DeepSeq
 import LAoP.Utils
 import qualified LAoP.Matrix.Internal as I
@@ -193,21 +192,21 @@ newtype Matrix e (cols :: Type) (rows :: Type) = M (I.Matrix e (I.Normalize cols
   deriving (Show, Num, Eq, Ord, NFData) via (I.Matrix e (I.Normalize cols) (I.Normalize rows))
 
 -- | Constraint type synonyms to keep the type signatures less convoluted
-type Countable a              = KnownNat (I.Count a)
-type CountableDimensions a b  = (Countable a, Countable b)
-type CountableN a             = KnownNat (I.Count (I.Normalize a))
-type CountableDimensionsN a b = (CountableN a, CountableN b)
-type FromListsN e a b         = I.FromLists e (I.Normalize a) (I.Normalize b)
-type Liftable e a b           = (Bounded a, Bounded b, Enum a, Enum b, Eq b, Num e, Ord e)
-type Trivial a                = I.Normalize (I.Normalize a) ~ I.Normalize (I.Normalize (I.Normalize a))
-type Trivial2 a               = I.Normalize a ~ I.Normalize (I.Normalize a)
-type Trivial3 a               = I.FromNat (I.Count (I.Normalize (I.Normalize a))) ~ I.Normalize (I.Normalize a)
-type TrivialP a b             = I.Normalize (a, b) ~ I.Normalize (I.Normalize a, I.Normalize b)
+type Countable a        = KnownNat (I.Count a)
+type CountableDims a b  = (Countable a, Countable b)
+type CountableN a       = KnownNat (I.Count (I.Normalize a))
+type CountableDimsN a b = (CountableN a, CountableN b)
+type FLN a b            = I.FromLists (I.Normalize a) (I.Normalize b)
+type Liftable e a b     = (Bounded a, Bounded b, Enum a, Enum b, Eq b, Num e, Ord e)
+type Trivial a          = I.Normalize (I.Normalize a) ~ I.Normalize (I.Normalize (I.Normalize a))
+type Trivial2 a         = I.Normalize a ~ I.Normalize (I.Normalize a)
+type Trivial3 a         = I.FromNat (I.Count (I.Normalize (I.Normalize a))) ~ I.Normalize (I.Normalize a)
+type TrivialP a b       = I.Normalize (a, b) ~ I.Normalize (I.Normalize a, I.Normalize b)
 
 -- | It is possible to implement a constrained version of the category type
 -- class.
 instance (Num e) => Category (Matrix e) where
-  type Object (Matrix e) a = (FromListsN e a a, CountableN a)
+  type Object (Matrix e) a = (FLN a a, CountableN a)
   id = iden
   (.) = comp
 
@@ -215,10 +214,10 @@ instance (Num e) => Category (Matrix e) where
 bimapM ::
        ( Liftable e a b,
          Liftable e c d,
-         CountableDimensionsN a c,
-         CountableDimensionsN b d,
-         FromListsN e d c,
-         FromListsN e b a
+         CountableDimsN a c,
+         CountableDimsN b d,
+         FLN d c,
+         FLN b a
        ) => (a -> b) -> (c -> d) -> Matrix e a c -> Matrix e b d
 bimapM f g m = fromF g . m . tr (fromF f)
 
@@ -273,8 +272,8 @@ infixl 2 ===
 -- | Functor instance equivalent function
 fmapM :: 
      ( Liftable e a b,
-       CountableDimensionsN a b,
-       FromListsN e b a
+       CountableDimsN a b,
+       FLN b a
      )
      =>
      (a -> b) -> Matrix e c a -> Matrix e c b
@@ -286,11 +285,11 @@ unitM = one 1
 
 -- | Applicative instance equivalent 'unit' function,
 multM :: 
-      ( CountableDimensionsN a b,
+      ( CountableDimsN a b,
         CountableN (a, b),
         Num e,
-        FromListsN e (a, b) a,
-        FromListsN e (a, b) b,
+        FLN (a, b) a,
+        FLN (a, b) b,
         TrivialP a b
       ) => Matrix e c a -> Matrix e c b -> Matrix e c (a, b)
 multM = kr
@@ -301,7 +300,7 @@ returnM ::
         ( Num e,
           Enum e,
           Enum a,
-          FromListsN e () a,
+          FLN () a,
           Countable a
         ) => a -> Matrix e One a
 returnM a = col l
@@ -318,35 +317,35 @@ bindM = flip comp
 
 -- | Build a matrix out of a list of list of elements. Throws a runtime
 -- error if the dimensions do not match.
-fromLists :: (FromListsN e cols rows) => [[e]] -> Matrix e cols rows
+fromLists :: (FLN cols rows) => [[e]] -> Matrix e cols rows
 fromLists = M . I.fromLists
 
 -- | Matrix builder function. Constructs a matrix provided with
 -- a construction function that operates with indices.
 matrixBuilder' ::
-  (FromListsN e cols rows, CountableDimensionsN cols rows )
+  (FLN cols rows, CountableDimsN cols rows )
   => ((Int, Int) -> e) -> Matrix e cols rows
 matrixBuilder' = M . I.matrixBuilder'
 
 -- | Matrix builder function. Constructs a matrix provided with
 -- a construction function that operates with arbitrary types.
 matrixBuilder ::
-  ( FromListsN e a b,
+  ( FLN a b,
     Enum a,
     Enum b,
     Bounded a,
     Bounded b,
     Eq a,
-    CountableDimensionsN a b
+    CountableDimsN a b
   ) => ((a, b) -> e) -> Matrix e a b
 matrixBuilder f = M (I.matrixBuilder f)
 
 -- | Constructs a column vector matrix
-col :: (FromListsN e () rows) => [e] -> Matrix e One rows
+col :: (FLN () rows) => [e] -> Matrix e One rows
 col = M . I.col
 
 -- | Constructs a row vector matrix
-row :: (FromListsN e cols ()) => [e] -> Matrix e cols One
+row :: (FLN cols ()) => [e] -> Matrix e cols One
 row = M . I.row
 
 -- | Lifts functions to matrices with arbitrary dimensions.
@@ -355,8 +354,8 @@ row = M . I.row
 -- types @a@ or @b@ allows.
 fromF' ::
   ( Liftable e a b,
-    CountableDimensionsN cols rows,
-    FromListsN e rows cols
+    CountableDimsN cols rows,
+    FLN rows cols
   ) =>
   (a -> b) -> Matrix e cols rows
 fromF' = M . I.fromF'
@@ -365,8 +364,8 @@ fromF' = M . I.fromF'
 -- cardinality's.
 fromF ::
   ( Liftable e a b,
-    CountableDimensionsN a b,
-    FromListsN e b a
+    CountableDimsN a b,
+    FLN b a
   ) =>
   (a -> b) -> Matrix e a b
 fromF = M . I.fromF
@@ -374,8 +373,8 @@ fromF = M . I.fromF
 -- | Lifts relation functions to Boolean Matrix
 toRel ::
   ( Liftable (Natural 0 1) a b,
-    CountableDimensionsN a b,
-    FromListsN (Natural 0 1) b a
+    CountableDimsN a b,
+    FLN b a
   ) => (a -> b -> Bool) -> Matrix (Natural 0 1) a b
 toRel = M . I.toRel
 
@@ -393,7 +392,7 @@ toList (M m) = I.toList m
 
 -- | The zero matrix. A matrix wholly filled with zeros.
 zeros ::
-  (Num e, FromListsN e cols rows, CountableDimensionsN cols rows) 
+  (Num e, FLN cols rows, CountableDimsN cols rows) 
   => Matrix e cols rows
 zeros = M I.zeros
 
@@ -403,7 +402,7 @@ zeros = M I.zeros
 --
 --   Also known as T (Top) matrix.
 ones ::
-  (Num e, FromListsN e cols rows, CountableDimensionsN cols rows) 
+  (Num e, FLN cols rows, CountableDimsN cols rows) 
   => Matrix e cols rows
 ones = M I.ones
 
@@ -412,7 +411,7 @@ ones = M I.ones
 -- | The constant matrix constructor. A matrix wholly filled with a given
 -- value.
 constant ::
-  (Num e, FromListsN e cols rows, CountableDimensionsN cols rows) 
+  (Num e, FLN cols rows, CountableDimsN cols rows) 
   => e -> Matrix e cols rows
 constant = M . I.constant
 
@@ -421,7 +420,7 @@ constant = M . I.constant
 -- | The T (Top) row vector matrix.
 bang ::
   forall e cols.
-  (Num e, Enum e, FromListsN e cols (), CountableN cols) =>
+  (Num e, Enum e, FLN cols (), CountableN cols) =>
   Matrix e cols One
 bang = M I.bang
 
@@ -433,7 +432,7 @@ point ::
         Num e,
         Ord e,
         CountableN a,
-        FromListsN e a One
+        FLN a One
       ) => a -> Matrix e One a
 point = fromF . const
 
@@ -441,7 +440,7 @@ point = fromF . const
 
 -- | iden matrix
 iden ::
-  (Num e, FromListsN e a a, CountableN a) =>
+  (Num e, FLN a a, CountableN a) =>
   Matrix e a a
 iden = M I.iden
 {-# NOINLINE iden #-}
@@ -477,9 +476,9 @@ infixl 7 ./
 -- | Biproduct first component projection
 p1 ::
   ( Num e,
-    CountableDimensionsN n m,
-    FromListsN e n m,
-    FromListsN e m m
+    CountableDimsN n m,
+    FLN n m,
+    FLN m m
   ) =>
   Matrix e (Either m n) m
 p1 = M I.p1
@@ -487,9 +486,9 @@ p1 = M I.p1
 -- | Biproduct second component projection
 p2 ::
   ( Num e,
-    CountableDimensionsN n m,
-    FromListsN e m n,
-    FromListsN e n n
+    CountableDimsN n m,
+    FLN m n,
+    FLN n n
   ) =>
   Matrix e (Either m n) n
 p2 = M I.p2
@@ -499,9 +498,9 @@ p2 = M I.p2
 -- | Biproduct first component injection
 i1 ::
   ( Num e,
-    CountableDimensionsN n m,
-    FromListsN e n m,
-    FromListsN e m m
+    CountableDimsN n m,
+    FLN n m,
+    FLN m m
   ) =>
   Matrix e m (Either m n)
 i1 = tr p1
@@ -509,9 +508,9 @@ i1 = tr p1
 -- | Biproduct second component injection
 i2 ::
   ( Num e,
-    CountableDimensionsN n m,
-    FromListsN e m n,
-    FromListsN e n n
+    CountableDimsN n m,
+    FLN m n,
+    FLN n n
   ) =>
   Matrix e n (Either m n)
 i2 = tr p2
@@ -545,11 +544,11 @@ infixl 5 -|-
 -- | Matrix coproduct functor also known as matrix direct sum.
 (-|-) ::
   ( Num e,
-    CountableDimensionsN j k,
-    FromListsN e k k,
-    FromListsN e j k,
-    FromListsN e k j,
-    FromListsN e j j
+    CountableDimsN j k,
+    FLN k k,
+    FLN j k,
+    FLN k j,
+    FLN j j
   ) =>
   Matrix e n k ->
   Matrix e m j ->
@@ -562,9 +561,9 @@ infixl 5 -|-
 fstM :: 
   forall e m k .
   ( Num e,
-    CountableDimensionsN m k,
+    CountableDimsN m k,
     CountableN (m, k),
-    FromListsN e (m, k) m,
+    FLN (m, k) m,
     TrivialP m k
   ) => Matrix e (m, k) m
 fstM = M (I.fstM @e @(I.Normalize m) @(I.Normalize k))
@@ -573,9 +572,9 @@ fstM = M (I.fstM @e @(I.Normalize m) @(I.Normalize k))
 sndM :: 
     forall e m k.
     ( Num e,
-      CountableDimensionsN k m,
+      CountableDimsN k m,
       CountableN (m, k),
-      FromListsN e (m, k) k,
+      FLN (m, k) k,
       TrivialP m k
     ) => Matrix e (m, k) k
 sndM = M (I.sndM @e @(I.Normalize m) @(I.Normalize k))
@@ -594,10 +593,10 @@ sndM = M (I.sndM @e @(I.Normalize m) @(I.Normalize k))
 kr ::
   forall e cols a b.
   ( Num e,
-    CountableDimensionsN a b,
+    CountableDimsN a b,
     CountableN (a, b),
-    FromListsN e (a, b) a,
-    FromListsN e (a, b) b,
+    FLN (a, b) a,
+    FLN (a, b) b,
     TrivialP a b
   ) => Matrix e cols a -> Matrix e cols b -> Matrix e cols (a, b)
 kr a b =
@@ -613,13 +612,13 @@ infixl 4 ><
 (><) ::
   forall e m p n q.
   ( Num e,
-    CountableDimensionsN m n,
-    CountableDimensionsN p q,
-    CountableDimensionsN (m, n) (p, q),
-    FromListsN e (m, n) m,
-    FromListsN e (m, n) n,
-    FromListsN e (p, q) p,
-    FromListsN e (p, q) q,
+    CountableDimsN m n,
+    CountableDimsN p q,
+    CountableDimsN (m, n) (p, q),
+    FLN (m, n) m,
+    FLN (m, n) n,
+    FLN (p, q) p,
+    FLN (p, q) q,
     TrivialP m n,
     TrivialP p q
   ) => Matrix e m p -> Matrix e n q -> Matrix e (m, n) (p, q)
@@ -664,7 +663,7 @@ tr (M m) = M (I.tr m)
 -- ArrowMonad solution presented in the paper.
 selectM :: 
        ( Num e,
-         FromListsN e b b,
+         FLN b b,
          CountableN b
        ) => Matrix e cols (Either a b) -> Matrix e a b -> Matrix e cols b
 selectM (M m) (M y) = M (I.select m y)
@@ -677,9 +676,9 @@ cond ::
        Trivial2 a,
        Trivial3 a,
        CountableN a,
-       FromListsN e () a,
-       FromListsN e a (),
-       FromListsN e a a,
+       FLN () a,
+       FLN a (),
+       FLN a a,
        Liftable e a Bool
      )
      =>
@@ -689,11 +688,11 @@ cond p (M a) (M b) = M (I.cond p a b)
 -- Pretty print
 
 -- | Matrix pretty printer
-pretty :: (CountableDimensionsN cols rows, Show e) => Matrix e cols rows -> String
+pretty :: (CountableDimsN cols rows, Show e) => Matrix e cols rows -> String
 pretty (M m) = I.pretty m
 
 -- | Matrix pretty printer
-prettyPrint :: (CountableDimensionsN cols rows, Show e) => Matrix e cols rows -> IO ()
+prettyPrint :: (CountableDimsN cols rows, Show e) => Matrix e cols rows -> IO ()
 prettyPrint (M m) = I.prettyPrint m
 
 -- | Zip two matrices with a given binary function
