@@ -104,8 +104,8 @@ module LAoP.Matrix.Type
     multM,
 
     -- * Selective equivalent instance function
-    selectM, 
-    
+    selectM,
+
     -- * Monad equivalent instance function
     returnM,
     bindM,
@@ -113,7 +113,9 @@ module LAoP.Matrix.Type
     -- * Misc
     -- ** Get dimensions
     columns,
+    columns',
     rows,
+    rows',
 
     -- ** Matrix Transposition
     tr,
@@ -265,7 +267,7 @@ infixl 2 ===
 -- Functor hierarchy
 
 -- | Functor instance equivalent function
-fmapM :: 
+fmapM ::
      ( Liftable e a b,
        CountableDimsN a b,
        FLN b a
@@ -279,7 +281,7 @@ unitM :: (Num e) => Matrix e () ()
 unitM = one 1
 
 -- | Applicative instance equivalent 'unit' function,
-multM :: 
+multM ::
       ( CountableDimsN a b,
         CountableN (a, b),
         Num e,
@@ -290,8 +292,8 @@ multM ::
 multM = kr
 
 -- | Monad instance equivalent 'return' function,
-returnM :: 
-        forall e a . 
+returnM ::
+        forall e a .
         ( Num e,
           Enum e,
           Enum a,
@@ -387,7 +389,7 @@ toList (M m) = I.toList m
 
 -- | The zero matrix. A matrix wholly filled with zeros.
 zeros ::
-  (Num e, FLN cols rows, CountableDimsN cols rows) 
+  (Num e, FLN cols rows, CountableDimsN cols rows)
   => Matrix e cols rows
 zeros = M I.zeros
 
@@ -397,7 +399,7 @@ zeros = M I.zeros
 --
 --   Also known as T (Top) matrix.
 ones ::
-  (Num e, FLN cols rows, CountableDimsN cols rows) 
+  (Num e, FLN cols rows, CountableDimsN cols rows)
   => Matrix e cols rows
 ones = M I.ones
 
@@ -406,7 +408,7 @@ ones = M I.ones
 -- | The constant matrix constructor. A matrix wholly filled with a given
 -- value.
 constant ::
-  (Num e, FLN cols rows, CountableDimsN cols rows) 
+  (Num e, FLN cols rows, CountableDimsN cols rows)
   => e -> Matrix e cols rows
 constant = M . I.constant
 
@@ -420,7 +422,7 @@ bang ::
 bang = M I.bang
 
 -- | Point constant relation
-point :: 
+point ::
       ( Bounded a,
         Enum a,
         Eq a,
@@ -449,7 +451,7 @@ iden = M I.iden
 comp :: (Num e) => Matrix e cr rows -> Matrix e cols cr -> Matrix e cols rows
 comp (M a) (M b) = M (I.comp a b)
 {-# NOINLINE comp #-}
-{-# RULES 
+{-# RULES
    "comp/iden1" forall m. comp m iden = m ;
    "comp/iden2" forall m. comp iden m = m
 #-}
@@ -514,23 +516,33 @@ i2 = tr p2
 
 -- | Obtain the number of rows.
 --
---   NOTE: The 'KnownNat' constaint is needed in order to obtain the
--- dimensions in constant time.
---
--- TODO: A 'rows' function that does not need the 'KnownNat' constraint in
--- exchange for performance.
+--   NOTE: The 'KnownNat' constraint is needed in order to obtain the
+-- dimensions in constant time. For a version that doesn't require the
+-- constraint see 'rows''.
 rows :: (CountableN rows) => Matrix e cols rows -> Int
 rows (M m) = I.rows m
 
--- | Obtain the number of columns.
--- 
---   NOTE: The 'KnownNat' constaint is needed in order to obtain the
--- dimensions in constant time.
+-- | Obtain the number of rows in an inefficient manner, but without any
+-- constraints.
 --
--- TODO: A 'columns' function that does not need the 'KnownNat' constraint in
--- exchange for performance.
+-- For a more efficient version see 'rows'.
+rows' :: Matrix e cols rows -> Int
+rows' (M m) = I.rows' m
+
+-- | Obtain the number of columns.
+--
+--   NOTE: The 'KnownNat' constraint is needed in order to obtain the
+-- dimensions in constant time. For a version that doesn't require the
+-- constraint see 'columns''.
 columns :: (CountableN cols) => Matrix e cols rows -> Int
 columns (M m) = I.columns m
+
+-- | Obtain the number of columns in an inefficient manner, but without any
+-- constraints.
+--
+-- For a more efficient version see 'columns'.
+columns' :: Matrix e cols rows -> Int
+columns' (M m) = I.columns' m
 
 -- Coproduct Bifunctor
 
@@ -553,7 +565,7 @@ infixl 5 -|-
 -- Khatri Rao Product and projections
 
 -- | Khatri Rao product first component projection matrix.
-fstM :: 
+fstM ::
   forall e m k .
   ( Num e,
     CountableDimsN m k,
@@ -564,7 +576,7 @@ fstM ::
 fstM = M (I.fstM @e @(I.Normalize m) @(I.Normalize k))
 
 -- | Khatri Rao product second component projection matrix.
-sndM :: 
+sndM ::
     forall e m k.
     ( Num e,
       CountableDimsN k m,
@@ -577,9 +589,9 @@ sndM = M (I.sndM @e @(I.Normalize m) @(I.Normalize k))
 -- | Khatri Rao Matrix product also known as matrix pairing.
 --
 --   NOTE: That this is not a true categorical product, see for instance:
--- 
+--
 -- @
---            | fstM . kr a b == a 
+--            | fstM . kr a b == a
 -- kr a b ==> |
 --            | sndM . kr a b == b
 -- @
@@ -625,7 +637,7 @@ infixl 4 ><
 -- Matrix abide Join Fork
 
 -- | Matrix "abiding" followin the 'Join'-'Fork' abide law.
--- 
+--
 -- Law:
 --
 -- @
@@ -637,7 +649,7 @@ abideJF (M m) = M (I.abideJF m)
 -- Matrix abide Fork Join
 
 -- | Matrix "abiding" followin the 'Fork'-'Join' abide law.
--- 
+--
 -- Law:
 --
 -- @
@@ -656,7 +668,7 @@ tr (M m) = M (I.tr m)
 
 -- | Selective functors 'select' operator equivalent inspired by the
 -- ArrowMonad solution presented in the paper.
-selectM :: 
+selectM ::
        ( Num e,
          FLN b b,
          CountableN b

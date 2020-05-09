@@ -30,7 +30,7 @@
 -- motivation behind the library, the underlying theory, and implementation details.
 --
 -- This module offers many of the combinators mentioned in the work of
--- Macedo (2012) and Oliveira (2012). 
+-- Macedo (2012) and Oliveira (2012).
 --
 -- This is an Internal module and it is no supposed to be imported.
 --
@@ -43,8 +43,8 @@ module LAoP.Matrix.Internal
     --
     -- There exists two type families that make it easier to write
     -- matrix dimensions: 'FromNat' and 'Count'. This approach
-    -- leads to a very straightforward implementation 
-    -- of LAoP combinators. 
+    -- leads to a very straightforward implementation
+    -- of LAoP combinators.
 
     -- * Type safe matrix representation
     Matrix (..),
@@ -86,7 +86,9 @@ module LAoP.Matrix.Internal
     -- * Misc
     -- ** Get dimensions
     columns,
+    columns',
     rows,
+    rows',
 
     -- ** Matrix Transposition
     tr,
@@ -334,7 +336,7 @@ instance {-# OVERLAPPING #-} (FromLists () rows) => FromLists () (Either () rows
   fromLists _         = error "Wrong dimensions"
 
 instance {-# OVERLAPPABLE #-} (FromLists () a, FromLists () b, Countable a) => FromLists () (Either a b) where
-  fromLists l@([_] : _) = 
+  fromLists l@([_] : _) =
       let rowsA = fromInteger (natVal (Proxy :: Proxy (Count a)))
        in Fork (fromLists (take rowsA l)) (fromLists (drop rowsA l))
   fromLists _         = error "Wrong dimensions"
@@ -510,7 +512,7 @@ comp (Join a b) (Fork c d) = comp a c + comp b d         -- Divide-and-conquer l
 comp (Fork a b) c          = Fork (comp a c) (comp b c) -- Fork fusion law
 comp c (Join a b)          = Join (comp c a) (comp c b)  -- Join fusion law
 {-# NOINLINE comp #-}
-{-# RULES 
+{-# RULES
    "comp/iden1" forall m. comp m iden = m ;
    "comp/iden2" forall m. comp iden m = m
 #-}
@@ -557,23 +559,37 @@ i2 = tr p2
 
 -- | Obtain the number of rows.
 --
---   NOTE: The 'KnownNat' constaint is needed in order to obtain the
--- dimensions in constant time.
---
--- TODO: A 'rows' function that does not need the 'KnownNat' constraint in
--- exchange for performance.
+--   NOTE: The 'KnownNat' constraint is needed in order to obtain the
+-- dimensions in constant time. For a version that doesn't require the
+-- constraint see 'rows''.
 rows :: forall e cols rows. (Countable rows) => Matrix e cols rows -> Int
 rows _ = fromInteger $ natVal (Proxy :: Proxy (Count rows))
 
--- | Obtain the number of columns.
--- 
---   NOTE: The 'KnownNat' constaint is needed in order to obtain the
--- dimensions in constant time.
+-- | Obtain the number of rows in an inefficient manner, but without any
+-- constraints.
 --
--- TODO: A 'columns' function that does not need the 'KnownNat' constraint in
--- exchange for performance.
+-- For a more efficient version see 'rows'.
+rows' :: Matrix e cols rows -> Int
+rows' (One _) = 1
+rows' (Join lhs _) = rows' lhs
+rows' (Fork top bottom) = rows' top + rows' bottom
+
+-- | Obtain the number of columns.
+--
+--   NOTE: The 'KnownNat' constraint is needed in order to obtain the
+-- dimensions in constant time. For a version that doesn't require the
+-- constraint see 'columns''.
 columns :: forall e cols rows. (Countable cols) => Matrix e cols rows -> Int
 columns _ = fromInteger $ natVal (Proxy :: Proxy (Count cols))
+
+-- | Obtain the number of columns in an inefficient manner, but without any
+-- constraints.
+--
+-- For a more efficient version see 'columns'.
+columns' :: Matrix e cols rows -> Int
+columns' (One _) = 1
+columns' (Join lhs rhs) = columns' lhs + columns' rhs
+columns' (Fork top _) = columns' top
 
 -- Coproduct Bifunctor
 
@@ -629,7 +645,7 @@ sndM = matrixBuilder' f
 -- | Khatri Rao Matrix product also known as matrix pairing.
 --
 --   NOTE: That this is not a true categorical product, see for instance:
--- 
+--
 -- @
 --            | fstM . kr a b == a
 -- kr a b ==> |
@@ -665,7 +681,7 @@ infixl 4 ><
        FL (Normalize (m, n)) n,
        FL (Normalize (p, q)) p,
        FL (Normalize (p, q)) q
-     ) 
+     )
      => Matrix e m p -> Matrix e n q -> Matrix e (Normalize (m, n)) (Normalize (p, q))
 (><) a b =
   let fstM' = fstM @e @m @n
@@ -988,7 +1004,7 @@ toRel ::
         Eq b,
         CountableDimsN a b,
         FLN b a
-      ) 
+      )
       => (a -> b -> Bool) -> Relation (Normalize a) (Normalize b)
 toRel f =
   let minA         = minBound @a
