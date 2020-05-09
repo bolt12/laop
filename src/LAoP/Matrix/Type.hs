@@ -71,7 +71,6 @@ module LAoP.Matrix.Type
     One,
 
     -- * Primitives
-    empty,
     one,
     join,
     fork,
@@ -228,10 +227,6 @@ type Zero = Void
 type One = ()
 
 -- Primitives
-
--- | Empty matrix constructor
-empty :: Matrix e Zero Zero
-empty = M I.Empty
 
 -- | Unit matrix constructor
 one :: e -> Matrix e One One

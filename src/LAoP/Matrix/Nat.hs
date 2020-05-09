@@ -67,7 +67,6 @@ module LAoP.Matrix.Nat
     TrivialP,
 
     -- * Primitives
-    empty,
     one,
     join,
     fork,
@@ -179,9 +178,6 @@ type TrivialE a b       = I.FromNat (a + b) ~ Either (I.FromNat a) (I.FromNat b)
 type TrivialP a b       = I.FromNat (a * b) ~ I.FromNat (I.Count (I.FromNat a) * I.Count (I.FromNat b))
 
 -- Primitives
-
-empty :: Matrix e 0 0
-empty = M I.Empty
 
 one :: e -> Matrix e 1 1
 one = M . I.One

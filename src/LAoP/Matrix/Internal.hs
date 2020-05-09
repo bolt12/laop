@@ -60,7 +60,6 @@ module LAoP.Matrix.Internal
     Trivial,
 
     -- * Primitives
-    empty,
     one,
     join,
     fork,
@@ -185,7 +184,6 @@ import qualified Prelude (id, (.))
 
 -- | LAoP (Linear Algebra of Programming) Inductive Matrix definition.
 data Matrix e cols rows where
-  Empty :: Matrix e Void Void
   One :: e -> Matrix e () ()
   Join :: Matrix e a rows -> Matrix e b rows -> Matrix e (Either a b) rows
   Fork :: Matrix e cols a -> Matrix e cols b -> Matrix e cols (Either a b)
@@ -215,7 +213,6 @@ type family Count (d :: Type) :: Nat where
 --
 --   Thanks to Li-Yao Xia this type family is super fast.
 type family FromNat (n :: Nat) :: Type where
-  FromNat 0 = Void
   FromNat 1 = ()
   FromNat n = FromNat' (Mod n 2 == 0) (FromNat (Div n 2))
 
@@ -247,13 +244,11 @@ instance (Num e) => Category (Matrix e) where
   (.) = comp
 
 instance NFData e => NFData (Matrix e cols rows) where
-    rnf Empty      = ()
     rnf (One e)    = rnf e
     rnf (Join a b) = rnf a `seq` rnf b
     rnf (Fork a b) = rnf a `seq` rnf b
 
 instance Eq e => Eq (Matrix e cols rows) where
-  Empty == Empty               = True
   (One a) == (One b)           = a == b
   (Join a b) == (Join c d)     = a == c && b == d
   (Fork a b) == (Fork c d)     = a == c && b == d
@@ -268,18 +263,15 @@ instance Num e => Num (Matrix e cols rows) where
 
   a * b = zipWithM (*) a b
 
-  abs Empty      = Empty
   abs (One a)    = One (abs a)
   abs (Join a b) = Join (abs a) (abs b)
   abs (Fork a b) = Fork (abs a) (abs b)
 
-  signum Empty      = Empty
   signum (One a)    = One (signum a)
   signum (Join a b) = Join (signum a) (signum b)
   signum (Fork a b) = Fork (signum a) (signum b)
 
 instance Ord e => Ord (Matrix e cols rows) where
-    Empty <= Empty               = True
     (One a) <= (One b)           = a <= b
     (Join a b) <= (Join c d)     = (a <= c) && (b <= d)
     (Fork a b) <= (Fork c d)     = (a <= c) && (b <= d)
@@ -287,10 +279,6 @@ instance Ord e => Ord (Matrix e cols rows) where
     x@(Join _ _) <= y@(Fork _ _) = abideJF x <= y
 
 -- Primitives
-
--- | Empty matrix constructor
-empty :: Matrix e Void Void
-empty = Empty
 
 -- | Unit matrix constructor
 one :: e -> Matrix e () ()
@@ -326,10 +314,6 @@ class FromLists cols rows where
   -- | Build a matrix out of a list of list of elements. Throws a runtime
   -- error if the dimensions do not match.
   fromLists :: [[e]] -> Matrix e cols rows
-
-instance FromLists Void Void where
-  fromLists [] = Empty
-  fromLists _  = error "Wrong dimensions"
 
 instance {-# OVERLAPPING #-} FromLists () () where
   fromLists [[e]] = One e
@@ -470,7 +454,6 @@ fromF f =
 
 -- | Converts a matrix to a list of lists of elements.
 toLists :: Matrix e cols rows -> [[e]]
-toLists Empty       = []
 toLists (One e)     = [[e]]
 toLists (Fork l r) = toLists l ++ toLists r
 toLists (Join l r)  = zipWith (++) (toLists l) (toLists r)
@@ -522,7 +505,6 @@ iden = matrixBuilder' (bool 0 1 . uncurry (==))
 --   This definition takes advantage of divide-and-conquer and fusion laws
 -- from LAoP.
 comp :: (Num e) => Matrix e cr rows -> Matrix e cols cr -> Matrix e cols rows
-comp Empty Empty           = Empty
 comp (One a) (One b)       = One (a * b)
 comp (Join a b) (Fork c d) = comp a c + comp b d         -- Divide-and-conquer law
 comp (Fork a b) c          = Fork (comp a c) (comp b c) -- Fork fusion law
@@ -538,7 +520,6 @@ comp c (Join a b)          = Join (comp c a) (comp c b)  -- Join fusion law
 infixl 7 .|
 -- | Scalar multiplication of matrices.
 (.|) :: Num e => e -> Matrix e cols rows -> Matrix e cols rows
-(.|) _ Empty = Empty
 (.|) e (One a) = One (e * a)
 (.|) e (Join a b) = Join (e .| a) (e .| b)
 (.|) e (Fork a b) = Fork (e .| a) (e .| b)
@@ -548,7 +529,6 @@ infixl 7 .|
 infixl 7 ./
 -- | Scalar multiplication of matrices.
 (./) :: Fractional e => Matrix e cols rows -> e -> Matrix e cols rows
-(./) Empty _ = Empty
 (./) (One a) e = One (a / e)
 (./) (Join a b) e = Join (a ./ e) (b ./ e)
 (./) (Fork a b) e = Fork (a ./ e) (b ./ e)
@@ -703,7 +683,6 @@ infixl 4 ><
 -- @
 abideJF :: Matrix e cols rows -> Matrix e cols rows
 abideJF (Join (Fork a c) (Fork b d)) = Fork (Join (abideJF a) (abideJF b)) (Join (abideJF c) (abideJF d)) -- Join-Fork abide law
-abideJF Empty                        = Empty
 abideJF (One e)                      = One e
 abideJF (Join a b)                   = Join (abideJF a) (abideJF b)
 abideJF (Fork a b)                   = Fork (abideJF a) (abideJF b)
@@ -717,7 +696,6 @@ abideJF (Fork a b)                   = Fork (abideJF a) (abideJF b)
 -- @
 abideFJ :: Matrix e cols rows -> Matrix e cols rows
 abideFJ (Fork (Join a b) (Join c d)) = Join (Fork (abideFJ a) (abideFJ c)) (Fork (abideFJ b) (abideFJ d)) -- Fork-Join abide law
-abideFJ Empty                        = Empty
 abideFJ (One e)                      = One e
 abideFJ (Join a b)                   = Join (abideFJ a) (abideFJ b)
 abideFJ (Fork a b)                   = Fork (abideFJ a) (abideFJ b)
@@ -726,7 +704,6 @@ abideFJ (Fork a b)                   = Fork (abideFJ a) (abideFJ b)
 
 -- | Matrix transposition.
 tr :: Matrix e cols rows -> Matrix e rows cols
-tr Empty      = Empty
 tr (One e)    = One e
 tr (Join a b) = Fork (tr a) (tr b)
 tr (Fork a b) = Join (tr a) (tr b)
@@ -865,7 +842,6 @@ prettyPrint = putStrLn . pretty
 
 -- | Zip two matrices with a given binary function
 zipWithM :: (e -> f -> g) -> Matrix e cols rows -> Matrix f cols rows -> Matrix g cols rows
-zipWithM _ Empty Empty               = Empty
 zipWithM f (One a) (One b)           = One (f a b)
 zipWithM f (Join a b) (Join c d)     = Join (zipWithM f a c) (zipWithM f b d)
 zipWithM f (Fork a b) (Fork c d)     = Fork (zipWithM f a c) (zipWithM f b d)
@@ -890,14 +866,12 @@ fromBool False = nat 0
 
 -- | Relational negation
 negateM :: Relation cols rows -> Relation cols rows
-negateM Empty         = Empty
 negateM (One (Nat p)) = One (Nat (negate p))
 negateM (Join a b)    = Join (negateM a) (negateM b)
 negateM (Fork a b)    = Fork (negateM a) (negateM b)
 
 -- | Relational addition
 orM :: Relation cols rows -> Relation cols rows -> Relation cols rows
-orM Empty Empty               = Empty
 orM (One a) (One b)           = One (fromBool (toBool a || toBool b))
 orM (Join a b) (Join c d)     = Join (orM a c) (orM b d)
 orM (Fork a b) (Fork c d)     = Fork (orM a c) (orM b d)
@@ -906,7 +880,6 @@ orM x@(Join _ _) y@(Fork _ _) = orM (abideJF x) y
 
 -- | Relational multiplication
 andM :: Relation cols rows -> Relation cols rows -> Relation cols rows
-andM Empty Empty               = Empty
 andM (One a) (One b)           = One (fromBool (toBool a && toBool b))
 andM (Join a b) (Join c d)     = Join (andM a c) (andM b d)
 andM (Fork a b) (Fork c d)     = Fork (andM a c) (andM b d)
@@ -915,7 +888,6 @@ andM x@(Join _ _) y@(Fork _ _) = andM (abideJF x) y
 
 -- | Relational subtraction
 subM :: Relation cols rows -> Relation cols rows -> Relation cols rows
-subM Empty Empty               = Empty
 subM (One a) (One b)           = if a - b < nat 0 then One (nat 0) else One (a - b)
 subM (Join a b) (Join c d)     = Join (subM a c) (subM b d)
 subM (Fork a b) (Fork c d)     = Fork (subM a c) (subM b d)
@@ -924,7 +896,6 @@ subM x@(Join _ _) y@(Fork _ _) = subM (abideJF x) y
 
 -- | Matrix relational composition.
 compRel :: Relation cr rows -> Relation cols cr -> Relation cols rows
-compRel Empty Empty           = Empty
 compRel (One a) (One b)       = One (fromBool (toBool a && toBool b))
 compRel (Join a b) (Fork c d) = orM (compRel a c) (compRel b d)   -- Divide-and-conquer law
 compRel (Fork a b) c          = Fork (compRel a c) (compRel b c) -- Fork fusion law
@@ -932,7 +903,6 @@ compRel c (Join a b)          = Join (compRel c a) (compRel c b)  -- Join fusion
 
 -- | Matrix relational right division
 divR :: Relation b c -> Relation b a -> Relation a c
-divR Empty Empty           = Empty
 divR (One a) (One b)       = One (fromBool (not (toBool b) || toBool a)) -- b implies a
 divR (Join a b) (Join c d) = andM (divR a c) (divR b d)
 divR (Fork a b) c          = Fork (divR a c) (divR b c)

@@ -52,7 +52,6 @@ module LAoP.Relation.Internal
     TrivialP,
 
     -- * Primitives
-    empty,
     one,
     join,
     (|||),
@@ -229,10 +228,6 @@ type One  = ()
 
 -- Primitives
 
--- | Empty matrix constructor
-empty :: Relation Zero Zero
-empty = R I.Empty
-
 -- | Unit matrix constructor
 one :: Boolean -> Relation One One
 one = R . I.One
@@ -383,7 +378,7 @@ belongs = toRel elemR
 -- | The zero relation. A relation where no element of type @a@ relates
 -- with elements of type @b@.
 --
---   Also known as ⊥ (Bottom) Relation or empty Relation.
+--   Also known as ⊥ (Bottom) Relation.
 --
 --   @
 --   r `.` ⊥ == ⊥ `.` r == ⊥

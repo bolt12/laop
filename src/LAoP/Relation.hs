@@ -41,7 +41,6 @@ module LAoP.Relation
     TrivialP,
 
     -- * Primitives
-    empty,
     one,
     join,
     (|||),
