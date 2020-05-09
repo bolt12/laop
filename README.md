@@ -14,7 +14,7 @@ See the package in hackage [here](https://hackage.haskell.org/package/laop-0.1.0
 
 There are a couple of repos with a WIP of benchmarks comparing [matrix composition](https://github.com/bolt12/laop-benchmarks) and a real use case of [data analytics](https://github.com/bolt12/laop-analytics).
 
-A Functional Pearl has been submitted to ICFP and can be regarded as the [reference document](https://github.com/bolt12/tymfgg-functional-pearl) for this library.
+A Functional Pearl has been written and can be regarded as the [reference document](https://github.com/bolt12/tymfgg-functional-pearl) for this library.
 
 ## Features
 
