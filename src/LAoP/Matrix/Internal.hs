@@ -174,6 +174,7 @@ import Data.Kind
 import Data.List
 import Data.Maybe
 import Data.Proxy
+import Data.Typeable
 import Data.Void
 import GHC.TypeLits
 import Data.Type.Equality
@@ -315,11 +316,11 @@ class FromLists cols rows where
   -- error if the dimensions do not match.
   fromLists :: [[e]] -> Matrix e cols rows
 
-instance {-# OVERLAPPING #-} FromLists () () where
+instance FromLists () () where
   fromLists [[e]] = One e
   fromLists _     = error "Wrong dimensions"
 
-instance {-# OVERLAPPING #-} (FromLists cols ()) => FromLists (Either () cols) () where
+instance (FromLists cols ()) => FromLists (Either () cols) () where
   fromLists [h : t] = Join (One h) (fromLists [t])
   fromLists _       = error "Wrong dimensions"
 
@@ -329,7 +330,7 @@ instance {-# OVERLAPPABLE #-} (FromLists a (), FromLists b (), Countable a) => F
        in Join (fromLists [take rowsA l]) (fromLists [drop rowsA l])
   fromLists _       = error "Wrong dimensions"
 
-instance {-# OVERLAPPING #-} (FromLists () rows) => FromLists () (Either () rows) where
+instance (FromLists () rows) => FromLists () (Either () rows) where
   fromLists ([h] : t) = Fork (One h) (fromLists t)
   fromLists _         = error "Wrong dimensions"
 
@@ -339,7 +340,7 @@ instance {-# OVERLAPPABLE #-} (FromLists () a, FromLists () b, Countable a) => F
        in Fork (fromLists (take rowsA l)) (fromLists (drop rowsA l))
   fromLists _         = error "Wrong dimensions"
 
-instance {-# OVERLAPPABLE #-} (FromLists (Either a b) c, FromLists (Either a b) d, Countable c) => FromLists (Either a b) (Either c d) where
+instance (FromLists (Either a b) c, FromLists (Either a b) d, Countable c) => FromLists (Either a b) (Either c d) where
   fromLists l@(h : t) =
     let lh        = length h
         rowsC     = fromInteger (natVal (Proxy :: Proxy (Count c)))
