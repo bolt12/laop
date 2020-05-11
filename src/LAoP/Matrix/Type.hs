@@ -215,8 +215,8 @@ instance (Num e) => Category (Matrix e) where
 bimapM ::
        ( Liftable e a b,
          Liftable e c d,
-         CountableDimsN a c,
-         CountableDimsN b d,
+         CountableDims a c,
+         CountableDims b d,
          FLN d c,
          FLN b a
        ) => (a -> b) -> (c -> d) -> Matrix e a c -> Matrix e b d
@@ -269,7 +269,7 @@ infixl 2 ===
 -- | Functor instance equivalent function
 fmapM ::
      ( Liftable e a b,
-       CountableDimsN a b,
+       CountableDims a b,
        FLN b a
      )
      =>
@@ -333,7 +333,7 @@ matrixBuilder ::
     Bounded a,
     Bounded b,
     Eq a,
-    CountableDimsN a b
+    Countable b
   ) => ((a, b) -> e) -> Matrix e a b
 matrixBuilder f = M (I.matrixBuilder f)
 
@@ -361,7 +361,7 @@ fromF' = M . I.fromF'
 -- cardinality's.
 fromF ::
   ( Liftable e a b,
-    CountableDimsN a b,
+    CountableDims a b,
     FLN b a
   ) =>
   (a -> b) -> Matrix e a b
@@ -370,7 +370,7 @@ fromF = M . I.fromF
 -- | Lifts relation functions to Boolean Matrix
 toRel ::
   ( Liftable (Natural 0 1) a b,
-    CountableDimsN a b,
+    CountableDims a b,
     FLN b a
   ) => (a -> b -> Bool) -> Matrix (Natural 0 1) a b
 toRel = M . I.toRel
@@ -428,7 +428,7 @@ point ::
         Eq a,
         Num e,
         Ord e,
-        CountableN a,
+        Countable a,
         FLN a One
       ) => a -> Matrix e One a
 point = fromF . const

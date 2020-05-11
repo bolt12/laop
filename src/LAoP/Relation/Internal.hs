@@ -283,7 +283,7 @@ relationBuilder ::
     Bounded a,
     Bounded b,
     Eq a,
-    CountableDimsN a b
+    CountableDims a b
   ) => ((a, b) -> Boolean) -> Relation a b
 relationBuilder = R . I.matrixBuilder
 
@@ -301,9 +301,9 @@ fromF' f = R (I.fromFRel' f)
 
 -- | Lifts functions to matrices with dimensions matching @a@ and @b@
 -- cardinality's.
-fromF :: 
+fromF ::
       ( Liftable a b,
-        CountableDimsN a b,
+        CountableDims a b,
         FLN b a
       )
       => (a -> b) -> Relation a b
@@ -312,7 +312,7 @@ fromF f = R (I.fromFRel f)
 -- | Lifts relation functions to 'Relation'
 toRel ::
       ( Liftable a b,
-        CountableDimsN a b,
+        CountableDims a b,
         FLN b a
       )
       => (a -> b -> Bool) -> Relation a b
@@ -322,7 +322,7 @@ toRel = R . I.toRel
 fromRel ::
         ( Liftable a b,
           Eq a,
-          CountableDimsN a b,
+          CountableDims a b,
           FLN a One,
           FLN b One
         )
@@ -351,7 +351,7 @@ toBool r = case toList r of
 pt :: 
    ( Liftable a b,
      Eq a,
-     CountableDimsN a b,
+     CountableDims a b,
      FLN a One,
      FLN b One
    )
@@ -365,7 +365,7 @@ belongs ::
         ( Bounded a,
           Enum a,
           Eq a,
-          CountableDimsN (List a) a,
+          CountableDims (List a) a,
           FLN a (List a)
         )
         => Relation (List a) a
@@ -413,11 +413,11 @@ bang ::
 bang = ones
 
 -- | Point constant relation
-point :: 
+point ::
       ( Bounded a,
         Enum a,
         Eq a,
-        CountableN a,
+        Countable a,
         FLN a One
       ) => a -> Relation One a
 point = fromF . const
@@ -496,7 +496,7 @@ overriddenBy r s = s `union` r `intersection` divR zeros (conv s)
 pointAp ::
         ( Liftable a b,
           Eq a,
-          CountableDimsN a b,
+          CountableDims a b,
           FLN a One,
           FLN b One
         ) => a -> b -> Relation a b -> Relation One One
@@ -508,7 +508,7 @@ pointAp a b r = conv (point b) . r . point a
 pointApBool ::
         ( Liftable a b,
           Eq a,
-          CountableDimsN a b,
+          CountableDims a b,
           FLN a One,
           FLN b One
         ) => a -> b -> Relation a b -> Bool
@@ -927,6 +927,7 @@ untrans s = fstR . conv (splitR (conv s) sndR)
 predR :: 
       ( Bounded a,
         Enum a,
+        Countable a,
         CountableN a,
         FLN a a,
         FLN Bool a
@@ -954,23 +955,25 @@ equalizer f g = id `intersection` divisionF f g
 -- @
 -- 'guard' p = 'i2' ``overriddenBy`` 'i1' `.` 'predR' p
 -- @
-guard :: 
+guard ::
      ( Bounded b,
        Enum b,
        CountableN b,
+       Countable b,
        FLN b b,
        FLN Bool b
      ) => Relation b Bool -> Relation b (Either b b)
 guard p = conv (eitherR (predR p) (predR (negate p)))
 
 -- | Relational McCarthy's conditional.
-cond :: 
+cond ::
      ( Bounded b,
        Enum b,
+       Countable b,
        CountableN b,
        FLN b b,
        FLN Bool b
-     ) 
+     )
      => Relation b Bool -> Relation b c -> Relation b c -> Relation b c
 cond p r s = eitherR r s . guard p
 

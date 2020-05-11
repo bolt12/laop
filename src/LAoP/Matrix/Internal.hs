@@ -369,16 +369,15 @@ matrixBuilder' f =
 matrixBuilder ::
   forall e a b.
   ( FLN a b,
-    CountableN b,
     Enum a,
     Enum b,
     Bounded a,
     Bounded b,
     Eq a,
-    CountableDimsN a b
+    Countable b
   ) => ((a, b) -> e) -> Matrix e (Normalize a) (Normalize b)
 matrixBuilder f =
-  let r         = fromInteger $ natVal (Proxy :: Proxy (Count (Normalize b)))
+  let r         = fromInteger $ natVal (Proxy :: Proxy (Count b))
       positions = [(a, b) | a <- [minBound .. maxBound], b <- [minBound .. maxBound]]
    in fromLists . map (map f) . transpose . buildList r $ positions
   where
@@ -429,7 +428,7 @@ fromF' f =
 fromF ::
   forall a b e.
   ( Liftable e a b,
-    CountableDimsN a b,
+    CountableDims a b,
     FLN b a
   ) =>
   (a -> b) ->
@@ -439,8 +438,8 @@ fromF f =
       maxA         = maxBound @a
       minB         = minBound @b
       maxB         = maxBound @b
-      ccols        = fromInteger $ natVal (Proxy :: Proxy (Count (Normalize a)))
-      rrows        = fromInteger $ natVal (Proxy :: Proxy (Count (Normalize b)))
+      ccols        = fromInteger $ natVal (Proxy :: Proxy (Count a))
+      rrows        = fromInteger $ natVal (Proxy :: Proxy (Count b))
       elementsA    = take ccols [minA .. maxA]
       elementsB    = take rrows [minB .. maxB]
       combinations = (,) <$> elementsA <*> elementsB
@@ -971,7 +970,7 @@ fromFRel' f =
 fromFRel ::
   forall a b.
   ( Liftable Boolean a b,
-    CountableDimsN a b,
+    CountableDims a b,
     FL (Normalize b) (Normalize a)
   ) =>
   (a -> b) ->
@@ -981,8 +980,8 @@ fromFRel f =
       maxA         = maxBound @a
       minB         = minBound @b
       maxB         = maxBound @b
-      ccols        = fromInteger $ natVal (Proxy :: Proxy (Count (Normalize a)))
-      rrows        = fromInteger $ natVal (Proxy :: Proxy (Count (Normalize b)))
+      ccols        = fromInteger $ natVal (Proxy :: Proxy (Count a))
+      rrows        = fromInteger $ natVal (Proxy :: Proxy (Count b))
       elementsA    = take ccols [minA .. maxA]
       elementsB    = take rrows [minB .. maxB]
       combinations = (,) <$> elementsA <*> elementsB
@@ -1003,7 +1002,7 @@ toRel ::
         Enum a,
         Enum b,
         Eq b,
-        CountableDimsN a b,
+        CountableDims a b,
         FLN b a
       )
       => (a -> b -> Bool) -> Relation (Normalize a) (Normalize b)
@@ -1012,8 +1011,8 @@ toRel f =
       maxA         = maxBound @a
       minB         = minBound @b
       maxB         = maxBound @b
-      ccols        = fromInteger $ natVal (Proxy :: Proxy (Count (Normalize a)))
-      rrows        = fromInteger $ natVal (Proxy :: Proxy (Count (Normalize b)))
+      ccols        = fromInteger $ natVal (Proxy :: Proxy (Count a))
+      rrows        = fromInteger $ natVal (Proxy :: Proxy (Count b))
       elementsA    = take ccols [minA .. maxA]
       elementsB    = take rrows [minB .. maxB]
       combinations = (,) <$> elementsA <*> elementsB
