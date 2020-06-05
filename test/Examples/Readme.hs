@@ -1,11 +1,10 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE DataKinds #-}
 
-module Examples
+module Examples.Readme
     ( exec
     )
   where

@@ -1,5 +1,11 @@
 # laop - Linear Algebra of Programming library
 
+[![GitHub CI](https://github.com/bolt12/laop/workflows/CI/badge.svg)](https://github.com/bolt12/laop/actions)
+[![Build status](https://img.shields.io/travis/bolt12/laop.svg?logo=travis)](https://travis-ci.org/bolt12/laop)
+[![Hackage](https://img.shields.io/hackage/v/laop.svg?logo=haskell)](https://hackage.haskell.org/package/laop)
+[![Stackage Lts](http://stackage.org/package/laop/badge/lts)](http://stackage.org/lts/package/laop)
+[![Stackage Nightly](http://stackage.org/package/laop/badge/nightly)](http://stackage.org/nightly/package/laop)
+
 The LAoP discipline generalises relations and functions treating them as
 Boolean matrices and in turn consider these as arrows.
 
@@ -10,40 +16,38 @@ motivation behind the library, the underlying theory, and implementation details
 This module offers many of the combinators mentioned in the work of
 [Macedo (2012)](https://repositorium.sdum.uminho.pt/handle/1822/22894) and [Oliveira (2012)](https://pdfs.semanticscholar.org/ccf5/27fa9179081223bffe8067edd81948644fc0.pdf). 
 
-See the package in hackage [here](https://hackage.haskell.org/package/laop-0.1.0.5)
-
-There are a couple of repos with a WIP of benchmarks comparing [matrix composition](https://github.com/bolt12/laop-benchmarks) and a real use case of [data analytics](https://github.com/bolt12/laop-analytics).
+See the package in hackage [here](https://hackage.haskell.org/package/laop-0.1.1.0)
 
 A Functional Pearl has been written and can be regarded as the [reference document](https://github.com/bolt12/tymfgg-pearl) for this library.
 
 ## Features
 
-This library offers:
+This library offers 4 main matrix programming modules:
 
-- An internal module representation that uses normal datatypes (`Void`, `()`, `Either`) for matrix dimensions and two
-  type families `FromNat` and `Count` to make it easier to work with these type of matrices.
-- An interfacing module that uses generalised types for the dimensions and is just a newtype wrapper
-  around the internal matrix data type.
-- An interfacing module that uses type level naturals for the dimensions and is just a newtype wrapper
-  around the internal matrix data type.
-- An interfacing module that restricts the matrix contents to being only 0's or 1's (True
-  and False). This module is called 'Relation' and offers many of the combinators seen in
-  AoP and Relational Calculus/Algebra.
-- A very simple Probabilistic Programming module and several functions and data types to
-  make it easier to deal with sample space.
+- One in which matrices are typed with type level natural numbers;
+- One in which matrices are typed with arbitrary generic data types;
+- One in which matrices are regarded as relations, i.e. boolean matrices;
 
-Given this, this new matrix formulation compared to other libraries one has much more advantages, such as:
+There's also an experimental module that uses matrices to represent probability
+distributions.
 
-- Has an inductive definition enabling writing matrix manipulation functions in a much more elegant and calculational way;
-- Statically typed dimensions;
-- Polymorphic data type dimensions;
-- Polymorphic matrix content;
-- Awesome dimension type inference;
-- Fast type natural conversion via `FromNat` type family;
-- Matrix `Junc` and `Split`-ing in O(1);
-- Matrix composition takes advantage of divide-and-conquer and fusion laws.
+The most interesting feature is that matrices are represented as an inductive data type.
+Given this formulation, matrix algorithms can be expressed in a much more elegant and
+calculational style than the traditional vector of vectors representation. This data type
+guarantees that a matrix will always have valid dimensions. It can also express block matrix
+computations naturally, which leads to total, efficient and statically typed manipulation
+and transformation functions.
 
-Unfortunately, this approach does not solve the issue of type dimensions being in some way constrainted making it impossible to write Arrow instances, for example. Type inference isn't perfect, when it comes to infer the types of matrices which dimensions are computed using type level naturals multiplication, the compiler needs type annotations in order to succeed.
+Like matrix multiplication, other common operations, such as matrix transposition, benefit from a block-oriented structure that leads to a simple and natural divide-and-conquer algorithmic solution. Performance wise, this means that without much effort we can obtain optimal cache-oblivious algorithms.
+
+Given this, this new matrix formulation compared to other libraries:
+
+- Is more compositional and polymorphic and does not have partial matrix manipulation functions (hence less chances for usage errors);
+- Our implementation of matrices enables simple manipulation of submatrices, making it particularly suitable for formal verification and equation reasoning, using the mathematical framework defined by the linear algebra of programming. Furthermore, the data type constructors ensure that the matrices of this kind are sound, i.e. malformed matrices with incorrect dimensions of the sort, can not be constructed.
+
+## Known issues
+
+Unfortunately, due to the use of type-level programming features, this approach sometimes requires type dimensions to be constrainted, in some way, impossible to write idiomatic Arrow instances, for example. Type inference isn't perfect, when it comes to infer the types of matrices which dimensions are computed using type level naturals multiplication, the compiler needs type annotations in order to succeed. And not all kinds of programs can be modeled using matrices, namely programs that deal with arbitrary infinite data types such as lists or integers (although there are some workarounds).
 
 ## Notes
 
