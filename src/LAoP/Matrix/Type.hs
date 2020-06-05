@@ -215,8 +215,8 @@ instance (Num e) => Category (Matrix e) where
 bimapM ::
        ( Liftable e a b,
          Liftable e c d,
-         CountableDims a c,
-         CountableDims b d,
+         CountableDimsN a c,
+         CountableDimsN b d,
          FLN d c,
          FLN b a
        ) => (a -> b) -> (c -> d) -> Matrix e a c -> Matrix e b d
@@ -269,7 +269,7 @@ infixl 2 ===
 -- | Functor instance equivalent function
 fmapM ::
      ( Liftable e a b,
-       CountableDims a b,
+       CountableDimsN a b,
        FLN b a
      )
      =>
@@ -361,7 +361,7 @@ fromF' = M . I.fromF'
 -- cardinality's.
 fromF ::
   ( Liftable e a b,
-    CountableDims a b,
+    CountableDimsN a b,
     FLN b a
   ) =>
   (a -> b) -> Matrix e a b
@@ -428,7 +428,7 @@ point ::
         Eq a,
         Num e,
         Ord e,
-        Countable a,
+        CountableN a,
         FLN a One
       ) => a -> Matrix e One a
 point = fromF . const

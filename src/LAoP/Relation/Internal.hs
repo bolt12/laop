@@ -303,7 +303,7 @@ fromF' f = R (I.fromFRel' f)
 -- cardinality's.
 fromF ::
       ( Liftable a b,
-        CountableDims a b,
+        CountableDimsN a b,
         FLN b a
       )
       => (a -> b) -> Relation a b
@@ -322,7 +322,7 @@ toRel = R . I.toRel
 fromRel ::
         ( Liftable a b,
           Eq a,
-          CountableDims a b,
+          CountableDimsN a b,
           FLN a One,
           FLN b One
         )
@@ -348,10 +348,10 @@ toBool r = case toList r of
 -- | Power transpose.
 --
 --  Maps a relation to a set valued function.
-pt :: 
+pt ::
    ( Liftable a b,
      Eq a,
-     CountableDims a b,
+     CountableDimsN a b,
      FLN a One,
      FLN b One
    )
@@ -417,7 +417,7 @@ point ::
       ( Bounded a,
         Enum a,
         Eq a,
-        Countable a,
+        CountableN a,
         FLN a One
       ) => a -> Relation One a
 point = fromF . const
@@ -496,7 +496,7 @@ overriddenBy r s = s `union` r `intersection` divR zeros (conv s)
 pointAp ::
         ( Liftable a b,
           Eq a,
-          CountableDims a b,
+          CountableDimsN a b,
           FLN a One,
           FLN b One
         ) => a -> b -> Relation a b -> Relation One One
@@ -508,7 +508,7 @@ pointAp a b r = conv (point b) . r . point a
 pointApBool ::
         ( Liftable a b,
           Eq a,
-          CountableDims a b,
+          CountableDimsN a b,
           FLN a One,
           FLN b One
         ) => a -> b -> Relation a b -> Bool
