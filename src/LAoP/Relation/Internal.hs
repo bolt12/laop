@@ -283,7 +283,7 @@ relationBuilder ::
     Bounded a,
     Bounded b,
     Eq a,
-    CountableDimsN a b
+    CountableDims a b
   ) => ((a, b) -> Boolean) -> Relation a b
 relationBuilder = R . I.matrixBuilder
 
@@ -301,7 +301,7 @@ fromF' f = R (I.fromFRel' f)
 
 -- | Lifts functions to matrices with dimensions matching @a@ and @b@
 -- cardinality's.
-fromF :: 
+fromF ::
       ( Liftable a b,
         CountableDimsN a b,
         FLN b a
@@ -312,7 +312,7 @@ fromF f = R (I.fromFRel f)
 -- | Lifts relation functions to 'Relation'
 toRel ::
       ( Liftable a b,
-        CountableDimsN a b,
+        CountableDims a b,
         FLN b a
       )
       => (a -> b -> Bool) -> Relation a b
@@ -348,7 +348,7 @@ toBool r = case toList r of
 -- | Power transpose.
 --
 --  Maps a relation to a set valued function.
-pt :: 
+pt ::
    ( Liftable a b,
      Eq a,
      CountableDimsN a b,
@@ -365,7 +365,7 @@ belongs ::
         ( Bounded a,
           Enum a,
           Eq a,
-          CountableDimsN (List a) a,
+          CountableDims (List a) a,
           FLN a (List a)
         )
         => Relation (List a) a
@@ -413,7 +413,7 @@ bang ::
 bang = ones
 
 -- | Point constant relation
-point :: 
+point ::
       ( Bounded a,
         Enum a,
         Eq a,
@@ -927,6 +927,7 @@ untrans s = fstR . conv (splitR (conv s) sndR)
 predR :: 
       ( Bounded a,
         Enum a,
+        Countable a,
         CountableN a,
         FLN a a,
         FLN Bool a
@@ -954,23 +955,25 @@ equalizer f g = id `intersection` divisionF f g
 -- @
 -- 'guard' p = 'i2' ``overriddenBy`` 'i1' `.` 'predR' p
 -- @
-guard :: 
+guard ::
      ( Bounded b,
        Enum b,
        CountableN b,
+       Countable b,
        FLN b b,
        FLN Bool b
      ) => Relation b Bool -> Relation b (Either b b)
 guard p = conv (eitherR (predR p) (predR (negate p)))
 
 -- | Relational McCarthy's conditional.
-cond :: 
+cond ::
      ( Bounded b,
        Enum b,
+       Countable b,
        CountableN b,
        FLN b b,
        FLN Bool b
-     ) 
+     )
      => Relation b Bool -> Relation b c -> Relation b c -> Relation b c
 cond p r s = eitherR r s . guard p
 

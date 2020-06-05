@@ -333,7 +333,7 @@ matrixBuilder ::
     Bounded a,
     Bounded b,
     Eq a,
-    CountableDimsN a b
+    Countable b
   ) => ((a, b) -> e) -> Matrix e a b
 matrixBuilder f = M (I.matrixBuilder f)
 
@@ -370,7 +370,7 @@ fromF = M . I.fromF
 -- | Lifts relation functions to Boolean Matrix
 toRel ::
   ( Liftable (Natural 0 1) a b,
-    CountableDimsN a b,
+    CountableDims a b,
     FLN b a
   ) => (a -> b -> Bool) -> Matrix (Natural 0 1) a b
 toRel = M . I.toRel

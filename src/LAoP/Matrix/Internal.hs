@@ -243,7 +243,7 @@ type Trivial a = FromNat (Count a) ~ a
 -- class.
 instance (Num e) => Category (Matrix e) where
   type Object (Matrix e) a = (FL a a, Countable a)
-  id = iden
+  id  = iden
   (.) = comp
 
 instance NFData e => NFData (Matrix e cols rows) where
@@ -259,7 +259,6 @@ instance Eq e => Eq (Matrix e cols rows) where
   x@(Join _ _) == y@(Fork _ _) = abideJF x == y
 
 instance Num e => Num (Matrix e cols rows) where
-
   a + b = zipWithM (+) a b
 
   a - b = zipWithM (-) a b
@@ -326,7 +325,8 @@ instance (FromLists cols ()) => FromLists (Either () cols) () where
   fromLists [h : t] = Join (One h) (fromLists [t])
   fromLists _       = error "Wrong dimensions"
 
-instance {-# OVERLAPPABLE #-} (FromLists a (), FromLists b (), Countable a) => FromLists (Either a b) () where
+instance {-# OVERLAPPABLE #-}
+  (FromLists a (), FromLists b (), Countable a) => FromLists (Either a b) () where
   fromLists [l] =
       let rowsA = fromInteger (natVal (Proxy :: Proxy (Count a)))
        in Join (fromLists [take rowsA l]) (fromLists [drop rowsA l])
@@ -336,13 +336,15 @@ instance (FromLists () rows) => FromLists () (Either () rows) where
   fromLists ([h] : t) = Fork (One h) (fromLists t)
   fromLists _         = error "Wrong dimensions"
 
-instance {-# OVERLAPPABLE #-} (FromLists () a, FromLists () b, Countable a) => FromLists () (Either a b) where
+instance {-# OVERLAPPABLE #-}
+  (FromLists () a, FromLists () b, Countable a) => FromLists () (Either a b) where
   fromLists l@([_] : _) =
       let rowsA = fromInteger (natVal (Proxy :: Proxy (Count a)))
        in Fork (fromLists (take rowsA l)) (fromLists (drop rowsA l))
   fromLists _         = error "Wrong dimensions"
 
-instance (FromLists (Either a b) c, FromLists (Either a b) d, Countable c) => FromLists (Either a b) (Either c d) where
+instance (FromLists (Either a b) c, FromLists (Either a b) d, Countable c)
+  => FromLists (Either a b) (Either c d) where
   fromLists l@(h : t) =
     let lh        = length h
         rowsC     = fromInteger (natVal (Proxy :: Proxy (Count c)))
@@ -369,16 +371,15 @@ matrixBuilder' f =
 matrixBuilder ::
   forall e a b.
   ( FLN a b,
-    CountableN b,
     Enum a,
     Enum b,
     Bounded a,
     Bounded b,
     Eq a,
-    CountableDimsN a b
+    Countable b
   ) => ((a, b) -> e) -> Matrix e (Normalize a) (Normalize b)
 matrixBuilder f =
-  let r         = fromInteger $ natVal (Proxy :: Proxy (Count (Normalize b)))
+  let r         = fromInteger $ natVal (Proxy :: Proxy (Count b))
       positions = [(a, b) | a <- [minBound .. maxBound], b <- [minBound .. maxBound]]
    in fromLists . map (map f) . transpose . buildList r $ positions
   where
@@ -434,24 +435,7 @@ fromF ::
   ) =>
   (a -> b) ->
   Matrix e (Normalize a) (Normalize b)
-fromF f =
-  let minA         = minBound @a
-      maxA         = maxBound @a
-      minB         = minBound @b
-      maxB         = maxBound @b
-      ccols        = fromInteger $ natVal (Proxy :: Proxy (Count (Normalize a)))
-      rrows        = fromInteger $ natVal (Proxy :: Proxy (Count (Normalize b)))
-      elementsA    = take ccols [minA .. maxA]
-      elementsB    = take rrows [minB .. maxB]
-      combinations = (,) <$> elementsA <*> elementsB
-      combAp       = map snd . sort . map (\(a, b) -> if f a == b
-                                                         then ((fromEnum a, fromEnum b), 1)
-                                                         else ((fromEnum a, fromEnum b), 0)) $ combinations
-      mList        = buildList combAp rrows
-   in tr $ fromLists mList
-  where
-    buildList [] _ = []
-    buildList l r  = take r l : buildList (drop r l) r
+fromF = fromF'
 
 -- Conversion
 
@@ -805,38 +789,35 @@ corr p = let f = fromF' p :: Matrix e q ()
 
 -- Pretty print
 
+fill :: Show e => [[e]] -> String -> String
+fill m str = replicate (widest - length str - 2) ' ' ++ str
+  where
+    v  = fmap show m
+    widest = maximum $ fmap length v
+
+fill2 :: Show e => Matrix e cols rows -> String -> String
+fill2 m str = replicate (widest - length str - 2) ' ' ++ str
+  where
+    v  = map show (toList m)
+    widest = maximum $ map length v
+
 prettyAux :: Show e => [[e]] -> [[e]] -> String
-prettyAux [] _     = ""
-prettyAux [[e]] m  = "│ " ++ fill (show e) ++ " │\n"
-  where
-   v  = fmap show m
-   widest = maximum $ fmap length v
-   fill str = replicate (widest - length str - 2) ' ' ++ str
-prettyAux [h] m    = "│ " ++ fill (unwords $ map show h) ++ " │\n"
-  where
-   v        = fmap show m
-   widest   = maximum $ fmap length v
-   fill str = replicate (widest - length str - 2) ' ' ++ str
-prettyAux (h : t) l = "│ " ++ fill (unwords $ map show h) ++ " │\n" ++
-                      prettyAux t l
-  where
-   v        = fmap show l
-   widest   = maximum $ fmap length v
-   fill str = replicate (widest - length str - 2) ' ' ++ str
+prettyAux [] _      = ""
+prettyAux [[e]] m   = "│ " ++ fill m (show e) ++ " │\n"
+prettyAux [h] m     = "│ " ++ fill m (unwords $ map show h) ++ " │\n"
+prettyAux (h : t) m = "│ " ++ fill m (unwords $ map show h) ++ " │\n" ++
+                      prettyAux t m
 
 -- | Matrix pretty printer
 pretty :: (CountableDims cols rows, Show e) => Matrix e cols rows -> String
 pretty m = concat
    [ "┌ ", unwords (replicate (columns m) blank), " ┐\n"
    , unlines
-   [ "│ " ++ unwords (fmap (\j -> fill $ show $ getElem i j m) [1..columns m]) ++ " │" | i <- [1..rows m] ]
+   [ "│ " ++ unwords (fmap (\j -> fill2 m $ show $ getElem i j m) [1..columns m]) ++ " │" | i <- [1..rows m] ]
    , "└ ", unwords (replicate (columns m) blank), " ┘"
    ]
  where
-   strings  = map show (toList m)
-   widest   = maximum $ map length strings
-   fill str = replicate (widest - length str) ' ' ++ str
-   blank    = fill ""
+   blank    = fill2 m ""
    safeGet i j m
     | i > rows m || j > columns m || i < 1 || j < 1 = Nothing
     | otherwise = Just $ unsafeGet i j m (toList m)
@@ -947,24 +928,7 @@ fromFRel' ::
   ) =>
   (a -> b) ->
   Relation cols rows
-fromFRel' f =
-  let minA         = minBound @a
-      maxA         = maxBound @a
-      minB         = minBound @b
-      maxB         = maxBound @b
-      ccols        = fromInteger $ natVal (Proxy :: Proxy (Count cols))
-      rrows        = fromInteger $ natVal (Proxy :: Proxy (Count rows))
-      elementsA    = take ccols [minA .. maxA]
-      elementsB    = take rrows [minB .. maxB]
-      combinations = (,) <$> elementsA <*> elementsB
-      combAp       = map snd . sort . map (\(a, b) -> if f a == b
-                                                         then ((fromEnum a, fromEnum b), nat 1)
-                                                         else ((fromEnum a, fromEnum b), nat 0)) $ combinations
-      mList        = buildList combAp rrows
-   in tr $ fromLists mList
-  where
-    buildList [] _ = []
-    buildList l r  = take r l : buildList (drop r l) r
+fromFRel' = fromF'
 
 -- | Lifts functions to relations with dimensions matching @a@ and @b@
 -- cardinality's.
@@ -972,28 +936,11 @@ fromFRel ::
   forall a b.
   ( Liftable Boolean a b,
     CountableDimsN a b,
-    FL (Normalize b) (Normalize a)
+    FLN b a
   ) =>
   (a -> b) ->
   Relation (Normalize a) (Normalize b)
-fromFRel f =
-  let minA         = minBound @a
-      maxA         = maxBound @a
-      minB         = minBound @b
-      maxB         = maxBound @b
-      ccols        = fromInteger $ natVal (Proxy :: Proxy (Count (Normalize a)))
-      rrows        = fromInteger $ natVal (Proxy :: Proxy (Count (Normalize b)))
-      elementsA    = take ccols [minA .. maxA]
-      elementsB    = take rrows [minB .. maxB]
-      combinations = (,) <$> elementsA <*> elementsB
-      combAp       = map snd . sort . map (\(a, b) -> if f a == b
-                                                         then ((fromEnum a, fromEnum b), nat 1)
-                                                         else ((fromEnum a, fromEnum b), nat 0)) $ combinations
-      mList        = buildList combAp rrows
-   in tr $ fromLists mList
-  where
-    buildList [] _ = []
-    buildList l r  = take r l : buildList (drop r l) r
+fromFRel = fromFRel'
 
 -- | Lifts a relation function to a Boolean Matrix
 toRel ::
@@ -1003,7 +950,7 @@ toRel ::
         Enum a,
         Enum b,
         Eq b,
-        CountableDimsN a b,
+        CountableDims a b,
         FLN b a
       )
       => (a -> b -> Bool) -> Relation (Normalize a) (Normalize b)
@@ -1012,8 +959,8 @@ toRel f =
       maxA         = maxBound @a
       minB         = minBound @b
       maxB         = maxBound @b
-      ccols        = fromInteger $ natVal (Proxy :: Proxy (Count (Normalize a)))
-      rrows        = fromInteger $ natVal (Proxy :: Proxy (Count (Normalize b)))
+      ccols        = fromInteger $ natVal (Proxy :: Proxy (Count a))
+      rrows        = fromInteger $ natVal (Proxy :: Proxy (Count b))
       elementsA    = take ccols [minA .. maxA]
       elementsB    = take rrows [minB .. maxB]
       combinations = (,) <$> elementsA <*> elementsB
