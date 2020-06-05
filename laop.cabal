@@ -1,8 +1,9 @@
 cabal-version:       2.4
 name:                laop
-version:             0.1.1.0
-synopsis:            See README for more info
-description:         See README for more info
+version:             0.1.1.1
+synopsis:            Matrix programming library
+description:         Matrix programming library that uses a type-safe inductive definition
+                     inspired by the Linear Algebra of Programming
 homepage:            https://github.com/bolt12/laop
 bug-reports:         https://github.com/bolt12/laop/issues
 license:             MIT
@@ -22,7 +23,7 @@ source-repository head
   location:            https://github.com/bolt12/laop.git
 
 common common-options
-  build-depends:       base >= 4.12.0.0 && < 4.14,
+  build-depends:       base >= 4.12.0.0 && < 5,
                        deepseq
   
   ghc-options:         -Wall
