@@ -21,7 +21,7 @@ cnot = kr fstM (fromF xor)
 ccnot :: (Num e, Ord e) => Matrix e ((Bool, Bool), Bool) ((Bool, Bool), Bool)
 ccnot = kr fstM (fromF f)
   where
-    f = xor . (tp (uncurry (&&)) id)
+    f = xor . tp (uncurry (&&)) id
     tp f g (a,b) = (f a, g b)
 
 had :: Matrix (Complex Double) Bool Bool
