@@ -1,7 +1,6 @@
 {-# LANGUAGE DeriveGeneric #-}
 
-module Spreadsheets
-  where
+module Examples.Spreadsheets
 
 import LAoP.Utils
 import LAoP.Matrix.Type

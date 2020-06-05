@@ -1,2 +1,8 @@
+module Main (main) where
+
+import qualified Examples.Readme as RD
+
 main :: IO ()
-main = putStrLn "Test suite not yet implemented"
+main = do
+  putStrLn ("Testing if README works" :: String)
+  RD.exec

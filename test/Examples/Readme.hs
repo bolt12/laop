@@ -5,7 +5,7 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE DataKinds #-}
 
-module Examples
+module Examples.Readme
     ( exec
     )
   where

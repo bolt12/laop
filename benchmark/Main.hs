@@ -8,10 +8,7 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Benchmarks
-    ( benchmark
-    )
-  where
+module Main (main) where
 
 import LAoP.Dist.Internal
 import LAoP.Utils
@@ -147,8 +144,8 @@ setupEnv2 = do
   distList2 <- generate (resize 1 (randomDistF @(Natural 0 100) @(Natural 0 100)))
   return (m21, m40, dist, dist2, distList1, distList2)
 
-benchmark :: IO ()
-benchmark = defaultMain [
+main :: IO ()
+main = defaultMain [
    env setupEnv $ \ ~(m11, m12, m21, m22, m31, m32) -> bgroup "Matrix Composition" [
    bgroup "10x10" [
      bench "WHNF - 10x10" $ whnf (comp m11) m12

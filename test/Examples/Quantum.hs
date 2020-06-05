@@ -1,5 +1,5 @@
 {-# LANGUAGE StandaloneDeriving #-}
-module Quantum where
+module Examples.Quantum where
 
 import LAoP.Utils
 import LAoP.Matrix.Type
