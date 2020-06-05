@@ -22,7 +22,7 @@ A Functional Pearl has been written and can be regarded as the [reference docume
 
 ## Features
 
-This library offers 4 main matrix programming modules:
+This library offers 3 main matrix programming modules:
 
 - One in which matrices are typed with type level natural numbers;
 - One in which matrices are typed with arbitrary generic data types;
