@@ -789,35 +789,38 @@ corr p = let f = fromF' p :: Matrix e q ()
 
 -- Pretty print
 
-fill :: Show e => [[e]] -> String -> String
-fill m str = replicate (widest - length str - 2) ' ' ++ str
-  where
-    v  = fmap show m
-    widest = maximum $ fmap length v
-
-fill2 :: Show e => Matrix e cols rows -> String -> String
-fill2 m str = replicate (widest - length str - 2) ' ' ++ str
-  where
-    v  = map show (toList m)
-    widest = maximum $ map length v
-
 prettyAux :: Show e => [[e]] -> [[e]] -> String
-prettyAux [] _      = ""
-prettyAux [[e]] m   = "│ " ++ fill m (show e) ++ " │\n"
-prettyAux [h] m     = "│ " ++ fill m (unwords $ map show h) ++ " │\n"
-prettyAux (h : t) m = "│ " ++ fill m (unwords $ map show h) ++ " │\n" ++
-                      prettyAux t m
+prettyAux [] _     = ""
+prettyAux [[e]] m  = "│ " ++ fill (show e) ++ " │\n"
+  where
+   v  = fmap show m
+   widest = maximum $ fmap length v
+   fill str = replicate (widest - length str - 2) ' ' ++ str
+prettyAux [h] m    = "│ " ++ fill (unwords $ map show h) ++ " │\n"
+  where
+   v        = fmap show m
+   widest   = maximum $ fmap length v
+   fill str = replicate (widest - length str - 2) ' ' ++ str
+prettyAux (h : t) l = "│ " ++ fill (unwords $ map show h) ++ " │\n" ++
+                      prettyAux t l
+  where
+   v        = fmap show l
+   widest   = maximum $ fmap length v
+   fill str = replicate (widest - length str - 2) ' ' ++ str
 
 -- | Matrix pretty printer
 pretty :: (CountableDims cols rows, Show e) => Matrix e cols rows -> String
 pretty m = concat
    [ "┌ ", unwords (replicate (columns m) blank), " ┐\n"
    , unlines
-   [ "│ " ++ unwords (fmap (\j -> fill2 m $ show $ getElem i j m) [1..columns m]) ++ " │" | i <- [1..rows m] ]
+   [ "│ " ++ unwords (fmap (\j -> fill $ show $ getElem i j m) [1..columns m]) ++ " │" | i <- [1..rows m] ]
    , "└ ", unwords (replicate (columns m) blank), " ┘"
    ]
  where
-   blank    = fill2 m ""
+   strings  = map show (toList m)
+   widest   = maximum $ map length strings
+   fill str = replicate (widest - length str) ' ' ++ str
+   blank    = fill ""
    safeGet i j m
     | i > rows m || j > columns m || i < 1 || j < 1 = Nothing
     | otherwise = Just $ unsafeGet i j m (toList m)
