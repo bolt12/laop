@@ -25,9 +25,6 @@ matrix:
   
 
 install:
-  # HLint check
-  - curl -sSL https://raw.github.com/ndmitchell/neil/master/misc/travis.sh | sh -s -- hlint .
-
   - |
     if [ -z "$STACK_YAML" ]; then
       cabal v2-update
