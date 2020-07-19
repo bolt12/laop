@@ -45,7 +45,7 @@ jobs:
 
     - name: Build
       run: |
-        nix-build --arg exe --argstr compiler ${{ matrix.ghc }}
+        nix-build --attr exe --argstr compiler ${{ matrix.ghc }}
 
     - name: Test
       run: |
