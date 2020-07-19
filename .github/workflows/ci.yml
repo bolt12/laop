@@ -37,11 +37,11 @@ jobs:
       name: Install Nix
 
     - uses: cachix/cachix-action@v6
-          with:
-            name: mycache
-            signingKey: '${{ secrets.CACHIX_SIGNING_KEY }}'
-            # Only needed for private caches
-            #authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+      with:
+        name: mycache
+        signingKey: '${{ secrets.CACHIX_SIGNING_KEY }}'
+        # Only needed for private caches
+        #authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
 
     - name: Build
       run: |
