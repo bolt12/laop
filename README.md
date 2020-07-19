@@ -2,7 +2,6 @@
 
 [![built with nix](https://img.shields.io/badge/Built_With-Nix-5277C3.svg?logo=nixos&labelColor=73C3D5)](https://builtwithnix.org)
 [![GitHub CI](https://github.com/bolt12/laop/workflows/CI/badge.svg)](https://github.com/bolt12/laop/actions)
-[![Build status](https://img.shields.io/travis/bolt12/laop.svg?logo=travis)](https://travis-ci.org/bolt12/laop)
 [![Hackage](https://img.shields.io/hackage/v/laop.svg?logo=haskell)](https://hackage.haskell.org/package/laop)
 
 The LAoP discipline generalises relations and functions treating them as

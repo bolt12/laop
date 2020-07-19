@@ -37,6 +37,7 @@ jobs:
       name: Install Nix
 
     - uses: cachix/cachix-action@v6
+      if: matrix.ghc == 'ghc883' # Push to cachix only the most up to date GHC version
       with:
         name: bolt12-laop
         signingKey: ${{ secrets.CACHIX_SIGNING_KEY }}
