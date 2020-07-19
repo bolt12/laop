@@ -14,30 +14,41 @@ jobs:
       matrix:
         cabal: ["3.0"]
         ghc:
-          - "8.6.5"
-          - "8.8.3"
+          - "ghc865"
+          - "ghc883"
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v2.3.1
       if: github.event.action == 'opened' || github.event.action == 'synchronize' || github.event.ref == 'refs/heads/master'
 
-    - uses: actions/setup-haskell@v1
-      name: Setup Haskell
-      with:
-        ghc-version: ${{ matrix.ghc }}
-        cabal-version: ${{ matrix.cabal }}
+    #- uses: actions/setup-haskell@v1
+    #  name: Setup Haskell
+    #  with:
+    #    ghc-version: ${{ matrix.ghc }}
+    #    cabal-version: ${{ matrix.cabal }}
 
-    - uses: actions/cache@v1
-      name: Cache ~/.cabal/store
+    #- uses: actions/cache@v1
+    #  name: Cache ~/.cabal/store
+    #  with:
+    #    path: ~/.cabal/store
+    #    key: ${{ runner.os }}-${{ matrix.ghc }}-cabal
+
+    - uses: cachix/install-nix-action@v10
+      name: Install Nix
+
+    - uses: cachix/cachix-action@v6
+      if: matrix.ghc == 'ghc883' # Push to cachix only the most up to date GHC version
       with:
-        path: ~/.cabal/store
-        key: ${{ runner.os }}-${{ matrix.ghc }}-cabal
+        name: bolt12-laop
+        signingKey: ${{ secrets.CACHIX_SIGNING_KEY }}
+        # Only needed for private caches
+        #authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
 
     - name: Build
       run: |
-        cabal v2-update
-        cabal v2-build --enable-tests --enable-benchmarks
+        nix-build --attr exe --argstr compiler ${{ matrix.ghc }}
 
     - name: Test
       run: |
-        cabal v2-test --enable-tests
+        nix-shell --argstr compiler ${{ matrix.ghc }} --run 'cabal v2-test --enable-tests'
+

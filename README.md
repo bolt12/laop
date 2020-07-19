@@ -1,10 +1,8 @@
 # laop - Linear Algebra of Programming library
 
+[![built with nix](https://img.shields.io/badge/Built_With-Nix-5277C3.svg?logo=nixos&labelColor=73C3D5)](https://builtwithnix.org)
 [![GitHub CI](https://github.com/bolt12/laop/workflows/CI/badge.svg)](https://github.com/bolt12/laop/actions)
-[![Build status](https://img.shields.io/travis/bolt12/laop.svg?logo=travis)](https://travis-ci.org/bolt12/laop)
 [![Hackage](https://img.shields.io/hackage/v/laop.svg?logo=haskell)](https://hackage.haskell.org/package/laop)
-[![Stackage Lts](http://stackage.org/package/laop/badge/lts)](http://stackage.org/lts/package/laop)
-[![Stackage Nightly](http://stackage.org/package/laop/badge/nightly)](http://stackage.org/nightly/package/laop)
 
 The LAoP discipline generalises relations and functions treating them as
 Boolean matrices and in turn consider these as arrows.
@@ -14,7 +12,7 @@ in Haskell. See [my Msc Thesis](https://github.com/bolt12/master-thesis) for the
 motivation behind the library, the underlying theory, and implementation details.
 
 This module offers many of the combinators mentioned in the work of
-[Macedo (2012)](https://repositorium.sdum.uminho.pt/handle/1822/22894) and [Oliveira (2012)](https://pdfs.semanticscholar.org/ccf5/27fa9179081223bffe8067edd81948644fc0.pdf). 
+[Macedo (2012)](https://repositorium.sdum.uminho.pt/handle/1822/22894) and [Oliveira (2012)](https://pdfs.semanticscholar.org/ccf5/27fa9179081223bffe8067edd81948644fc0.pdf).
 
 See the package in hackage [here](https://hackage.haskell.org/package/laop-0.1.1.0)
 
