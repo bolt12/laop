@@ -4,8 +4,6 @@
 [![GitHub CI](https://github.com/bolt12/laop/workflows/CI/badge.svg)](https://github.com/bolt12/laop/actions)
 [![Build status](https://img.shields.io/travis/bolt12/laop.svg?logo=travis)](https://travis-ci.org/bolt12/laop)
 [![Hackage](https://img.shields.io/hackage/v/laop.svg?logo=haskell)](https://hackage.haskell.org/package/laop)
-[![Stackage Lts](http://stackage.org/package/laop/badge/lts)](http://stackage.org/lts/package/laop)
-[![Stackage Nightly](http://stackage.org/package/laop/badge/nightly)](http://stackage.org/nightly/package/laop)
 
 The LAoP discipline generalises relations and functions treating them as
 Boolean matrices and in turn consider these as arrows.

@@ -26,7 +26,8 @@ let
       (import sources.niv {}).niv
       pkgs.nixpkgs-fmt
     ];
-    withHoogle = true;
+    withHoogle = false; # If 'true' it gives an error because the library only depends on
+                        # 'base'
   };
 
   exe = pkgs.haskell.lib.justStaticExecutables (myHaskellPackages."laop");
