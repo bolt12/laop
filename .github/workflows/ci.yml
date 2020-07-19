@@ -14,8 +14,8 @@ jobs:
       matrix:
         cabal: ["3.0"]
         ghc:
-          - "8.6.5"
-          - "8.8.3"
+          - "ghc865"
+          - "ghc883"
 
     steps:
     - uses: actions/checkout@v2.3.1
