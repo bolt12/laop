@@ -332,7 +332,6 @@ matrixBuilder ::
     Enum b,
     Bounded a,
     Bounded b,
-    Eq a,
     Countable b
   ) => ((a, b) -> e) -> Matrix e a b
 matrixBuilder f = M (I.matrixBuilder f)
@@ -408,7 +407,7 @@ ones = M I.ones
 -- | The constant matrix constructor. A matrix wholly filled with a given
 -- value.
 constant ::
-  (Num e, FLN cols rows, CountableDimsN cols rows)
+  (FLN cols rows, CountableDimsN cols rows)
   => e -> Matrix e cols rows
 constant = M . I.constant
 
@@ -679,8 +678,7 @@ selectM (M m) (M y) = M (I.select m y)
 
 -- | McCarthy's Conditional expresses probabilistic choice.
 cond ::
-     ( Trivial a,
-       Trivial2 a,
+     ( Trivial2 a,
        Trivial3 a,
        CountableN a,
        FLN () a,
