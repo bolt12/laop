@@ -176,14 +176,11 @@ import Data.Kind
 import Data.List
 import Data.Maybe
 import Data.Proxy
-import Data.Typeable
-import Data.Void
 import GHC.TypeLits
 import Data.Type.Equality
 import GHC.Generics
 import Control.DeepSeq
 import Prelude hiding (id, (.))
-import qualified Prelude (id, (.))
 
 -- | LAoP (Linear Algebra of Programming) Inductive Matrix definition.
 data Matrix e cols rows where
@@ -352,6 +349,7 @@ instance (FromLists (Either a b) c, FromLists (Either a b) d, Countable c)
      in if lh > 0 && condition
           then Fork (fromLists (take rowsC l)) (fromLists (drop rowsC l))
           else error "Not all rows have the same length"
+  fromLists _         = error "Wrong dimensions"
 
 -- | Matrix builder function. Constructs a matrix provided with
 -- a construction function that operates with indices.
@@ -375,7 +373,6 @@ matrixBuilder ::
     Enum b,
     Bounded a,
     Bounded b,
-    Eq a,
     Countable b
   ) => ((a, b) -> e) -> Matrix e (Normalize a) (Normalize b)
 matrixBuilder f =
@@ -467,7 +464,7 @@ ones = matrixBuilder' (const 1)
 
 -- | The constant matrix constructor. A matrix wholly filled with a given
 -- value.
-constant :: (Num e, FL cols rows, CountableDims cols rows) => e -> Matrix e cols rows
+constant :: (FL cols rows, CountableDims cols rows) => e -> Matrix e cols rows
 constant e = matrixBuilder' (const e)
 
 -- Bang Matrix
@@ -789,25 +786,6 @@ corr p = let f = fromF' p :: Matrix e q ()
 
 -- Pretty print
 
-prettyAux :: Show e => [[e]] -> [[e]] -> String
-prettyAux [] _     = ""
-prettyAux [[e]] m  = "│ " ++ fill (show e) ++ " │\n"
-  where
-   v  = fmap show m
-   widest = maximum $ fmap length v
-   fill str = replicate (widest - length str - 2) ' ' ++ str
-prettyAux [h] m    = "│ " ++ fill (unwords $ map show h) ++ " │\n"
-  where
-   v        = fmap show m
-   widest   = maximum $ fmap length v
-   fill str = replicate (widest - length str - 2) ' ' ++ str
-prettyAux (h : t) l = "│ " ++ fill (unwords $ map show h) ++ " │\n" ++
-                      prettyAux t l
-  where
-   v        = fmap show l
-   widest   = maximum $ fmap length v
-   fill str = replicate (widest - length str - 2) ' ' ++ str
-
 -- | Matrix pretty printer
 pretty :: (CountableDims cols rows, Show e) => Matrix e cols rows -> String
 pretty m = concat
@@ -952,7 +930,6 @@ toRel ::
         Bounded b,
         Enum a,
         Enum b,
-        Eq b,
         CountableDims a b,
         FLN b a
       )

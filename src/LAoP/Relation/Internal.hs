@@ -68,6 +68,7 @@ module LAoP.Relation.Internal
     fromLists,
     fromF',
     fromF,
+    fromRel,
     toRel,
     toLists,
     toList,
@@ -174,7 +175,6 @@ module LAoP.Relation.Internal
   )
     where
 
-import Data.Void
 import qualified LAoP.Matrix.Internal as I
 import LAoP.Utils.Internal
 import Control.DeepSeq
@@ -184,7 +184,6 @@ import Prelude hiding (id, (.))
 
 -- | Boolean type synonym for working with boolean matrices
 type Boolean = Natural 0 1
-type Powerset a = List (List a)
 
 -- | Relation data type.
 newtype Relation a b = R (I.Matrix Boolean (I.Normalize a) (I.Normalize b))
@@ -223,7 +222,6 @@ instance Num (Relation a b) where
     negate (R a) = R (I.negateM a) 
 
 -- Type alias
-type Zero = Void
 type One  = ()
 
 -- Primitives
@@ -282,7 +280,6 @@ relationBuilder ::
     Enum b,
     Bounded a,
     Bounded b,
-    Eq a,
     CountableDims a b
   ) => ((a, b) -> Boolean) -> Relation a b
 relationBuilder = R . I.matrixBuilder
@@ -927,7 +924,6 @@ untrans s = fstR . conv (splitR (conv s) sndR)
 predR :: 
       ( Bounded a,
         Enum a,
-        Countable a,
         CountableN a,
         FLN a a,
         FLN Bool a
@@ -959,7 +955,6 @@ guard ::
      ( Bounded b,
        Enum b,
        CountableN b,
-       Countable b,
        FLN b b,
        FLN Bool b
      ) => Relation b Bool -> Relation b (Either b b)
@@ -969,7 +964,6 @@ guard p = conv (eitherR (predR p) (predR (negate p)))
 cond ::
      ( Bounded b,
        Enum b,
-       Countable b,
        CountableN b,
        FLN b b,
        FLN Bool b
