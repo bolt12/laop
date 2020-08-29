@@ -16,7 +16,7 @@ This module offers many of the combinators mentioned in the work of
 
 See the package in hackage [here](https://hackage.haskell.org/package/laop-0.1.1.0)
 
-A Functional Pearl has been written and can be regarded as the [reference document](https://github.com/bolt12/tymfgg-pearl) for this library.
+A Functional Pearl has been written and can be regarded as the [reference document](https://github.com/bolt12/tymfgg-pearl) ([ACM link](https://dl.acm.org/doi/abs/10.1145/3406088.3409019)) for this library.
 
 ## Features
 
