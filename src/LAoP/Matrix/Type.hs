@@ -183,7 +183,7 @@ where
 import Data.Void
 import Data.Proxy
 import Data.Kind
-import GHC.TypeLits
+import GHC.TypeLits hiding (Natural)
 import Control.DeepSeq
 import LAoP.Utils
 import qualified LAoP.Matrix.Internal as I

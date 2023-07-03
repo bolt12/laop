@@ -6,11 +6,13 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
+{-# OPTIONS_GHC -Wno-orphans #-}
+
 module LAoP.Utils.Internal
   (
     -- * 'Natural' data type
     Natural(..),
-    nat,
+    reifyToNatural,
 
     -- * Coerce auxiliar functions to help promote 'Int' typed functions to
     -- 'Natural' typed functions.
@@ -30,7 +32,7 @@ import Data.Coerce
 import Data.Proxy
 import Data.List
 import Data.Maybe
-import GHC.TypeLits
+import GHC.TypeLits hiding (Natural)
 import Control.DeepSeq
 import GHC.Generics
 import Data.Kind
@@ -46,25 +48,25 @@ newtype Natural (start :: Nat) (end :: Nat) = Nat Int
 -- | Throws a runtime error if any of the operations overflows or
 -- underflows.
 instance (KnownNat n, KnownNat m) => Num (Natural n m) where
-    (Nat a) + (Nat b) = nat @n @m (a + b)
-    (Nat a) - (Nat b) = nat @n @m (a - b)
-    (Nat a) * (Nat b) = nat @n @m (a * b)
-    abs (Nat a) = nat @n @m (abs a)
-    signum (Nat a) = nat @n @m (signum a)
-    fromInteger i = nat @n @m (fromInteger i)
+    (Nat a) + (Nat b) = reifyToNatural @n @m (a + b)
+    (Nat a) - (Nat b) = reifyToNatural @n @m (a - b)
+    (Nat a) * (Nat b) = reifyToNatural @n @m (a * b)
+    abs (Nat a) = reifyToNatural @n @m (abs a)
+    signum (Nat a) = reifyToNatural @n @m (signum a)
+    fromInteger i = reifyToNatural @n @m (fromInteger i)
 
--- | Natural constructor function. Throws a runtime error if the 'Int'
--- value is greater than the corresponding @m@ or lower than @n@ in the @'Natural' n m@ type.
-nat :: forall n m . (KnownNat n, KnownNat m) => Int -> Natural n m
-nat i =
+-- | Natural constructor function. Throws a runtime error if the 'Int' value is greater
+-- than the corresponding @m@ or lower than @n@ in the @'Natural' n m@ type.
+reifyToNatural :: forall n m . (KnownNat n, KnownNat m) => Int -> Natural n m
+reifyToNatural i =
   let start = fromInteger (natVal (Proxy :: Proxy n))
       end   = fromInteger (natVal (Proxy :: Proxy m))
    in if start <= i && i <= end
         then Nat i
         else error "Off limits"
 
--- | Auxiliary function that promotes binary 'Int' functions to 'Natural'
--- binary functions.
+-- | Auxiliary function that promotes binary 'Int' functions to 'Natural' binary
+-- functions.
 coerceNat :: (Int -> Int -> Int) -> (Natural a a' -> Natural b b' -> Natural c c')
 coerceNat = coerce
 
@@ -75,7 +77,7 @@ coerceNat2 = coerce
 
 -- | Auxiliary function that promotes ternary (binary) 'Int' functions to 'Natural'
 -- functions.
-coerceNat3 :: (Int -> Int -> a) -> (Natural b b' -> Natural c c' -> a) 
+coerceNat3 :: (Int -> Int -> a) -> (Natural b b' -> Natural c c' -> a)
 coerceNat3 = coerce
 
 instance (KnownNat n, KnownNat m) => Bounded (Natural n m) where
@@ -83,9 +85,9 @@ instance (KnownNat n, KnownNat m) => Bounded (Natural n m) where
   maxBound = Nat $ fromInteger (natVal (Proxy :: Proxy m))
 
 instance (KnownNat n, KnownNat m) => Enum (Natural n m) where
-  toEnum i = 
+  toEnum i =
       let start = fromInteger (natVal (Proxy :: Proxy n))
-       in nat (start + i)
+       in reifyToNatural (start + i)
   -- | Throws a runtime error if the value is off limits
   fromEnum (Nat nat) =
     let start = fromInteger (natVal (Proxy :: Proxy n))
@@ -157,7 +159,7 @@ instance
     Bounded a
   ) => Bounded (List a)
   where
-  minBound = L [] 
+  minBound = L []
   maxBound = L [minBound .. maxBound]
 
 instance
@@ -171,7 +173,7 @@ instance
         in L (powerset as !! i)
 
   fromEnum (L []) = 0
-  fromEnum (L x) = 
+  fromEnum (L x) =
     let as = [minBound .. maxBound]
         in fromMaybe (error "Does not exist") $ elemIndex x (powerset as)
 
@@ -181,15 +183,6 @@ class Category k where
   type Object k o = ()
   id :: Object k a => k a a
   (.) :: k b c -> k a b -> k a c
-
-{-# RULES
-"identity/left" forall p .
-                id . p = p
-"identity/right"        forall p .
-                p . id = p
-"association"   forall p q r .
-                (p . q) . r = p . (q . r)
- #-}
 
 instance Category (->) where
   id = Prelude.id

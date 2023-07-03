@@ -48,8 +48,8 @@ module LAoP.Matrix.Nat
     --
     --         There exists two type families that make it easier to write
     --         matrix dimensions: 'FromNat' and 'Count'. This approach
-    --         leads to a very straightforward implementation 
-    --         of LAoP combinators. 
+    --         leads to a very straightforward implementation
+    --         of LAoP combinators.
 
     -- * Type safe matrix representation
     Matrix (..),
@@ -102,7 +102,7 @@ module LAoP.Matrix.Nat
     (./),
 
     -- ** Selective operator
-    select, 
+    select,
 
     -- ** McCarthy's Conditional
     cond,
@@ -157,10 +157,11 @@ module LAoP.Matrix.Nat
   )
 where
 
-import Data.Proxy
 import GHC.TypeLits
 import Control.DeepSeq
 import qualified LAoP.Matrix.Internal as I
+import Data.Proxy (Proxy)
+import Data.List (sort)
 
 newtype Matrix e (cols :: Nat) (rows :: Nat) = M (I.Matrix e (I.FromNat cols) (I.FromNat rows))
   deriving (Show, Num, Eq, Ord, NFData) via (I.Matrix e (I.FromNat cols) (I.FromNat rows))
@@ -220,7 +221,7 @@ fromLists = M . I.fromLists
 -- | Matrix builder function. Constructs a matrix provided with
 -- a construction function that operates with indices.
 matrixBuilder' ::
-  (FLN e cols rows, CountableN cols, CountableN rows) 
+  (FLN e cols rows, CountableN cols, CountableN rows)
   => ((Int, Int) -> e) -> Matrix e cols rows
 matrixBuilder' = M . I.matrixBuilder'
 
@@ -240,15 +241,32 @@ fromF' ::
   Matrix e cols rows
 fromF' = M . I.fromF'
 
-fromF ::
+fromF :: forall e a b.
   ( Liftable e a b,
-    CountableNz a,
-    CountableNz b,
-    FLNz e b a
+    KnownNat (I.Count a),
+    KnownNat (I.Count b),
+    I.FL (I.FromNat (I.Count b)) (I.FromNat (I.Count a))
   ) =>
   (a -> b) ->
   Matrix e (I.Count a) (I.Count b)
-fromF = undefined -- M . I.fromF
+fromF f =
+  let minA         = minBound @a
+      maxA         = maxBound @a
+      minB         = minBound @b
+      maxB         = maxBound @b
+      ccols        = fromInteger $ natVal (undefined :: Proxy (I.Count a))
+      rrows        = fromInteger $ natVal (undefined :: Proxy (I.Count b))
+      elementsA    = take ccols [minA .. maxA]
+      elementsB    = take rrows [minB .. maxB]
+      combinations = (,) <$> elementsA <*> elementsB
+      combAp       = map snd . sort . map (\(a, b) -> if f a == b
+                                                         then ((fromEnum a, fromEnum b), 1)
+                                                         else ((fromEnum a, fromEnum b), 0)) $ combinations
+      mList        = buildList combAp rrows
+   in tr $ fromLists mList
+  where
+    buildList [] _ = []
+    buildList l r  = take r l : buildList (drop r l) r
 
 -- Conversion
 
@@ -275,7 +293,7 @@ ones = M I.ones
 -- Const Matrix
 
 constant ::
-  (Num e, FLN e cols rows, CountableN cols, CountableN rows) =>
+  (FLN e cols rows, CountableN cols, CountableN rows) =>
   e ->
   Matrix e cols rows
 constant = M . I.constant
@@ -453,7 +471,7 @@ tr :: Matrix e cols rows -> Matrix e rows cols
 tr (M m) = M (I.tr m)
 
 -- Selective 'select' operator
-select :: 
+select ::
        ( Num e,
          FLN e rows1 rows1,
          CountableN rows1,
