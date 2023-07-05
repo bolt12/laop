@@ -176,7 +176,7 @@ import Data.Kind
 import Data.List
 import Data.Maybe
 import Data.Proxy
-import GHC.TypeLits
+import GHC.TypeLits hiding (Natural)
 import Data.Type.Equality
 import GHC.Generics
 import Control.DeepSeq
@@ -269,6 +269,8 @@ instance Num e => Num (Matrix e cols rows) where
   signum (One a)    = One (signum a)
   signum (Join a b) = Join (signum a) (signum b)
   signum (Fork a b) = Fork (signum a) (signum b)
+
+  fromInteger = error "fromInteger: doesn't exist"
 
 instance Ord e => Ord (Matrix e cols rows) where
     (One a) <= (One b)           = a <= b
@@ -791,7 +793,7 @@ pretty :: (CountableDims cols rows, Show e) => Matrix e cols rows -> String
 pretty m = concat
    [ "┌ ", unwords (replicate (columns m) blank), " ┐\n"
    , unlines
-   [ "│ " ++ unwords (fmap (\j -> fill $ show $ getElem i j m) [1..columns m]) ++ " │" | i <- [1..rows m] ]
+   [ "│ " ++ unwords (fmap (fill . show . getElem i) [1..columns m]) ++ " │" | i <- [1..rows m] ]
    , "└ ", unwords (replicate (columns m) blank), " ┘"
    ]
  where
@@ -799,12 +801,12 @@ pretty m = concat
    widest   = maximum $ map length strings
    fill str = replicate (widest - length str) ' ' ++ str
    blank    = fill ""
-   safeGet i j m
+   safeGet i j
     | i > rows m || j > columns m || i < 1 || j < 1 = Nothing
-    | otherwise = Just $ unsafeGet i j m (toList m)
-   unsafeGet i j m l = l !! encode (columns m) (i,j)
-   encode m (i,j)    = (i-1)*m + j - 1
-   getElem i j m     =
+    | otherwise = Just $ unsafeGet i j (toList m)
+   unsafeGet i j l = l !! encode (i,j)
+   encode (i,j)    = (i-1)* columns m + j - 1
+   getElem i j     =
      fromMaybe
        (error $
           "getElem: Trying to get the "
@@ -813,7 +815,7 @@ pretty m = concat
            ++ show (rows m) ++ "x" ++ show (columns m)
            ++ " matrix."
        )
-       (safeGet i j m)
+       (safeGet i j)
 
 -- | Matrix pretty printer
 prettyPrint :: (CountableDims cols rows, Show e) => Matrix e cols rows -> IO ()
@@ -837,11 +839,12 @@ toBool :: (Num e, Eq e) => e -> Bool
 toBool n
   | n == 0 = False
   | n == 1 = True
+  | otherwise = error "toBool: argument out of range"
 
 -- | Helper conversion function
 fromBool :: Bool -> Natural 0 1
-fromBool True  = nat 1
-fromBool False = nat 0
+fromBool True  = reifyToNatural 1
+fromBool False = reifyToNatural 0
 
 -- | Relational negation
 negateM :: Relation cols rows -> Relation cols rows
@@ -867,7 +870,7 @@ andM x@(Join _ _) y@(Fork _ _) = andM (abideJF x) y
 
 -- | Relational subtraction
 subM :: Relation cols rows -> Relation cols rows -> Relation cols rows
-subM (One a) (One b)           = if a - b < nat 0 then One (nat 0) else One (a - b)
+subM (One a) (One b)           = if a - b < reifyToNatural 0 then One (reifyToNatural 0) else One (a - b)
 subM (Join a b) (Join c d)     = Join (subM a c) (subM b d)
 subM (Fork a b) (Fork c d)     = Fork (subM a c) (subM b d)
 subM x@(Fork _ _) y@(Join _ _) = subM x (abideJF y)
@@ -945,8 +948,8 @@ toRel f =
       elementsB    = take rrows [minB .. maxB]
       combinations = (,) <$> elementsA <*> elementsB
       combAp       = map snd . sort . map (\(a, b) -> if uncurry f (a, b)
-                                                         then ((fromEnum a, fromEnum b), nat 1)
-                                                         else ((fromEnum a, fromEnum b), nat 0)) $ combinations
+                                                         then ((fromEnum a, fromEnum b), reifyToNatural 1)
+                                                         else ((fromEnum a, fromEnum b), reifyToNatural 0)) $ combinations
       mList        = buildList combAp rrows
    in tr $ fromLists mList
   where

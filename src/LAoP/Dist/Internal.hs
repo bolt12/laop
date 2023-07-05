@@ -70,7 +70,7 @@ type Liftable a b       = (Bounded a, Bounded b, Enum a, Enum b, Eq b, Num Prob,
 type TrivialP a b       = Normalize (a, b) ~ Normalize (Normalize a, Normalize b)
 
 -- | Functor instance
-fmapD :: 
+fmapD ::
      ( Liftable a b,
        CountableDimsN a b,
        FLN b a
@@ -84,7 +84,7 @@ unitD :: Dist ()
 unitD = D (one 1)
 
 -- | Applicative/Monoidal instance 'mult' function
-multD :: 
+multD ::
       ( CountableDimsN a b,
         CountableN (a, b),
         FLN (a, b) a,
@@ -94,17 +94,16 @@ multD ::
 multD (D a) (D b) = D (kr a b)
 
 -- | Selective instance function
-selectD :: 
+selectD ::
        ( FLN b b,
          CountableN b
        ) => Dist (Either a b) -> Matrix Prob a b -> Dist b
 selectD (D d) m = D (selectM d m)
 
 -- | Chooses which of the two given effectful
--- functions to apply to a given argument; 
+-- functions to apply to a given argument;
 branchD ::
-       ( Num e,
-         CountableDimsN a b,
+       ( CountableDimsN a b,
          CountableDimsN c (Either b c),
          FLN c b,
          FLN a b,
@@ -116,7 +115,7 @@ branchD ::
          FLN (Either b c) b,
          FLN (Either b c) c
        )
-       => Dist (Either a b) -> Matrix Prob a c -> Matrix Prob b c -> Dist c
+       =>Dist (Either a b) -> Matrix Prob a c -> Matrix Prob b c -> Dist c
 branchD x l r = f x `selectD` g l `selectD` r
   where
     f (D m) = D (fork (tr i1) (i1 `comp` tr i2) `comp` m)
@@ -148,10 +147,9 @@ bindD :: Dist a -> Matrix Prob a b -> Dist b
 bindD (D d) m = D (m `comp` d)
 
 -- | Extract probabilities given an Event.
-(??) :: 
-     ( Enum a, 
-       Countable a,
-       FLN () a
+(??) ::
+     ( Enum a,
+       Countable a
      ) => (a -> Bool) -> Dist a -> Prob
 (??) p d =
     let l = toValues d
@@ -189,33 +187,33 @@ normal :: (FLN () a) => [a] -> Dist a
 normal = shape (normalCurve 0.5 0.5)
 
 -- | Transforms a 'Dist' into a list of pairs.
-toValues :: forall a . (Enum a, Countable a, FLN () a) => Dist a -> [(a, Prob)]
+toValues :: forall a . (Enum a, Countable a) => Dist a -> [(a, Prob)]
 toValues (D d) =
-    let rows = fromInteger (natVal (Proxy :: Proxy (Count a)))
+    let rrows = fromInteger (natVal (Proxy :: Proxy (Count a)))
         probs = toList d
-        res = zip (map toEnum [0..rows]) probs
+        res = zip (map toEnum [0..rrows]) probs
      in res
 
 -- | Pretty a distribution
-prettyDist :: forall a. (Show a, Enum a, Countable a, FLN () a) => Dist a -> String
+prettyDist :: forall a. (Show a, Enum a, Countable a) => Dist a -> String
 prettyDist d =
-    let values = sortBy (\(a, p1) (b, p2) -> compare p2 p1) (toValues @a d)
+    let values = sortBy (\(_, pp1) (_, pp2) -> compare pp2 pp1) (toValues @a d)
         w = maximum (map (length . show . fst) values)
      in concatMap
           (\(x,p) -> showR w x ++ ' ': showProb p ++ "\n")
           values
   where
     showProb p = show (p * 100) ++ "%"
-    showR n x = show x ++ " " 
+    showR _ x = show x ++ " "
 
 -- | Pretty Print a distribution
-prettyPrintDist :: forall a . (Show a, Enum a, Countable a, FLN () a) => Dist a -> IO ()
+prettyPrintDist :: forall a . (Show a, Enum a, Countable a) => Dist a -> IO ()
 prettyPrintDist = putStrLn . prettyDist @a
 
 -- Auxiliary functions
 
 fromFreqs :: (FLN () a) => [(a,Prob)] -> Dist a
-fromFreqs xs = D (col (map (\(x,p) -> p/q) xs))
+fromFreqs xs = D (col (map (\(_,p) -> p/q) xs))
            where q = sum $ map snd xs
 
 normalCurve :: Prob -> Prob -> Prob -> Prob

@@ -1,4 +1,4 @@
-{ compiler ? "ghc865" }:
+{ compiler ? "ghc92" }:
 
 let
   sources = import ./nix/sources.nix;
@@ -21,10 +21,13 @@ let
       p."laop"
     ];
     buildInputs = with pkgs.haskellPackages; [
-      myHaskellPackages.cabal-install
-      pkgs.lorri
+      # cabal
+      cabal-install
       (import sources.niv {}).niv
       pkgs.nixpkgs-fmt
+      (pkgs.haskell-language-server.override {
+        supportedGhcVersions = [ "92" ];
+      })
     ];
     withHoogle = false; # If 'true' it gives an error because the library only depends on
                         # 'base'

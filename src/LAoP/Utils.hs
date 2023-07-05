@@ -26,13 +26,13 @@ module LAoP.Utils
     -- example:
     --
     -- We want to calculate the probability of the sum of two dice throws.
-    -- To do this we start by defining the sample space: 
+    -- To do this we start by defining the sample space:
     --
     -- @
     -- type SampleSpace = Int -- We think 'Int' are enough
     --
     -- die :: Dist Int 6
-    -- die = unifrom [1..6] 
+    -- die = unifrom [1..6]
     --
     -- -- Promote 'Int' addition to a matrix
     -- addM = fromF (uncurry (+)) -- Impossible
@@ -67,7 +67,7 @@ module LAoP.Utils
     -- dieSumProb = ssAddM `comp` (khatri die die)
     -- @
     --
-    -- This is a nice solution for small sample spaces. But for larger ones 
+    -- This is a nice solution for small sample spaces. But for larger ones
     -- it is not feasible to write a data type with hundreds of constructors
     -- and then write manipulation functions that need to deal with them.
     -- To mitigate this limitation the 'Natural' type comes a long way and
@@ -75,10 +75,10 @@ module LAoP.Utils
     --
     -- @
     -- ssAdd :: Natural 1 6 -> Natural 1 6 -> Natural 1 12
-    -- ssAdd = coerceNat (+) 
-    -- 
+    -- ssAdd = coerceNat (+)
+    --
     -- ssAddM = fromF' (uncurry sumSS)
-    -- 
+    --
     -- die :: Dist (Natural 1 6) 6
     -- die = uniform [nat @1 @6 1 .. nat 6]
     --
@@ -87,7 +87,7 @@ module LAoP.Utils
     --
     -- * 'Natural' data type
     Natural,
-    nat,
+    reifyToNatural,
 
     -- * Coerce auxiliar functions to help promote 'Int' typed functions to
     -- 'Natural' typed functions.

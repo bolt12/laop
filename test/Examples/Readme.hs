@@ -4,6 +4,8 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE DataKinds #-}
 
+{-# OPTIONS_GHC -Wno-missing-signatures #-}
+
 module Examples.Readme
     ( exec
     )
@@ -12,9 +14,6 @@ module Examples.Readme
 import LAoP.Matrix.Type
 import qualified LAoP.Relation as R
 import LAoP.Utils
-import LAoP.Dist
-import GHC.TypeLits
-import Data.Coerce
 import qualified GHC.Generics as G
 import Prelude hiding (id, (.))
 
@@ -30,7 +29,7 @@ firstChoice :: Matrix Double () Outcome
 firstChoice = col [1/3, 2/3]
 
 secondChoice :: Matrix Double Outcome Outcome
-secondChoice = fromF switch 
+secondChoice = fromF switch
 
 -- Dice sum
 
@@ -39,20 +38,22 @@ type SS = Natural 1 6 -- Sample Space
 sumSS :: SS -> SS -> Natural 2 12
 sumSS = coerceNat (+)
 
+sumSSM :: Matrix Double (SS, SS) (Natural 2 12)
 sumSSM = fromF (uncurry sumSS)
 
 condition :: (Int, Int) -> Int -> Int
-condition (fst, snd) thrd = if fst == snd
-                               then fst * 3
-                               else fst + snd + thrd
+condition (a, b) c = if a == b
+                        then a * 3
+                        else a + b + c
 
 conditionSS :: (SS, SS) -> SS -> Natural 3 18
 conditionSS = coerceNat2 condition
 
+conditionalThrows :: Matrix Double () (Natural 3 18)
 conditionalThrows = fromF (uncurry conditionSS) . kr (kr die die) die
 
 die :: Matrix Double () SS
-die = col $ map (const (1/6)) [nat @1 @6 1 .. nat 6]
+die = col $ map (const (1/6)) [reifyToNatural @1 @6 1 .. reifyToNatural 6]
 
 -- Sprinkler
 data G = Dry | Wet
@@ -95,10 +96,10 @@ tag f = kr f id
 state g s r = tag g . tag s . r
 
 grass_wet :: Matrix Double () (G, (S, R)) -> Matrix Double One One
-grass_wet state = row [0,1] . fstM . state
+grass_wet s = row [0,1] . fstM . s
 
 rainning :: Matrix Double (G, (S, R)) One
-rainning = row [0,1] . sndM . sndM 
+rainning = row [0,1] . sndM . sndM
 
 -- Alcuin Puzzle
 
@@ -141,7 +142,7 @@ locationRightR = R.fromF locationRight
 
 -- Being at the same bank
 sameBank :: R.Relation Being Bank -> R.Relation Being Being
-sameBank = R.ker 
+sameBank = R.ker
 
 -- Risk of somebody eating somebody else
 canEat :: R.Relation Being Bank -> R.Relation Being Being

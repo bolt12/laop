@@ -16,7 +16,7 @@
 -- Maintainer : armandoifsantos@gmail.com
 -- Stability  : experimental
 --
--- The AoP discipline generalises functions to relations which are 
+-- The AoP discipline generalises functions to relations which are
 -- Boolean matrices.
 --
 -- This module offers many of the combinators of the Algebra of
@@ -34,8 +34,8 @@ module LAoP.Relation.Internal
     --
     -- There exists two type families that make it easier to write
     -- matrix dimensions: 'FromNat' and 'Count'. This approach
-    -- leads to a very straightforward implementation 
-    -- of LAoP combinators. 
+    -- leads to a very straightforward implementation
+    -- of LAoP combinators.
 
     -- * Relation data type
     Relation (..),
@@ -179,7 +179,7 @@ import qualified LAoP.Matrix.Internal as I
 import LAoP.Utils.Internal
 import Control.DeepSeq
 import Data.Bool
-import GHC.TypeLits
+import GHC.TypeLits hiding (Natural)
 import Prelude hiding (id, (.))
 
 -- | Boolean type synonym for working with boolean matrices
@@ -219,7 +219,13 @@ instance Num (Relation a b) where
     (R a) * (R b) = R (I.andM a b)
 
     -- | Matrix negation becomes Boolean matrix negation
-    negate (R a) = R (I.negateM a) 
+    negate (R a) = R (I.negateM a)
+
+    abs = error "abs: does not exist"
+
+    signum = error "signum: does not exist"
+
+    fromInteger = error "fromInteger: does not exist"
 
 -- Type alias
 type One  = ()
@@ -288,7 +294,7 @@ relationBuilder = R . I.matrixBuilder
 --
 --   NOTE: Be careful to not ask for a matrix bigger than the cardinality of
 -- types @a@ or @b@ allows.
-fromF' :: 
+fromF' ::
       ( Liftable a b,
         CountableDimsN c d,
         FLN d c
@@ -384,7 +390,7 @@ belongs = toRel elemR
 zeros ::
   (FLN a b, CountableDimsN a b) =>
   Relation a b
-zeros = relationBuilder' (const (nat 0))
+zeros = relationBuilder' (const (reifyToNatural 0))
 
 -- Ones Matrix
 
@@ -399,7 +405,7 @@ zeros = relationBuilder' (const (nat 0))
 ones ::
   (FLN a b, CountableDimsN a b) =>
   Relation a b
-ones = relationBuilder' (const (nat 1))
+ones = relationBuilder' (const (reifyToNatural 1))
 
 -- Bang Matrix
 
@@ -428,7 +434,7 @@ point = fromF . const
 -- @
 iden ::
   (FLN a a, CountableN a) => Relation a a
-iden = relationBuilder' (bool (nat 0) (nat 1) . uncurry (==))
+iden = relationBuilder' (bool (reifyToNatural 0) (reifyToNatural 1) . uncurry (==))
 
 -- | Relational composition
 --
@@ -440,7 +446,7 @@ comp (R a) (R b) = R (I.compRel a b)
 
 -- | Relational right division
 --
--- @'divR' x y@ is the largest relation @z@ which, 
+-- @'divR' x y@ is the largest relation @z@ which,
 -- pre-composed with @y@, approximates @x@.
 divR :: Relation b c -> Relation b a -> Relation a c
 divR (R x) (R y) = R (I.divR x y)
@@ -457,7 +463,7 @@ divL (R x) (R y) = R (I.divL x y)
 
 -- | Relational symmetric division
 --
--- @'pointAp' c b ('divS' s r)@ means that @b@ and @c@ 
+-- @'pointAp' c b ('divS' s r)@ means that @b@ and @c@
 -- are related to exactly the same outputs by @r@ and by @s@.
 divS :: Relation c a -> Relation b a -> Relation c b
 divS (R x) (R y) = R (I.divS x y)
@@ -480,7 +486,7 @@ shrunkBy r s = r `intersection` divR s (conv r)
 -- r ``overriddenBy`` 'zeros' == r
 -- r ``overriddenBy`` r       == r
 -- @
-overriddenBy :: 
+overriddenBy ::
              ( FLN b b,
                CountableN b
              ) => Relation a b -> Relation a b -> Relation a b
@@ -515,8 +521,8 @@ pointApBool a b r = toBool $ conv (point b) . r . point a
 --
 -- Given binary 'Relation' r, writing @'pointAp' a b r@
 -- (read: “@b@ is related to @a@ by @r@”) means the same as
--- @'pointAp' b a ('conv' r)@, where @'conv' r@ is said to be 
--- the converse of @r@. 
+-- @'pointAp' b a ('conv' r)@, where @'conv' r@ is said to be
+-- the converse of @r@.
 -- In terms of grammar, @'conv' r@ corresponds to the passive voice
 conv :: Relation a b -> Relation b a
 conv (R a) = R (I.tr a)
@@ -611,11 +617,11 @@ surjective = reflexive . img
 -- f `.` r ``sse`` s == r ``sse`` f `.` s
 -- r `.` f ``sse`` s == r ``sse`` s `.` f
 -- @
-function :: 
+function ::
          ( CountableDimsN a b,
            FLN a a,
            FLN b b
-         ) 
+         )
          => Relation a b -> Bool
 function r = simple r && entire r
 
@@ -654,7 +660,7 @@ injection ::
 injection r = function r && representation r
 
 -- | A 'Relation' @r@ is an 'bijection' 'iff' @'injection' r && 'surjection' r@
-bijection :: 
+bijection ::
           ( CountableDimsN a b,
             FLN b b,
             FLN a a
@@ -711,7 +717,7 @@ equivalence r = symmetric r && preorder r
 partialEquivalence :: (CountableN a, FLN a a) => Relation a a -> Bool
 partialEquivalence r = partialOrder r && equivalence r
 
--- | A 'Relation' @r@ is 'difunctional' or regular wherever 
+-- | A 'Relation' @r@ is 'difunctional' or regular wherever
 -- @r `.` 'conv' r `.` r == r@
 difunctional :: Relation a b -> Bool
 difunctional r = r . conv r . r == r
@@ -723,7 +729,7 @@ difunctional r = r . conv r . r == r
 --   NOTE: That this is not a true categorical product, see for instance:
 --
 -- @
---                | 'fstR' `.` 'splitR' a b ``sse`` a 
+--                | 'fstR' `.` 'splitR' a b ``sse`` a
 -- 'splitR' a b <=>   |
 --                | 'sndR' `.` 'splitR' a b ``sse`` b
 -- @
@@ -739,7 +745,7 @@ difunctional r = r . conv r . r == r
 -- @
 -- 'eitherR' ('splitR' r s) ('splitR' t v) == 'splitR' ('eitherR' r t) ('eitherR' s v)
 -- @
-splitR :: 
+splitR ::
        ( CountableDimsN a b,
          CountableN (a, b),
          FLN (a, b) a,
@@ -828,7 +834,7 @@ eitherR = join
 -- 'img' 'i1' ``union`` 'img' 'i2' == 'id'
 -- 'i1' `.` 'i2' = 'zeros'
 -- @
-i1 :: 
+i1 ::
    ( CountableDimsN a b,
      FLN b a,
      FLN a a
@@ -842,7 +848,7 @@ i1 = R I.i1
 -- 'img' 'i1' ``union`` 'img' 'i2' == 'id'
 -- 'i1' `.` 'i2' = 'zeros'
 -- @
-i2 :: 
+i2 ::
    ( CountableDimsN a b,
      FLN a b,
      FLN b b
@@ -863,7 +869,7 @@ infixl 5 -|-
     FLN d b,
     FLN b d,
     FLN d d
-  ) 
+  )
   => Relation a b -> Relation c d -> Relation (Either a c) (Either b d)
 (-|-) (R a) (R b) = R ((I.-|-) a b)
 
@@ -874,7 +880,7 @@ infixl 5 -|-
 -- Every n-ary relation can be expressed as a binary relation through
 -- 'trans'/'untrans';
 -- more-over, where each particular attribute is placed (input/output) is irrelevant.
-trans :: 
+trans ::
       ( CountableDimsN a b,
         CountableN c,
         CountableDimsN (a, b) (c, b),
@@ -921,7 +927,7 @@ untrans s = fstR . conv (splitR (conv s) sndR)
 -- @
 -- 'predR' q `.` 'predR' p == 'predR' q ``union`` 'predR' p
 -- @
-predR :: 
+predR ::
       ( Bounded a,
         Enum a,
         CountableN a,
@@ -975,7 +981,7 @@ cond p r s = eitherR r s . guard p
 --
 -- For injective relations, 'domain' and 'ker'nel coincide,
 -- since @'ker' r ``sse`` 'id'@ in such situations.
-domain :: 
+domain ::
        ( CountableN a,
          FLN a a
        ) => Relation a b -> Relation a a
@@ -985,7 +991,7 @@ domain r = ker r `intersection` id
 --
 -- For functions, 'range' and 'img' (image) coincide,
 -- since @'img' f ``sse`` id@ for any @f@.
-range :: 
+range ::
       ( CountableN b,
         FLN b b
       ) => Relation a b -> Relation b b
