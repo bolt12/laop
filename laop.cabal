@@ -1,6 +1,6 @@
 cabal-version:       3.0
 name:                laop
-version:             0.1.1.1
+version:             0.2.0.0
 synopsis:            Matrix programming library
 description:         Matrix programming library that uses a type-safe inductive definition
                      inspired by the Linear Algebra of Programming
@@ -15,8 +15,7 @@ category:            Data
 build-type:          Simple
 extra-doc-files:     README.md
                      CHANGELOG.md
-tested-with:         GHC == 8.6.5
-                     GHC == 8.8.3
+tested-with:         GHC == 8.10.7
                      GHC == 9.2.8
 
 source-repository head

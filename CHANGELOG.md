@@ -3,6 +3,14 @@
 `laop` uses [PVP Versioning][1].
 The changelog is available [on GitHub][2].
 
+## 0.2.0.0
+
+- Compiles with GHC 9.2.8
+- Update nix infrastructure
+- Cleans up death code and warnings
+- Changed `nat` to `reifyToNatural`
+
+
 ## 0.1.1.1
 
 * Bump base version to work with cabal
