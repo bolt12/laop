@@ -16,6 +16,8 @@ jobs:
         ghc:
           - "ghc8107"
           - "ghc92"
+          - "ghc967"
+          - "ghc910"
 
     steps:
     - uses: actions/checkout@v2.3.1

@@ -1,5 +1,5 @@
-{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -7,176 +7,184 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE NoStarIsType #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE NoStarIsType #-}
 
 -----------------------------------------------------------------------------
--- |
--- Module     : LAoP.Matrix.Nat
--- Copyright  : (c) Armando Santos 2019-2020
--- Maintainer : armandoifsantos@gmail.com
--- Stability  : experimental
---
--- The LAoP discipline generalises relations and functions treating them as
--- Boolean matrices and in turn consider these as arrows.
---
--- __LAoP__ is a library for algebraic (inductive) construction and manipulation of matrices
--- in Haskell. See <https://github.com/bolt12/master-thesis my Msc Thesis> for the
--- motivation behind the library, the underlying theory, and implementation details.
---
--- This module offers a newtype wrapper around 'Matrix.Type.Matrix' that
--- uses type level naturals instead of standard data types for the matrices
--- dimensions.
---
+
 -----------------------------------------------------------------------------
 
-module LAoP.Matrix.Nat
-  ( -- | LAoP (Linear Algebra of Programming) Inductive Matrix definition.
-    --
-    --         LAoP generalises relations and functions treating them as
-    --         Boolean matrices and in turn consider these as arrows.
-    --         This library offers many of the combinators mentioned in the work of
-    --         Macedo (2012) and Oliveira (2012).
-    --
-    --         This definition is a wrapper around 'Matrix.Type' but
-    --         dimensions are type level Naturals. Type inference might not
-    --         be as desired.
-    --
-    --         There exists two type families that make it easier to write
-    --         matrix dimensions: 'FromNat' and 'Count'. This approach
-    --         leads to a very straightforward implementation
-    --         of LAoP combinators.
+{- |
+Module     : LAoP.Matrix.Nat
+Copyright  : (c) Armando Santos 2019-2020
+Maintainer : armandoifsantos@gmail.com
+Stability  : experimental
 
-    -- * Type safe matrix representation
-    Matrix (..),
+The LAoP discipline generalises relations and functions treating them as
+Boolean matrices and in turn consider these as arrows.
 
-    -- * Constraint type synonyms
-    Countable,
-    CountableDims,
-    CountableN,
-    CountableNz,
-    CountableDimsN,
-    FLN,
-    FLNz,
-    Liftable,
-    TrivialE,
-    TrivialP,
+__LAoP__ is a library for algebraic (inductive) construction and manipulation of matrices
+in Haskell. See <https://github.com/bolt12/master-thesis my Msc Thesis> for the
+motivation behind the library, the underlying theory, and implementation details.
 
-    -- * Primitives
-    one,
-    join,
-    fork,
+This module offers a newtype wrapper around 'Matrix.Type.Matrix' that
+uses type level naturals instead of standard data types for the matrices
+dimensions.
+-}
+module LAoP.Matrix.Nat (
+  -- | LAoP (Linear Algebra of Programming) Inductive Matrix definition.
+  --
+  --         LAoP generalises relations and functions treating them as
+  --         Boolean matrices and in turn consider these as arrows.
+  --         This library offers many of the combinators mentioned in the work of
+  --         Macedo (2012) and Oliveira (2012).
+  --
+  --         This definition is a wrapper around 'Matrix.Type' but
+  --         dimensions are type level Naturals. Type inference might not
+  --         be as desired.
+  --
+  --         There exists two type families that make it easier to write
+  --         matrix dimensions: 'FromNat' and 'Count'. This approach
+  --         leads to a very straightforward implementation
+  --         of LAoP combinators.
 
-    -- * Auxiliary type families
-    I.FromNat,
-    I.Count,
-    I.Normalize,
+  -- * Type safe matrix representation
+  Matrix (..),
 
-    -- * Matrix construction and conversion
-    I.FL,
-    fromLists,
-    toLists,
-    toList,
-    matrixBuilder',
-    row,
-    col,
-    zeros,
-    ones,
-    bang,
-    constant,
+  -- * Constraint type synonyms
+  Countable,
+  CountableDims,
+  CountableN,
+  CountableNz,
+  CountableDimsN,
+  FLN,
+  FLNz,
+  Liftable,
+  TrivialE,
+  TrivialP,
 
-    -- * Misc
-    -- ** Get dimensions
-    columns,
-    rows,
+  -- * Primitives
+  one,
+  join,
+  fork,
 
-    -- ** Matrix Transposition
-    tr,
+  -- * Auxiliary type families
+  I.FromNat,
+  I.Count,
+  I.Normalize,
 
-    -- ** Scalar multiplication/division of matrices
-    (.|),
-    (./),
+  -- * Matrix construction and conversion
+  I.FL,
+  fromLists,
+  toLists,
+  toList,
+  matrixBuilder',
+  row,
+  col,
+  zeros,
+  ones,
+  bang,
+  constant,
 
-    -- ** Selective operator
-    select,
+  -- * Misc
 
-    -- ** McCarthy's Conditional
-    cond,
+  -- ** Get dimensions
+  columns,
+  rows,
 
-    -- ** Matrix "abiding"
-    abideJF,
-    abideFJ,
+  -- ** Matrix Transposition
+  tr,
 
-    -- ** Zip Matrices
-    zipWithM,
+  -- ** Scalar multiplication/division of matrices
+  (.|),
+  (./),
 
-    -- * Biproduct approach
-    -- ** Fork
-    (===),
-    -- *** Projections
-    p1,
-    p2,
-    -- ** Join
-    (|||),
-    -- *** Injections
-    i1,
-    i2,
-    -- ** Bifunctors
-    (-|-),
-    (><),
+  -- ** Selective operator
+  select,
 
-    -- ** Applicative matrix combinators
+  -- ** McCarthy's Conditional
+  cond,
 
-    -- | Note that given the restrictions imposed it is not possible to
-    -- implement the standard type classes present in standard Haskell.
-    -- *** Matrix pairing projections
-    fstM,
-    sndM,
+  -- ** Matrix "abiding"
+  abideJF,
+  abideFJ,
 
-    -- *** Matrix pairing
-    kr,
+  -- ** Zip Matrices
+  zipWithM,
 
-    -- * Matrix composition and lifting
+  -- * Biproduct approach
 
-    -- ** Arrow matrix combinators
+  -- ** Fork
+  (===),
 
-    -- | Note that given the restrictions imposed it is not possible to
-    -- implement the standard type classes present in standard Haskell.
-    iden,
-    comp,
-    fromF',
-    fromF,
+  -- *** Projections
+  p1,
+  p2,
 
-    -- * Matrix printing
-    pretty,
-    prettyPrint
-  )
+  -- ** Join
+  (|||),
+
+  -- *** Injections
+  i1,
+  i2,
+
+  -- ** Bifunctors
+  (-|-),
+  (><),
+
+  -- ** Applicative matrix combinators
+
+  -- | Note that given the restrictions imposed it is not possible to
+  -- implement the standard type classes present in standard Haskell.
+  -- *** Matrix pairing projections
+  fstM,
+  sndM,
+
+  -- *** Matrix pairing
+  kr,
+
+  -- * Matrix composition and lifting
+
+  -- ** Arrow matrix combinators
+
+  -- | Note that given the restrictions imposed it is not possible to
+  -- implement the standard type classes present in standard Haskell.
+  iden,
+  comp,
+  fromF',
+  fromF,
+
+  -- * Matrix printing
+  pretty,
+  prettyPrint,
+)
 where
 
-import GHC.TypeLits
 import Control.DeepSeq
-import qualified LAoP.Matrix.Internal as I
-import Data.Proxy (Proxy)
 import Data.List (sort)
+import Data.Proxy (Proxy)
+import GHC.TypeLits
+import LAoP.Matrix.Internal qualified as I
 
 newtype Matrix e (cols :: Nat) (rows :: Nat) = M (I.Matrix e (I.FromNat cols) (I.FromNat rows))
   deriving (Show, Num, Eq, Ord, NFData) via (I.Matrix e (I.FromNat cols) (I.FromNat rows))
 
 -- | Constraint type synonyms to keep the type signatures less convoluted
-type Countable a        = KnownNat (I.Count a)
-type CountableDims a b  = (Countable a, Countable b)
-type CountableN a       = KnownNat (I.Count (I.FromNat a))
-type CountableNz a      = KnownNat (I.Count (I.Normalize a))
+type Countable a = KnownNat (I.Count a)
+
+type CountableDims a b = (Countable a, Countable b)
+type CountableN a = KnownNat (I.Count (I.FromNat a))
+type CountableNz a = KnownNat (I.Count (I.Normalize a))
 type CountableDimsN a b = (CountableN a, CountableN b)
-type FLN e a b          = I.FL (I.FromNat a) (I.FromNat b)
-type FLNz e a b         = I.FL (I.Normalize a) (I.Normalize b)
-type Liftable e a b     = (Bounded a, Bounded b, Enum a, Enum b, Eq b, Num e, Ord e)
-type TrivialE a b       = I.FromNat (a + b) ~ Either (I.FromNat a) (I.FromNat b)
-type TrivialP a b       = I.FromNat (a * b) ~ I.FromNat (I.Count (I.FromNat a) * I.Count (I.FromNat b))
+type FLN e a b = I.FL (I.FromNat a) (I.FromNat b)
+type FLNz e a b = I.FL (I.Normalize a) (I.Normalize b)
+type Liftable e a b = (Bounded a, Bounded b, Enum a, Enum b, Eq b, Num e, Ord e)
+type TrivialE a b = I.FromNat (a + b) ~ Either (I.FromNat a) (I.FromNat b)
+type TrivialP a b = I.FromNat (a * b) ~ I.FromNat (I.Count (I.FromNat a) * I.Count (I.FromNat b))
 
 -- Primitives
 
@@ -218,11 +226,13 @@ infixl 2 ===
 fromLists :: (FLN e cols rows) => [[e]] -> Matrix e cols rows
 fromLists = M . I.fromLists
 
--- | Matrix builder function. Constructs a matrix provided with
--- a construction function that operates with indices.
+{- | Matrix builder function. Constructs a matrix provided with
+a construction function that operates with indices.
+-}
 matrixBuilder' ::
-  (FLN e cols rows, CountableN cols, CountableN rows)
-  => ((Int, Int) -> e) -> Matrix e cols rows
+  (FLN e cols rows, CountableN cols, CountableN rows) =>
+  ((Int, Int) -> e) ->
+  Matrix e cols rows
 matrixBuilder' = M . I.matrixBuilder'
 
 col :: (I.FL () (I.FromNat rows)) => [e] -> Matrix e 1 rows
@@ -232,41 +242,49 @@ row :: (I.FL (I.FromNat cols) ()) => [e] -> Matrix e cols 1
 row = M . I.row
 
 fromF' ::
-  ( Liftable e a b,
-    CountableN cols,
-    CountableN rows,
-    FLN e rows cols
+  ( Liftable e a b
+  , CountableN cols
+  , CountableN rows
+  , FLN e rows cols
   ) =>
   (a -> b) ->
   Matrix e cols rows
 fromF' = M . I.fromF'
 
-fromF :: forall e a b.
-  ( Liftable e a b,
-    KnownNat (I.Count a),
-    KnownNat (I.Count b),
-    I.FL (I.FromNat (I.Count b)) (I.FromNat (I.Count a))
+fromF ::
+  forall e a b.
+  ( Liftable e a b
+  , KnownNat (I.Count a)
+  , KnownNat (I.Count b)
+  , I.FL (I.FromNat (I.Count b)) (I.FromNat (I.Count a))
   ) =>
   (a -> b) ->
   Matrix e (I.Count a) (I.Count b)
 fromF f =
-  let minA         = minBound @a
-      maxA         = maxBound @a
-      minB         = minBound @b
-      maxB         = maxBound @b
-      ccols        = fromInteger $ natVal (undefined :: Proxy (I.Count a))
-      rrows        = fromInteger $ natVal (undefined :: Proxy (I.Count b))
-      elementsA    = take ccols [minA .. maxA]
-      elementsB    = take rrows [minB .. maxB]
+  let minA = minBound @a
+      maxA = maxBound @a
+      minB = minBound @b
+      maxB = maxBound @b
+      ccols = fromInteger $ natVal (undefined :: Proxy (I.Count a))
+      rrows = fromInteger $ natVal (undefined :: Proxy (I.Count b))
+      elementsA = take ccols [minA .. maxA]
+      elementsB = take rrows [minB .. maxB]
       combinations = (,) <$> elementsA <*> elementsB
-      combAp       = map snd . sort . map (\(a, b) -> if f a == b
-                                                         then ((fromEnum a, fromEnum b), 1)
-                                                         else ((fromEnum a, fromEnum b), 0)) $ combinations
-      mList        = buildList combAp rrows
+      combAp =
+        map snd
+          . sort
+          . map
+            ( \(a, b) ->
+                if f a == b
+                  then ((fromEnum a, fromEnum b), 1)
+                  else ((fromEnum a, fromEnum b), 0)
+            )
+          $ combinations
+      mList = buildList combAp rrows
    in tr $ fromLists mList
   where
     buildList [] _ = []
-    buildList l r  = take r l : buildList (drop r l) r
+    buildList l r = take r l : buildList (drop r l) r
 
 -- Conversion
 
@@ -321,33 +339,35 @@ comp (M a) (M b) = M (I.comp a b)
 -- Scalar multiplication of matrices
 
 infixl 7 .|
+
 -- | Scalar multiplication of matrices.
-(.|) :: Num e => e -> Matrix e cols rows -> Matrix e cols rows
+(.|) :: (Num e) => e -> Matrix e cols rows -> Matrix e cols rows
 (.|) e (M m) = M (e I..| m)
 
 -- Scalar division of matrices
 
 infixl 7 ./
+
 -- | Scalar multiplication of matrices.
-(./) :: Fractional e => Matrix e cols rows -> e -> Matrix e cols rows
+(./) :: (Fractional e) => Matrix e cols rows -> e -> Matrix e cols rows
 (./) (M m) e = M (m I../ e)
 
 p1 ::
-  ( Num e,
-    CountableDimsN n m,
-    FLN e n m,
-    FLN e m m,
-    TrivialE m n
+  ( Num e
+  , CountableDimsN n m
+  , FLN e n m
+  , FLN e m m
+  , TrivialE m n
   ) =>
   Matrix e (m + n) m
 p1 = M I.p1
 
 p2 ::
-  ( Num e,
-    CountableDimsN n m,
-    FLN e m n,
-    FLN e n n,
-    TrivialE m n
+  ( Num e
+  , CountableDimsN n m
+  , FLN e m n
+  , FLN e n n
+  , TrivialE m n
   ) =>
   Matrix e (m + n) n
 p2 = M I.p2
@@ -355,21 +375,21 @@ p2 = M I.p2
 -- Injections
 
 i1 ::
-  ( Num e,
-    CountableDimsN n rows,
-    FLN e n rows,
-    FLN e rows rows,
-    TrivialE rows n
+  ( Num e
+  , CountableDimsN n rows
+  , FLN e n rows
+  , FLN e rows rows
+  , TrivialE rows n
   ) =>
   Matrix e rows (rows + n)
 i1 = tr p1
 
 i2 ::
-  ( Num e,
-    CountableDimsN rows m,
-    FLN e m rows,
-    FLN e rows rows,
-    TrivialE m rows
+  ( Num e
+  , CountableDimsN rows m
+  , FLN e m rows
+  , FLN e rows rows
+  , TrivialE m rows
   ) =>
   Matrix e rows (m + rows)
 i2 = tr p2
@@ -386,14 +406,14 @@ infixl 5 -|-
 
 -- | Coproduct Bifunctor (Direct sum)
 (-|-) ::
-  ( Num e,
-    CountableDimsN j k,
-    FLN e k k,
-    FLN e j k,
-    FLN e k j,
-    FLN e j j,
-    TrivialE n m,
-    TrivialE k j
+  ( Num e
+  , CountableDimsN j k
+  , FLN e k k
+  , FLN e j k
+  , FLN e k j
+  , FLN e j j
+  , TrivialE n m
+  , TrivialE k j
   ) =>
   Matrix e n k ->
   Matrix e m j ->
@@ -402,36 +422,41 @@ infixl 5 -|-
 
 -- | Khatri Rao Product first projection
 fstM ::
-  forall e m k .
-  ( Num e,
-    CountableDimsN m k,
-    CountableN (m * k),
-    FLN e (m * k) m,
-    TrivialP m k
-  ) => Matrix e (m * k) m
+  forall e m k.
+  ( Num e
+  , CountableDimsN m k
+  , CountableN (m * k)
+  , FLN e (m * k) m
+  , TrivialP m k
+  ) =>
+  Matrix e (m * k) m
 fstM = M (I.fstM @e @(I.FromNat m) @(I.FromNat k))
 
 -- | Khatri Rao Product second projection
 sndM ::
-    forall e m k.
-    ( Num e,
-      CountableDimsN k m,
-      FLN e (m * k) k,
-      CountableN (m * k),
-      TrivialP m k
-    ) => Matrix e (m * k) k
+  forall e m k.
+  ( Num e
+  , CountableDimsN k m
+  , FLN e (m * k) k
+  , CountableN (m * k)
+  , TrivialP m k
+  ) =>
+  Matrix e (m * k) k
 sndM = M (I.sndM @e @(I.FromNat m) @(I.FromNat k))
 
 -- | Khatri Rao Product
 kr ::
   forall e cols a b.
-  ( Num e,
-    CountableDimsN a b,
-    CountableN (a * b),
-    FLN e (a * b) a,
-    FLN e (a * b) b,
-    TrivialP a b
-  ) => Matrix e cols a -> Matrix e cols b -> Matrix e cols (a * b)
+  ( Num e
+  , CountableDimsN a b
+  , CountableN (a * b)
+  , FLN e (a * b) a
+  , FLN e (a * b) b
+  , TrivialP a b
+  ) =>
+  Matrix e cols a ->
+  Matrix e cols b ->
+  Matrix e cols (a * b)
 kr a b =
   let fstM' = fstM @e @a @b
       sndM' = sndM @e @a @b
@@ -442,17 +467,20 @@ infixl 4 ><
 
 (><) ::
   forall e m p n q.
-  ( Num e,
-    CountableDimsN m n,
-    CountableDimsN p q,
-    CountableDimsN (m * n) (p * q),
-    FLN e (m * n) m,
-    FLN e (m * n) n,
-    FLN e (p * q) p,
-    FLN e (p * q) q,
-    TrivialP m n,
-    TrivialP p q
-  ) => Matrix e m p -> Matrix e n q -> Matrix e (m * n) (p * q)
+  ( Num e
+  , CountableDimsN m n
+  , CountableDimsN p q
+  , CountableDimsN (m * n) (p * q)
+  , FLN e (m * n) m
+  , FLN e (m * n) n
+  , FLN e (p * q) p
+  , FLN e (p * q) q
+  , TrivialP m n
+  , TrivialP p q
+  ) =>
+  Matrix e m p ->
+  Matrix e n q ->
+  Matrix e (m * n) (p * q)
 (><) a b =
   let fstM' = fstM @e @m @n
       sndM' = sndM @e @m @n
@@ -472,27 +500,32 @@ tr (M m) = M (I.tr m)
 
 -- Selective 'select' operator
 select ::
-       ( Num e,
-         FLN e rows1 rows1,
-         CountableN rows1,
-         I.FromNat rows2 ~ I.FromNat rows1,
-         I.FromNat cols1 ~ I.FromNat cols2,
-         I.FromNat rows3 ~ Either (I.FromNat cols3) (I.FromNat rows1)
-       ) => Matrix e cols1 rows3 -> Matrix e cols3 rows1 -> Matrix e cols2 rows2
+  ( Num e
+  , FLN e rows1 rows1
+  , CountableN rows1
+  , I.FromNat rows2 ~ I.FromNat rows1
+  , I.FromNat cols1 ~ I.FromNat cols2
+  , I.FromNat rows3 ~ Either (I.FromNat cols3) (I.FromNat rows1)
+  ) =>
+  Matrix e cols1 rows3 ->
+  Matrix e cols3 rows1 ->
+  Matrix e cols2 rows2
 select (M m) (M y) = M (I.select m y)
 
 -- McCarthy's Conditional
 
 cond ::
-     ( I.FromNat (I.Count (I.FromNat cols)) ~ I.FromNat cols,
-       CountableN cols,
-       I.FL () (I.FromNat cols),
-       I.FL (I.FromNat cols) (),
-       FLN e cols cols,
-       Liftable e a Bool
-     )
-     =>
-     (a -> Bool) -> Matrix e cols rows -> Matrix e cols rows -> Matrix e cols rows
+  ( I.FromNat (I.Count (I.FromNat cols)) ~ I.FromNat cols
+  , CountableN cols
+  , I.FL () (I.FromNat cols)
+  , I.FL (I.FromNat cols) ()
+  , FLN e cols cols
+  , Liftable e a Bool
+  ) =>
+  (a -> Bool) ->
+  Matrix e cols rows ->
+  Matrix e cols rows ->
+  Matrix e cols rows
 cond p (M a) (M b) = M (I.cond p a b)
 
 -- Pretty print
