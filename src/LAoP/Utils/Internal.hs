@@ -19,8 +19,8 @@ module LAoP.Utils.Internal (
   coerceNat2,
   coerceNat3,
 
-  -- * 'List' data type
-  List (..),
+  -- * 'BoundedList' data type
+  BoundedList (..),
 
   -- * Category type class
   Category (..),
@@ -156,7 +156,7 @@ instance
 This data type is a newtype wrapper around '[]'. This exists in order to
 implement an 'Enum' and 'Bounded' instance that cannot be harmful for the outside.
 -}
-newtype List a = L [a]
+newtype BoundedList a = L [a]
   deriving (Eq, Show, Read)
 
 powerset :: [a] -> [[a]]
@@ -167,7 +167,7 @@ instance
   ( Enum a
   , Bounded a
   ) =>
-  Bounded (List a)
+  Bounded (BoundedList a)
   where
   minBound = L []
   maxBound = L [minBound .. maxBound]
@@ -177,7 +177,7 @@ instance
   , Enum a
   , Eq a
   ) =>
-  Enum (List a)
+  Enum (BoundedList a)
   where
   toEnum i =
     let as = [minBound .. maxBound]

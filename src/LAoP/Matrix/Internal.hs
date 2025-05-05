@@ -204,7 +204,7 @@ deriving instance (Show e) => Show (Matrix e cols rows)
 -}
 type family Count (d :: Type) :: Nat where
   Count (Natural n m) = (m - n) + 1
-  Count (List a) = (^) 2 (Count a)
+  Count (BoundedList a) = (^) 2 (Count a)
   Count (Either a b) = (+) (Count a) (Count b)
   Count (a, b) = (*) (Count a) (Count b)
   Count (a -> b) = (^) (Count b) (Count a)

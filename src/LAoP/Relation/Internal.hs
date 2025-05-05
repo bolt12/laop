@@ -384,7 +384,7 @@ pt ::
   , FLN b One
   ) =>
   Relation a b ->
-  (a -> List b)
+  (a -> BoundedList b)
 pt r a =
   let (L lb) = maxBound
    in L [b | b <- lb, toBool (pointAp a b r)]
@@ -394,10 +394,10 @@ belongs ::
   ( Bounded a
   , Enum a
   , Eq a
-  , CountableDims (List a) a
-  , FLN a (List a)
+  , CountableDims (BoundedList a) a
+  , FLN a (BoundedList a)
   ) =>
-  Relation (List a) a
+  Relation (BoundedList a) a
 belongs = toRel elemR
   where
     elemR (L l) x = x `elem` l
@@ -969,8 +969,6 @@ trans ::
   , FLN (c, b) b
   , FLN (a, b) a
   , FLN (a, b) b
-  , Trivial (a, b)
-  , Trivial (c, b)
   , TrivialP a b
   , TrivialP c b
   ) =>
@@ -992,8 +990,6 @@ untrans ::
   , FLN (c, b) b
   , FLN (a, b) b
   , FLN (a, b) a
-  , Trivial (a, b)
-  , Trivial (c, b)
   , TrivialP a b
   , TrivialP c b
   ) =>

@@ -1,6 +1,5 @@
 name: CI
 
-# Trigger the workflow on push or pull request, but only for the master branch
 on:
   pull_request:
   push:
@@ -14,22 +13,21 @@ jobs:
       matrix:
         cabal: ["3.0"]
         ghc:
-          - "ghc8107"
-          - "ghc92"
-          - "ghc967"
+          - "ghc927"
+          - "ghc96"
           - "ghc910"
 
     steps:
-    - uses: actions/checkout@v2.3.1
-      if: github.event.action == 'opened' || github.event.action == 'synchronize' || github.event.ref == 'refs/heads/master'
+    - uses: actions/checkout@v2
 
     - uses: cachix/install-nix-action@v20
       name: Install Nix
 
     - name: Build
       run: |
-        nix-build --attr exe --argstr compiler ${{ matrix.ghc }}
+        nix build .#${{ matrix.ghc }}-laop
+
 
     - name: Test
       run: |
-        nix-shell --argstr compiler ${{ matrix.ghc }} --run 'cabal v2-test --enable-tests'
+        nix develop .#${{ matrix.ghc }}-laop -c cabal v2-test --enable-tests

@@ -6,7 +6,7 @@
       meta.description = "Haskell development environment";
       # See https://community.flake.parts/haskell-flake/devshell#composing-devshells
       inputsFrom = [
-        config.haskellProjects.default.outputs.devShell # See ./nix/modules/haskell.nix
+        config.haskellProjects.ghc910.outputs.devShell # See ./nix/modules/haskell.nix
         config.pre-commit.devShell # See ./nix/modules/pre-commit.nix
       ];
       packages = with pkgs; [

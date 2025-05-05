@@ -97,8 +97,8 @@ module LAoP.Utils (
   coerceNat2,
   coerceNat3,
 
-  -- * List data type
-  List (..),
+  -- * Bounded List data type
+  BoundedList (..),
 
   -- * Category type-class
   Category (..),
