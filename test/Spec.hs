@@ -1,6 +1,6 @@
 module Main (main) where
 
-import qualified Examples.Readme as RD
+import Examples.Readme qualified as RD
 
 main :: IO ()
 main = do

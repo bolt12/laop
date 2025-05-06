@@ -1,10 +1,10 @@
 {-# LANGUAGE DeriveGeneric #-}
 
-module Examples.Spreadsheets
+module Examples.Spreadsheets where
 
-import LAoP.Utils
-import LAoP.Matrix.Type
 import GHC.Generics
+import LAoP.Matrix.Type
+import LAoP.Utils
 import Prelude hiding (id, (.))
 
 data Student = Student1 | Student2 | Student3 | Student4
@@ -31,11 +31,10 @@ m = fromLists [[95, 90, 100, 40], [20, 90, 90, 0], [30, 20, 95, 0], [50, 80, 100
 w :: Matrix Float Question One
 w = fromLists [[0.2, 0.3, 0.2, 0.3]]
 
-xls :: Matrix Float Question One
-    -> Matrix Float Question Student
-    -> Matrix Float Student One
-    -> Matrix Float (Either Question Results) (Either One Student)
-xls w m t = join (fork w m) (fork zeros r)
+xls ::
+  Matrix Float Student One ->
+  Matrix Float (Either Question Results) (Either One Student)
+xls t = join (fork w m) (fork zeros r)
   where
     rExam = m . tr w
     rTest = tr t
@@ -43,5 +42,5 @@ xls w m t = join (fork w m) (fork zeros r)
     r = (rExam . tr exam) + (rTest . tr test) + (rFinal . tr final)
 
 -- | Overloaded, point-wise 'max' function
-maxPW :: Ord e => Matrix e a b -> Matrix e a b -> Matrix e a b
+maxPW :: (Ord e) => Matrix e a b -> Matrix e a b -> Matrix e a b
 maxPW = zipWithM max
