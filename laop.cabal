@@ -87,6 +87,7 @@ test-suite laop-test
     Test.Generators
     Test.Index.Properties
     Test.Matrix.Properties
+    Test.Matrix.Reference
     Test.Nat.Properties
     Test.Relation.Properties
 
@@ -94,6 +95,7 @@ test-suite laop-test
   build-depends:
     QuickCheck >=2.15 && <2.19,
     laop,
+    matrix >=0.3.6 && <0.4,
     tasty >=1.5 && <1.6,
     tasty-hunit >=0.10 && <0.11,
     tasty-quickcheck >=0.11 && <0.12,
