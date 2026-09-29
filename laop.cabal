@@ -17,6 +17,7 @@ category: Data
 build-type: Simple
 extra-doc-files:
   CHANGELOG.md
+  PARALLELISM.md
   README.md
 
 tested-with: ghc ==9.10.3

@@ -36,6 +36,7 @@
               (root + /LICENSE)
               (root + /README.md)
               (root + /CHANGELOG.md)
+              (root + /PARALLELISM.md)
             ];
           }
         );
