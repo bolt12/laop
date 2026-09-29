@@ -1,8 +1,18 @@
 module Main (main) where
 
-import Examples.Readme qualified as RD
+import qualified Examples.Quantum as QU
+import qualified Examples.Readme  as RD
+import           Test.Tasty
+import           Test.Tasty.HUnit
 
 main :: IO ()
-main = do
-  putStrLn ("Testing if README works" :: String)
-  RD.exec
+main =
+  defaultMain $
+    testGroup "LAoP"
+      [ testGroup "Examples"
+          [ testGroup "README" (map check RD.checks)
+          , testGroup "Quantum" (map check QU.checks)
+          ]
+      ]
+  where
+    check (name, ok) = testCase name (assertBool name ok)

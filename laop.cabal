@@ -80,11 +80,15 @@ test-suite laop-test
   type: exitcode-stdio-1.0
   hs-source-dirs: test
   other-modules:
+    Examples.Quantum
     Examples.Readme
     Examples.Spreadsheets
 
   main-is: Spec.hs
-  build-depends: laop
+  build-depends:
+    laop,
+    tasty >=1.5 && <1.6,
+    tasty-hunit >=0.10 && <0.11,
 
 benchmark laop-benchmark
   import: common-options, executable-options

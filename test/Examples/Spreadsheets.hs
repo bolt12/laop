@@ -1,20 +1,33 @@
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE TypeFamilies         #-}
+{-# LANGUAGE UndecidableInstances #-}
 
-module Examples.Spreadsheets where
+module Examples.Spreadsheets (
+  xls,
+  maxPW,
+) where
 
-import GHC.Generics
-import LAoP.Matrix.Type
-import LAoP.Utils
-import Prelude hiding (id, (.))
+import           GHC.Generics        (Generic)
+import           LAoP.Matrix.Indexed
+import           LAoP.Utils
+import           Prelude             hiding (id, (.))
 
 data Student = Student1 | Student2 | Student3 | Student4
-  deriving (Eq, Show, Enum, Bounded, Generic)
+  deriving (Eq, Show, Generic)
+
+instance MatIndex Student where
+  type DimOf Student = GDimOf Student
 
 data Question = Question1 | Question2 | Question3 | Question4
-  deriving (Eq, Show, Enum, Bounded, Generic)
+  deriving (Eq, Show, Generic)
+
+instance MatIndex Question where
+  type DimOf Question = GDimOf Question
 
 data Results = Exam | Test | Final
-  deriving (Eq, Show, Enum, Bounded, Generic)
+  deriving (Eq, Show, Generic)
+
+instance MatIndex Results where
+  type DimOf Results = GDimOf Results
 
 test :: Matrix Float One Results
 test = point Test
@@ -39,8 +52,7 @@ xls t = join (fork w m) (fork zeros r)
     rExam = m . tr w
     rTest = tr t
     rFinal = rTest `maxPW` rExam
-    r = (rExam . tr exam) + (rTest . tr test) + (rFinal . tr final)
+    r = (rExam . tr exam) .+. (rTest . tr test) .+. (rFinal . tr final)
 
--- | Overloaded, point-wise 'max' function
 maxPW :: (Ord e) => Matrix e a b -> Matrix e a b -> Matrix e a b
 maxPW = zipWithM max
