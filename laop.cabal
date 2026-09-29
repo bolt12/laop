@@ -56,6 +56,7 @@ library
   build-depends:
     array >=0.5.8 && <0.6,
     deepseq >=1.5 && <1.6,
+    parallel >=3.2 && <3.3,
 
   exposed-modules:
     LAoP.Dist
@@ -63,6 +64,9 @@ library
     LAoP.Matrix.Indexed
     LAoP.Matrix.Internal
     LAoP.Matrix.Nat
+    LAoP.Matrix.Parallel
+    LAoP.Matrix.Parallel.Indexed
+    LAoP.Matrix.Parallel.Nat
     LAoP.Matrix.Type
     LAoP.Relation
     LAoP.Relation.Internal
