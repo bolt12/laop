@@ -83,12 +83,20 @@ test-suite laop-test
     Examples.Quantum
     Examples.Readme
     Examples.Spreadsheets
+    Test.Dist.Properties
+    Test.Generators
+    Test.Index.Properties
+    Test.Matrix.Properties
+    Test.Nat.Properties
+    Test.Relation.Properties
 
   main-is: Spec.hs
   build-depends:
+    QuickCheck >=2.15 && <2.19,
     laop,
     tasty >=1.5 && <1.6,
     tasty-hunit >=0.10 && <0.11,
+    tasty-quickcheck >=0.11 && <0.12,
 
 benchmark laop-benchmark
   import: common-options, executable-options

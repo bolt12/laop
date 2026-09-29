@@ -1,7 +1,12 @@
 module Main (main) where
 
-import qualified Examples.Quantum as QU
-import qualified Examples.Readme  as RD
+import qualified Examples.Quantum         as QU
+import qualified Examples.Readme          as RD
+import           Test.Dist.Properties
+import           Test.Index.Properties
+import           Test.Matrix.Properties
+import           Test.Nat.Properties
+import           Test.Relation.Properties
 import           Test.Tasty
 import           Test.Tasty.HUnit
 
@@ -9,7 +14,12 @@ main :: IO ()
 main =
   defaultMain $
     testGroup "LAoP"
-      [ testGroup "Examples"
+      [ matrixPropertyTests
+      , relationPropertyTests
+      , distPropertyTests
+      , indexPropertyTests
+      , natPropertyTests
+      , testGroup "Examples"
           [ testGroup "README" (map check RD.checks)
           , testGroup "Quantum" (map check QU.checks)
           ]
