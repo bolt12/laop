@@ -40,7 +40,6 @@ common common-options
     -Wunused-packages
     -fhide-source-paths
     -Wmissing-export-lists
-    -Wno-compat-unqualified-imports
     -Wno-duplicate-exports
 
   default-language: GHC2024
@@ -54,7 +53,10 @@ common executable-options
 library
   import: common-options
   hs-source-dirs: src
-  build-depends: deepseq >=1.5 && <1.6
+  build-depends:
+    array >=0.5.8 && <0.6,
+    deepseq >=1.5 && <1.6,
+
   exposed-modules:
     LAoP.Dist
     LAoP.Dist.Internal
@@ -65,6 +67,8 @@ library
     LAoP.Relation.Internal
     LAoP.Utils
     LAoP.Utils.Internal
+
+  other-modules: LAoP.Matrix.Dim
 
 test-suite laop-test
   import: common-options, executable-options
