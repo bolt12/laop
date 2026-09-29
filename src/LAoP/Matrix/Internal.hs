@@ -138,6 +138,16 @@ module LAoP.Matrix.Internal (
   rows,
   rows',
 
+  -- * Boolean matrices
+  Boolean (..),
+  Relation,
+  toBool,
+  fromBool,
+  negateM,
+  divR,
+  divL,
+  divS,
+
   -- * Pretty printing
   pretty,
   prettyPrint,
@@ -530,6 +540,7 @@ comp c (Join a b)          = Join (comp c a) (comp c b)
 {-# NOINLINE [1] comp #-}
 -- Phase [0], after the rewrite rules on 'comp' have had their chance.
 {-# SPECIALISE [0] comp :: Matrix Double cr rows -> Matrix Double cols cr -> Matrix Double cols rows #-}
+{-# SPECIALISE [0] comp :: Matrix Boolean cr rows -> Matrix Boolean cols cr -> Matrix Boolean cols rows #-}
 
 {-# RULES
 "comp/iden-right" forall m. comp m iden = m
@@ -757,6 +768,61 @@ rows' :: Matrix e cols rows -> Int
 rows' (One _)           = 1
 rows' (Join lhs _)      = rows' lhs
 rows' (Fork top bottom) = rows' top + rows' bottom
+
+-- Boolean matrices
+
+{- | Elements of relations: the boolean semiring, with @+@ as disjunction and
+@*@ as conjunction. Composing t'Boolean' matrices with 'comp' is therefore
+relational composition.
+
+@-@ is truncated subtraction (@a - b@ is @a && not b@), so '.-.' is relational
+difference. 'negate' and the other ring laws do not hold; 'fromInteger' maps
+0 to false and every other integer to true. Values show as @0@ and @1@.
+-}
+newtype Boolean = Boolean Bool
+  deriving (Eq, Ord)
+  deriving newtype (NFData)
+
+instance Show Boolean where
+  showsPrec _ (Boolean b) = showString (if b then "1" else "0")
+
+instance Num Boolean where
+  Boolean a + Boolean b = Boolean (a || b)
+  Boolean a * Boolean b = Boolean (a && b)
+  Boolean a - Boolean b = Boolean (a && not b)
+  abs = id
+  signum = id
+  fromInteger n = Boolean (n /= 0)
+
+-- | Relation data type.
+type Relation a b = Matrix Boolean a b
+
+-- | Reads a t'Boolean' as a 'Bool'.
+toBool :: Boolean -> Bool
+toBool (Boolean b) = b
+
+-- | Lifts a 'Bool' to a t'Boolean'.
+fromBool :: Bool -> Boolean
+fromBool = Boolean
+
+-- | Relational complement, element by element.
+negateM :: Relation cols rows -> Relation cols rows
+negateM = emap (fromBool . not . toBool)
+
+-- | Matrix relational right division
+divR :: Relation b c -> Relation b a -> Relation a c
+divR (One a) (One b)       = One (fromBool (not (toBool b) || toBool a))
+divR (Join a b) (Join c d) = divR a c .*. divR b d
+divR (Fork a b) c          = Fork (divR a c) (divR b c)
+divR c (Fork a b)          = Join (divR c a) (divR c b)
+
+-- | Matrix relational left division
+divL :: Relation c b -> Relation a b -> Relation a c
+divL x y = tr (divR (tr y) (tr x))
+
+-- | Matrix relational symmetric division
+divS :: Relation c a -> Relation b a -> Relation c b
+divS s r = divL r s .*. divR (tr r) (tr s)
 
 -- Pretty printing
 
