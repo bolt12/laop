@@ -355,24 +355,32 @@ one = One
 -}
 join :: Matrix e a rows -> Matrix e b rows -> Matrix e (a :+: b) rows
 join = Join
+{-# NOINLINE [1] join #-}
 
 {- | Stacks @a@ above @b@: the split @[a/b]@ of Macedo and Oliveira (2013,
 eq. 17). Fork algebra uses "fork" for pairing, which here is 'kr'.
 -}
 fork :: Matrix e cols a -> Matrix e cols b -> Matrix e cols (a :+: b)
 fork = Fork
+{-# NOINLINE [1] fork #-}
 
 infixl 3 |||
 
--- | Matrix @Join@ constructor. An alias of 'join'.
+{- | Matrix @Join@ constructor. An alias of 'join', inlined early so the
+rewrite rules written against 'join' see through it.
+-}
 (|||) :: Matrix e a rows -> Matrix e b rows -> Matrix e (a :+: b) rows
 (|||) = join
+{-# INLINE (|||) #-}
 
 infixl 2 ===
 
--- | Matrix @Fork@ constructor. An alias of 'fork'.
+{- | Matrix @Fork@ constructor. An alias of 'fork', inlined early so the
+rewrite rules written against 'fork' see through it.
+-}
 (===) :: Matrix e cols a -> Matrix e cols b -> Matrix e cols (a :+: b)
 (===) = fork
+{-# INLINE (===) #-}
 
 -- Element-wise operations
 
@@ -388,6 +396,7 @@ fork a b .+. fork c d == fork (a .+. c) (b .+. d)
 -}
 (.+.) :: (Num e) => Matrix e cols rows -> Matrix e cols rows -> Matrix e cols rows
 (.+.) = zipWithM (+)
+{-# NOINLINE [1] (.+.) #-}
 
 infixl 6 .-.
 
@@ -400,6 +409,7 @@ infixl 7 .*.
 -- | Element-wise multiplication of matrices (Hadamard product).
 (.*.) :: (Num e) => Matrix e cols rows -> Matrix e cols rows -> Matrix e cols rows
 (.*.) = zipWithM (*)
+{-# NOINLINE [1] (.*.) #-}
 
 {- | Zip two matrices with a given binary function. When the two are laid out
 differently, 'splitJoin' and 'splitFork' line the blocks up as the recursion
@@ -447,6 +457,7 @@ iden = generate (\c r -> bool 0 1 (c == r))
 -- | The zero matrix. A matrix wholly filled with zeros.
 zeros :: (Num e, KnownDim cols, KnownDim rows) => Matrix e cols rows
 zeros = generate (\_ _ -> 0)
+{-# NOINLINE [1] zeros #-}
 
 {- | The ones matrix. A matrix wholly filled with ones.
 
@@ -454,6 +465,7 @@ zeros = generate (\_ _ -> 0)
 -}
 ones :: (Num e, KnownDim cols, KnownDim rows) => Matrix e cols rows
 ones = generate (\_ _ -> 1)
+{-# NOINLINE [1] ones #-}
 
 -- | The constant matrix constructor. A matrix wholly filled with a given value.
 constant :: (KnownDim cols, KnownDim rows) => e -> Matrix e cols rows
@@ -519,6 +531,7 @@ tr :: Matrix e cols rows -> Matrix e rows cols
 tr (One e)    = One e
 tr (Join a b) = Fork (tr a) (tr b)
 tr (Fork a b) = Join (tr a) (tr b)
+{-# NOINLINE [1] tr #-}
 
 -- Composition
 
@@ -527,10 +540,11 @@ tr (Fork a b) = Join (tr a) (tr b)
   This definition takes advantage of divide-and-conquer and fusion laws
 from LAoP.
 
-Optimised builds rewrite @comp m iden@ and @comp iden m@ to @m@ using the RULES
-in this module. The rules assume exact arithmetic: if a matrix holds @NaN@ or
-an infinity, the result can differ from an unoptimised build, because the
-skipped products by zero would have propagated it.
+Optimised builds rewrite some compositions away using the RULES in this module
+(@comp m iden@ becomes @m@, @comp p1 (fork a b)@ becomes @a@, and so on). The
+rules assume exact arithmetic: if a matrix holds @NaN@ or an infinity, the
+result can differ from an unoptimised build, because the skipped products by
+zero would have propagated it.
 -}
 comp :: (Num e) => Matrix e cr rows -> Matrix e cols cr -> Matrix e cols rows
 comp (One a) (One b)       = One (a * b)
@@ -543,8 +557,35 @@ comp c (Join a b)          = Join (comp c a) (comp c b)
 {-# SPECIALISE [0] comp :: Matrix Boolean cr rows -> Matrix Boolean cols cr -> Matrix Boolean cols rows #-}
 
 {-# RULES
+-- Category: identity
 "comp/iden-right" forall m. comp m iden = m
 "comp/iden-left"  forall m. comp iden m = m
+
+-- Transpose: involution and constants
+"tr/involution" forall m. tr (tr m) = m
+"tr/iden"   tr iden = iden
+
+-- Additive identity
+"add/zeros-right" forall m. m .+. zeros = m
+"add/zeros-left"  forall m. zeros .+. m = m
+
+-- Hadamard identity and annihilation
+"had/ones-right"  forall m. m .*. ones = m
+"had/ones-left"   forall m. ones .*. m = m
+"had/zeros-right" forall m. m .*. zeros = zeros
+"had/zeros-left"  forall m. zeros .*. m = zeros
+
+-- Biproduct (Macedo and Oliveira 2013, eqs. 11, 12) and orthogonality (eqs. 14, 15)
+"comp/p1-i1" comp p1 i1 = iden
+"comp/p2-i2" comp p2 i2 = iden
+"comp/p1-i2" comp p1 i2 = zeros
+"comp/p2-i1" comp p2 i1 = zeros
+
+-- Cancellation (Macedo and Oliveira 2013, eqs. 28, 29)
+"comp/p1-fork" forall a b. comp p1 (fork a b) = a
+"comp/p2-fork" forall a b. comp p2 (fork a b) = b
+"comp/join-i1" forall a b. comp (join a b) i1 = a
+"comp/join-i2" forall a b. comp (join a b) i2 = b
   #-}
 
 -- Projections
@@ -554,20 +595,24 @@ comp c (Join a b)          = Join (comp c a) (comp c b)
 -}
 p1 :: forall e m n. (Num e, KnownDim m, KnownDim n) => Matrix e (m :+: n) m
 p1 = Join iden zeros
+{-# NOINLINE [1] p1 #-}
 
 -- | Second biproduct projection, @[0|id]@.
 p2 :: forall e m n. (Num e, KnownDim m, KnownDim n) => Matrix e (m :+: n) n
 p2 = Join zeros iden
+{-# NOINLINE [1] p2 #-}
 
 -- Injections
 
 -- | First biproduct injection, @[id/0]@, the transpose of 'p1'.
 i1 :: forall e m n. (Num e, KnownDim m, KnownDim n) => Matrix e m (m :+: n)
 i1 = tr p1
+{-# NOINLINE [1] i1 #-}
 
 -- | Second biproduct injection, @[0/id]@.
 i2 :: forall e m n. (Num e, KnownDim m, KnownDim n) => Matrix e n (m :+: n)
 i2 = tr p2
+{-# NOINLINE [1] i2 #-}
 
 -- Direct sum
 
