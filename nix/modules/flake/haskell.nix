@@ -13,11 +13,7 @@
     }:
     let
       ghcDefault = "ghc910";
-      ghcVersions = [
-        "ghc927"
-        "ghc96"
-        ghcDefault
-      ];
+      ghcVersions = [ ghcDefault ];
     in
     {
       # Our only Haskell project. You can have multiple projects, but this template
