@@ -60,6 +60,7 @@ library
   exposed-modules:
     LAoP.Dist
     LAoP.Dist.Internal
+    LAoP.Matrix.Indexed
     LAoP.Matrix.Internal
     LAoP.Matrix.Nat
     LAoP.Matrix.Type

@@ -211,10 +211,11 @@ instance
 
 {- | A subset of a finite type, represented by the list of its members.
 
-Order and duplicates in the list carry no meaning. The 'Enum' instance numbers
-subsets by a bitmask in which the first value of the element type is the most
-significant bit. For a two-value type @{a0, a1}@ the order is @L []@,
-@L [a1]@, @L [a0]@, @L [a0, a1]@.
+Order and duplicates in the list carry no meaning. The 'Enum' instance (and the
+@MatIndex@ instance in "LAoP.Matrix.Indexed") number subsets by a bitmask in
+which the first value of the element type is the most significant bit. For a
+two-value type @{a0, a1}@ the order is @L []@, @L [a1]@, @L [a0]@,
+@L [a0, a1]@.
 -}
 newtype BoundedList a = L [a]
   deriving (Eq, Show, Read)
