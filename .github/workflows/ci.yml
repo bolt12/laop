@@ -20,8 +20,8 @@ jobs:
     - uses: cachix/install-nix-action@v27
       name: Install Nix
 
-    # Builds the library and runs the test suite (haskell-flake enables
-    # doCheck by default).
+    # Builds the library, compiles the benchmark and runs the test suite
+    # (haskell-flake enables doCheck by default).
     - name: Build and test
       run: |
         nix build -L .#${{ matrix.ghc }}-laop

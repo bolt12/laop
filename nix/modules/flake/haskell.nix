@@ -54,6 +54,8 @@
         settings = {
           laop = {
             stan = false;
+            # Compile (but do not run) the benchmark so CI catches bit-rot.
+            benchmark = true;
             # haddock = false;
           };
           /*
@@ -66,6 +68,9 @@
         # Development shell configuration
         devShell = {
           hlsCheck.enable = false;
+          # Brings hmatrix (linked against nixpkgs BLAS/LAPACK), criterion and
+          # the other benchmark dependencies into the shell's package database.
+          benchmark = true;
           mkShellArgs = {
             shellHook = ''
               export SHELL=/run/current-system/sw/bin/bash
