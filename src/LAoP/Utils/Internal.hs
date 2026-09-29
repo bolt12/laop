@@ -1,20 +1,36 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE PatternSynonyms     #-}
+{-# LANGUAGE RoleAnnotations     #-}
+{-# LANGUAGE TypeFamilies        #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 
+{- |
+Module     : LAoP.Utils.Internal
+Copyright  : (c) Armando Santos 2019-2026
+Maintainer : armandoifsantos@gmail.com
+Stability  : experimental
+
+Bounded index types ('Ranged', 'BoundedList') and the constrained 'Category'
+class. "LAoP.Utils" is the public interface; this module also exposes the raw
+'Ranged' constructor.
+
+This is an Internal module and it is not supposed to be imported.
+-}
 module LAoP.Utils.Internal (
-  -- * 'Natural' data type
-  Natural (..),
+  -- * 'Ranged' data type
+  Ranged (UnsafeRanged),
+  pattern Rng,
+  mkRanged,
+
+  -- * Coerce auxiliary functions to help promote 'Int' typed functions to
+  -- 'Ranged' typed functions.
+  coerceRanged,
+  coerceRanged2,
+  coerceRanged3,
+
+  -- * Deprecated aliases
+  Natural,
   reifyToNatural,
-
-  -- * Coerce auxiliar functions to help promote 'Int' typed functions to
-
-  -- 'Natural' typed functions.
   coerceNat,
   coerceNat2,
   coerceNat3,
@@ -27,80 +43,122 @@ module LAoP.Utils.Internal (
 )
 where
 
-import Control.DeepSeq
-import Data.Bits (bit, testBit, (.|.))
-import Data.Coerce
-import Data.Kind
-import Data.Proxy
-import GHC.Enum (boundedEnumFrom, boundedEnumFromThen)
-import GHC.Generics
-import GHC.TypeLits hiding (Natural)
-import Prelude hiding (id, (.))
-import Prelude qualified
+import           Control.DeepSeq
+import           Data.Bits       (bit, testBit, (.|.))
+import           Data.Coerce
+import           Data.Kind
+import           Data.Proxy
+import           GHC.Enum        (boundedEnumFrom, boundedEnumFromThen)
+import           GHC.Read        (expectP, parens)
+import           GHC.Stack       (HasCallStack)
+import           GHC.TypeLits    hiding (Natural)
+import           Prelude         hiding (id, (.))
+import qualified Prelude
+import           Text.Read       (Lexeme (Ident), Read (..), pfail, prec, step)
 
 {- | Wrapper around 'Int's that have a restrictive semantic associated.
-A value of type @'Natural' n m@ can only be instanciated with some 'Int'
-@i@ that's @n <= i <= m@.
+A value of type @'Ranged' n m@ can only be instantiated with some 'Int'
+@i@ where @n <= i <= m@.
+
+Build values with 'mkRanged', numeric literals or 'toEnum'; read them with the
+'Rng' pattern. The raw constructor is not exported from "LAoP.Utils", and the
+nominal roles stop 'coerce' from moving a value into other bounds.
 -}
-newtype Natural (start :: Nat) (end :: Nat) = Nat Int
-  deriving (Show, Read, Eq, Ord, NFData, Generic)
+newtype Ranged (start :: Nat) (end :: Nat) = UnsafeRanged Int
+  deriving (Eq, Ord, NFData)
+
+type role Ranged nominal nominal
+
+-- | Matches a 'Ranged' value and exposes its 'Int'. Matching only.
+pattern Rng :: Int -> Ranged n m
+pattern Rng i <- UnsafeRanged i
+
+{-# COMPLETE Rng #-}
+
+instance Show (Ranged n m) where
+  showsPrec d (UnsafeRanged i) = showParen (d > 10) (showString "Rng " . showsPrec 11 i)
+
+-- | Reads what 'show' prints, failing on values outside the range.
+instance (KnownNat n, KnownNat m) => Read (Ranged n m) where
+  readPrec = parens . prec 10 $ do
+    expectP (Ident "Rng")
+    i <- step readPrec
+    if inRange @n @m (toInteger i) then pure (UnsafeRanged i) else pfail
+
+inRange :: forall n m. (KnownNat n, KnownNat m) => Integer -> Bool
+inRange i = natVal (Proxy @n) <= i && i <= natVal (Proxy @m)
+
+outOfRange :: forall n m a. (HasCallStack, KnownNat n, KnownNat m) => String -> Integer -> a
+outOfRange what i =
+  error $
+    what
+      ++ ": "
+      ++ show i
+      ++ " is outside ["
+      ++ show (natVal (Proxy @n))
+      ++ ", "
+      ++ show (natVal (Proxy @m))
+      ++ "]"
 
 {- | Throws a runtime error if any of the operations overflows or
 underflows.
 -}
-instance (KnownNat n, KnownNat m) => Num (Natural n m) where
-  (Nat a) + (Nat b) = reifyToNatural @n @m (a + b)
-  (Nat a) - (Nat b) = reifyToNatural @n @m (a - b)
-  (Nat a) * (Nat b) = reifyToNatural @n @m (a * b)
-  abs (Nat a) = reifyToNatural @n @m (abs a)
-  signum (Nat a) = reifyToNatural @n @m (signum a)
-  fromInteger i = reifyToNatural @n @m (fromInteger i)
+instance (KnownNat n, KnownNat m) => Num (Ranged n m) where
+  (Rng a) + (Rng b) = mkRanged @n @m (a + b)
+  (Rng a) - (Rng b) = mkRanged @n @m (a - b)
+  (Rng a) * (Rng b) = mkRanged @n @m (a * b)
+  abs (Rng a) = mkRanged @n @m (abs a)
+  signum (Rng a) = mkRanged @n @m (signum a)
+  fromInteger i
+    | inRange @n @m i = UnsafeRanged (fromInteger i)
+    | otherwise = outOfRange @n @m "Ranged.fromInteger" i
 
-{- | Natural constructor function. Throws a runtime error if the 'Int' value is greater
-than the corresponding @m@ or lower than @n@ in the @'Natural' n m@ type.
+{- | Ranged constructor function. Throws a runtime error if the 'Int' value
+is greater than @m@ or lower than @n@ in the @'Ranged' n m@ type.
 -}
-reifyToNatural :: forall n m. (KnownNat n, KnownNat m) => Int -> Natural n m
-reifyToNatural i =
-  let start = fromInteger (natVal (Proxy :: Proxy n))
-      end = fromInteger (natVal (Proxy :: Proxy m))
-   in if start <= i && i <= end
-        then Nat i
-        else error "Off limits"
+mkRanged :: forall n m. (HasCallStack, KnownNat n, KnownNat m) => Int -> Ranged n m
+mkRanged i
+  | inRange @n @m (toInteger i) = UnsafeRanged i
+  | otherwise = outOfRange @n @m "mkRanged" (toInteger i)
 
-{- | Auxiliary function that promotes binary 'Int' functions to 'Natural' binary
-functions.
+{- | Promotes binary 'Int' functions to 'Ranged' binary functions. Throws a
+runtime error if the result falls outside the result range.
 -}
-coerceNat :: (Int -> Int -> Int) -> (Natural a a' -> Natural b b' -> Natural c c')
-coerceNat = coerce
+coerceRanged ::
+  (HasCallStack, KnownNat c, KnownNat c') =>
+  (Int -> Int -> Int) ->
+  (Ranged a a' -> Ranged b b' -> Ranged c c')
+coerceRanged f (Rng x) (Rng y) = mkRanged (f x y)
 
-{- | Auxiliary function that promotes ternary (binary) 'Int' functions to 'Natural'
-functions.
+{- | Promotes ternary (binary) 'Int' functions to 'Ranged' functions. Throws a
+runtime error if the result falls outside the result range.
 -}
-coerceNat2 :: ((Int, Int) -> Int -> Int) -> ((Natural a a', Natural b b') -> Natural c c' -> Natural d d')
-coerceNat2 = coerce
+coerceRanged2 ::
+  (HasCallStack, KnownNat d, KnownNat d') =>
+  ((Int, Int) -> Int -> Int) ->
+  ((Ranged a a', Ranged b b') -> Ranged c c' -> Ranged d d')
+coerceRanged2 f (Rng x, Rng y) (Rng z) = mkRanged (f (x, y) z)
 
-{- | Auxiliary function that promotes ternary (binary) 'Int' functions to 'Natural'
-functions.
+-- | Promotes binary 'Int' functions to 'Ranged' functions with polymorphic result.
+coerceRanged3 :: (Int -> Int -> a) -> (Ranged b b' -> Ranged c c' -> a)
+coerceRanged3 = coerce
+
+instance (KnownNat n, KnownNat m) => Bounded (Ranged n m) where
+  minBound = UnsafeRanged (fromInteger (natVal (Proxy :: Proxy n)))
+  maxBound = UnsafeRanged (fromInteger (natVal (Proxy :: Proxy m)))
+
+{- | Enumerates the range from 0: @'toEnum' 0 == 'minBound'@. @[x ..]@ and
+@[x, y ..]@ stop at the bounds.
 -}
-coerceNat3 :: (Int -> Int -> a) -> (Natural b b' -> Natural c c' -> a)
-coerceNat3 = coerce
-
-instance (KnownNat n, KnownNat m) => Bounded (Natural n m) where
-  minBound = Nat $ fromInteger (natVal (Proxy :: Proxy n))
-  maxBound = Nat $ fromInteger (natVal (Proxy :: Proxy m))
-
-instance (KnownNat n, KnownNat m) => Enum (Natural n m) where
+instance (KnownNat n, KnownNat m) => Enum (Ranged n m) where
   toEnum i =
     let start = fromInteger (natVal (Proxy :: Proxy n))
-     in reifyToNatural (start + i)
+     in mkRanged (start + i)
 
-  -- \| Throws a runtime error if the value is off limits
-  fromEnum (Nat nat) =
-    let start = fromInteger (natVal (Proxy :: Proxy n))
-        end = fromInteger (natVal (Proxy :: Proxy m))
-     in if start <= nat && nat <= end
-          then nat - start
-          else error "Off limits"
+  fromEnum (Rng val) = val - fromInteger (natVal (Proxy :: Proxy n))
+
+  enumFrom = boundedEnumFrom
+  enumFromThen = boundedEnumFromThen
 
 {- | Optimized 'Enum' instance for tuples that comply with the given
 constraints.
@@ -148,7 +206,7 @@ instance
         lb = fmap Right ([minBound .. maxBound] :: [b])
      in (la ++ lb) !! i
 
-  fromEnum (Left a) = fromEnum a
+  fromEnum (Left a)  = fromEnum a
   fromEnum (Right b) = fromEnum (maxBound :: a) + fromEnum b + 1
 
 {- | A subset of a finite type, represented by the list of its members.
@@ -198,3 +256,29 @@ class Category (k :: j -> j -> Type) where
 instance Category (->) where
   id = Prelude.id
   (.) = (Prelude..)
+
+-- Deprecated aliases
+
+-- | Deprecated alias of 'Ranged'.
+type Natural = Ranged
+{-# DEPRECATED Natural "Use Ranged instead" #-}
+
+-- | Deprecated alias of 'mkRanged'.
+reifyToNatural :: forall n m. (HasCallStack, KnownNat n, KnownNat m) => Int -> Ranged n m
+reifyToNatural = mkRanged
+{-# DEPRECATED reifyToNatural "Use mkRanged instead" #-}
+
+-- | Deprecated alias of 'coerceRanged'.
+coerceNat :: (HasCallStack, KnownNat c, KnownNat c') => (Int -> Int -> Int) -> (Ranged a a' -> Ranged b b' -> Ranged c c')
+coerceNat = coerceRanged
+{-# DEPRECATED coerceNat "Use coerceRanged instead" #-}
+
+-- | Deprecated alias of 'coerceRanged2'.
+coerceNat2 :: (HasCallStack, KnownNat d, KnownNat d') => ((Int, Int) -> Int -> Int) -> ((Ranged a a', Ranged b b') -> Ranged c c' -> Ranged d d')
+coerceNat2 = coerceRanged2
+{-# DEPRECATED coerceNat2 "Use coerceRanged2 instead" #-}
+
+-- | Deprecated alias of 'coerceRanged3'.
+coerceNat3 :: (Int -> Int -> a) -> (Ranged b b' -> Ranged c c' -> a)
+coerceNat3 = coerceRanged3
+{-# DEPRECATED coerceNat3 "Use coerceRanged3 instead" #-}
