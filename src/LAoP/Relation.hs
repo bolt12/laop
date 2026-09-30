@@ -1,10 +1,6 @@
------------------------------------------------------------------------------
-
------------------------------------------------------------------------------
-
 {- |
 Module     : LAoP.Relation
-Copyright  : (c) Armando Santos 2019-2020
+Copyright  : (c) Armando Santos 2019-2026
 Maintainer : armandoifsantos@gmail.com
 Stability  : experimental
 
@@ -14,32 +10,11 @@ Boolean matrices.
 This module offers many of the combinators of the Algebra of
 Programming discipline. It is still under construction and very
 experimental.
-
-This is an Internal module and it is no supposed to be imported.
 -}
 module LAoP.Relation (
-  -- | This definition makes use of the fact that 'Void' is
-  -- isomorphic to 0 and '()' to 1 and captures matrix
-  -- dimensions as stacks of 'Either's.
-  --
-  -- There exists two type families that make it easier to write
-  -- matrix dimensions: 'FromNat' and 'Count'. This approach
-  -- leads to a very straightforward implementation
-  -- of LAoP combinators.
-
   -- * Relation data type
   Relation (..),
   Boolean,
-
-  -- * Constraint type synonyms
-  Countable,
-  CountableDims,
-  CountableN,
-  CountableDimsN,
-  FLN,
-  Liftable,
-  Trivial,
-  TrivialP,
 
   -- * Primitives
   one,
@@ -48,17 +23,11 @@ module LAoP.Relation (
   fork,
   (===),
 
-  -- * Auxiliary type families
-  FromNat,
-  Count,
-  Normalize,
-
-  -- * Matrix construction and conversion
-  FromLists,
+  -- * Construction
   fromLists,
   fromF,
-  fromF',
   toRel,
+  fromRel,
   toLists,
   toList,
   toBool,
@@ -74,6 +43,8 @@ module LAoP.Relation (
   conv,
   intersection,
   union,
+  complement,
+  difference,
   sse,
   implies,
   iff,
@@ -106,22 +77,14 @@ module LAoP.Relation (
 
   -- * Relational pairing
   splitR,
-
-  -- ** Projections
   fstR,
   sndR,
-
-  -- ** Bifunctor
   (><),
 
   -- * Relational coproduct
   eitherR,
-
-  -- ** Injections
   i1,
   i2,
-
-  -- ** Bifunctor
   (-|-),
 
   -- * Relational "currying"
@@ -145,26 +108,21 @@ module LAoP.Relation (
 
   -- * Conditionals
   equalizer,
-
-  -- ** McCarthy's Conditional
   predR,
   guard,
   cond,
 
-  -- * Relational composition and lifting
+  -- * Composition and lifting
   iden,
   comp,
-  fromF,
-  fromF',
 
-  -- ** Relational application
+  -- * Relational application
   pointAp,
   pointApBool,
 
-  -- * Matrix printing
+  -- * Pretty printing
   pretty,
   prettyPrint,
-)
-where
+) where
 
-import LAoP.Relation.Internal
+import           LAoP.Relation.Internal

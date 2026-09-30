@@ -1,6 +1,6 @@
 cabal-version: 3.0
 name: laop
-version: 0.2.0.0
+version: 0.3.0.0
 synopsis: Matrix programming library
 description:
   Matrix programming library that uses a type-safe inductive definition
@@ -12,25 +12,24 @@ license: MIT
 license-file: LICENSE
 author: Armando Santos
 maintainer: Armando Santos <armandoifsantos@gmail.com>
-copyright: 2023 Armando Santos
+copyright: 2019-2026 Armando Santos
 category: Data
 build-type: Simple
 extra-doc-files:
   CHANGELOG.md
+  PARALLELISM.md
   README.md
 
-tested-with: ghc ==8.10.7 || ==9.2.8
+tested-with: ghc ==9.10.3
 
 source-repository head
   type: git
   location: https://github.com/bolt12/laop.git
 
 common common-options
-  build-depends:
-    base >=4.12.0.0 && <5,
-    deepseq,
-
+  build-depends: base >=4.20 && <5
   ghc-options:
+    -- -Wno-duplicate-exports: ghc considers exporting f and f' the same name
     -Wall
     -Wno-unticked-promoted-constructors
     -Wcompat
@@ -42,67 +41,76 @@ common common-options
     -Wunused-packages
     -fhide-source-paths
     -Wmissing-export-lists
-    -Wpartial-fields
-    -Wno-compat-unqualified-imports
     -Wno-duplicate-exports
 
-  -- Needed because ghc considers exporting f and f' the same name
-  default-language: Haskell2010
-  default-extensions: ImportQualifiedPost
+  default-language: GHC2024
+
+common executable-options
+  ghc-options:
+    -threaded
+    -rtsopts
+    -with-rtsopts=-N
 
 library
   import: common-options
   hs-source-dirs: src
+  build-depends:
+    array >=0.5.8 && <0.6,
+    deepseq >=1.5 && <1.6,
+    parallel >=3.2 && <3.3,
+
   exposed-modules:
     LAoP.Dist
     LAoP.Dist.Internal
+    LAoP.Matrix.Indexed
     LAoP.Matrix.Internal
     LAoP.Matrix.Nat
+    LAoP.Matrix.Parallel
+    LAoP.Matrix.Parallel.Indexed
+    LAoP.Matrix.Parallel.Nat
     LAoP.Matrix.Type
     LAoP.Relation
     LAoP.Relation.Internal
     LAoP.Utils
     LAoP.Utils.Internal
 
+  other-modules: LAoP.Matrix.Dim
+
 test-suite laop-test
-  import: common-options
+  import: common-options, executable-options
   type: exitcode-stdio-1.0
   hs-source-dirs: test
   other-modules:
+    Examples.Quantum
     Examples.Readme
     Examples.Spreadsheets
+    Test.Dist.Properties
+    Test.Generators
+    Test.Index.Properties
+    Test.Matrix.Properties
+    Test.Matrix.Reference
+    Test.Nat.Properties
+    Test.Relation.Properties
 
   main-is: Spec.hs
-  build-depends: laop
-  ghc-options:
-    -threaded
-    -rtsopts
-    -with-rtsopts=-N
-    -funfolding-use-threshold=16
-    -fexcess-precision
-    -optc-O3
-    -optc-ffast-math
-
-  default-extensions: ImportQualifiedPost
+  build-depends:
+    QuickCheck >=2.15 && <2.19,
+    laop,
+    matrix >=0.3.6 && <0.4,
+    tasty >=1.5 && <1.6,
+    tasty-hunit >=0.10 && <0.11,
+    tasty-quickcheck >=0.11 && <0.12,
 
 benchmark laop-benchmark
-  import: common-options
+  import: common-options, executable-options
   type: exitcode-stdio-1.0
   hs-source-dirs: benchmark
   main-is: Main.hs
   build-depends:
-    QuickCheck,
-    criterion,
-    deepseq,
+    QuickCheck >=2.15 && <2.19,
+    criterion >=1.6 && <1.7,
+    hmatrix >=0.20 && <0.23,
     laop,
-
-  ghc-options:
-    -threaded
-    -rtsopts
-    -with-rtsopts=-N
-    -funfolding-use-threshold=16
-    -fexcess-precision
-    -optc-O3
-    -optc-ffast-math
-
-  default-extensions: ImportQualifiedPost
+    linear >=1.22 && <1.24,
+    matrix >=0.3.6 && <0.4,
+    vector >=0.13 && <0.14,
