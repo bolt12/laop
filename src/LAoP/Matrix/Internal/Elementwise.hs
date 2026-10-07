@@ -22,6 +22,8 @@ module LAoP.Matrix.Internal.Elementwise (
   (./),
 ) where
 
+import           LAoP.Matrix.Internal.Boolean        (Boolean)
+import           LAoP.Matrix.Internal.Construction   (ones, zeros)
 import           LAoP.Matrix.Internal.Representation
 
 -- Element-wise operations
@@ -38,6 +40,9 @@ fork a b .+. fork c d == fork (a .+. c) (b .+. d)
 -}
 (.+.) :: (Num e) => Matrix e cols rows -> Matrix e cols rows -> Matrix e cols rows
 (.+.) = zipWithM (+)
+{-# NOINLINE [1] (.+.) #-}
+{-# SPECIALISE [0] (.+.) :: Matrix Double cols rows -> Matrix Double cols rows -> Matrix Double cols rows #-}
+{-# SPECIALISE [0] (.+.) :: Matrix Boolean cols rows -> Matrix Boolean cols rows -> Matrix Boolean cols rows #-}
 
 infixl 6 .-.
 
@@ -50,6 +55,9 @@ infixl 7 .*.
 -- | Element-wise multiplication of matrices (Hadamard product).
 (.*.) :: (Num e) => Matrix e cols rows -> Matrix e cols rows -> Matrix e cols rows
 (.*.) = zipWithM (*)
+{-# NOINLINE [1] (.*.) #-}
+{-# SPECIALISE [0] (.*.) :: Matrix Double cols rows -> Matrix Double cols rows -> Matrix Double cols rows #-}
+{-# SPECIALISE [0] (.*.) :: Matrix Boolean cols rows -> Matrix Boolean cols rows -> Matrix Boolean cols rows #-}
 
 {- | Zip two matrices with a given binary function. When the two are laid out
 differently, 'splitJoin' and 'splitFork' line the blocks up as the recursion
@@ -95,3 +103,15 @@ infixl 7 ./
 (./) (Join a b) s = Join (a ./ s) (b ./ s)
 (./) (Fork a b) s = Fork (a ./ s) (b ./ s)
 {-# INLINABLE (./) #-}
+
+{-# RULES
+-- Additive identity
+"add/zeros-right" forall m. m .+. zeros = m
+"add/zeros-left"  forall m. zeros .+. m = m
+
+-- Hadamard identity and annihilation
+"had/ones-right"  forall m. m .*. ones = m
+"had/ones-left"   forall m. ones .*. m = m
+"had/zeros-right" forall m. m .*. zeros = zeros
+"had/zeros-left"  forall m. zeros .*. m = zeros
+  #-}

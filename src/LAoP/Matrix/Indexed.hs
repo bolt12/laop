@@ -333,24 +333,32 @@ one = M . I.one
 -}
 join :: Matrix e a c -> Matrix e b c -> Matrix e (Either a b) c
 join (M a) (M b) = M (I.join a b)
+{-# NOINLINE [1] join #-}
 
 {- | Puts @a@ on top of @b@, with rows indexed by 'Either': the split @[a/b]@
 of Macedo and Oliveira (2013, eq. 17). The pairing that fork algebras call "fork" is 'kr'.
 -}
 fork :: Matrix e c a -> Matrix e c b -> Matrix e c (Either a b)
 fork (M a) (M b) = M (I.fork a b)
+{-# NOINLINE [1] fork #-}
 
 infixl 3 |||
 
--- | Matrix @Join@ constructor. An alias of 'join'.
+{- | Matrix @Join@ constructor. An alias of 'join', inlined early so the
+rewrite rules written against 'join' see through it.
+-}
 (|||) :: Matrix e a c -> Matrix e b c -> Matrix e (Either a b) c
 (|||) = join
+{-# INLINE (|||) #-}
 
 infixl 2 ===
 
--- | Matrix @Fork@ constructor. An alias of 'fork'.
+{- | Matrix @Fork@ constructor. An alias of 'fork', inlined early so the
+rewrite rules written against 'fork' see through it.
+-}
 (===) :: Matrix e c a -> Matrix e c b -> Matrix e c (Either a b)
 (===) = fork
+{-# INLINE (===) #-}
 
 -- Construction
 
@@ -383,10 +391,12 @@ row l = M (withDim @a (I.row l))
 -- | The zero matrix. A matrix wholly filled with zeros.
 zeros :: forall e a b. (Num e, MatIndex a, MatIndex b) => Matrix e a b
 zeros = M (withDims @a @b I.zeros)
+{-# NOINLINE [1] zeros #-}
 
 -- | The ones matrix. A matrix wholly filled with ones.
 ones :: forall e a b. (Num e, MatIndex a, MatIndex b) => Matrix e a b
 ones = M (withDims @a @b I.ones)
+{-# NOINLINE [1] ones #-}
 
 -- | The T (Top) row vector matrix.
 bang :: forall e a. (Num e, MatIndex a) => Matrix e a ()
@@ -399,6 +409,7 @@ constant e = generateM (\_ _ -> e)
 -- | Identity matrix.
 iden :: forall e a. (Num e, MatIndex a) => Matrix e a a
 iden = M (withDim @a I.iden)
+{-# NOINLINE [1] iden #-}
 
 -- Matrix builder
 
@@ -501,15 +512,56 @@ point a = generateM (\_ r -> if r == toOrd a then 1 else 0)
 {- | Matrix composition: @comp f g@ applies @g@ and then @f@. It is
 'LAoP.Matrix.Internal.comp', whose documentation describes how the product is
 computed, and the composition of the 'Category' instance.
+
+Optimised builds rewrite some compositions away with the rules of this module,
+the rules of "LAoP.Matrix.Internal#rules" restated for these matrices
+(@comp m iden@ becomes @m@, @comp p1 (fork a b)@ becomes @a@, and so on). The
+rules assume exact arithmetic: if a matrix holds @NaN@ or an infinity, the
+result can differ from an unoptimised build, because the skipped products by
+zero would have propagated it.
 -}
 comp :: (Num e) => Matrix e b c -> Matrix e a b -> Matrix e a c
 comp (M a) (M b) = M (I.comp a b)
+{-# NOINLINE [1] comp #-}
+
+{-# RULES
+-- Category: identity
+"Indexed comp/iden-right" forall m. comp m iden = m
+"Indexed comp/iden-left"  forall m. comp iden m = m
+
+-- Transpose: involution and constants
+"Indexed tr/involution" forall m. tr (tr m) = m
+"Indexed tr/iden"   tr iden = iden
+
+-- Additive identity
+"Indexed add/zeros-right" forall m. m .+. zeros = m
+"Indexed add/zeros-left"  forall m. zeros .+. m = m
+
+-- Hadamard identity and annihilation
+"Indexed had/ones-right"  forall m. m .*. ones = m
+"Indexed had/ones-left"   forall m. ones .*. m = m
+"Indexed had/zeros-right" forall m. m .*. zeros = zeros
+"Indexed had/zeros-left"  forall m. zeros .*. m = zeros
+
+-- Biproduct (Macedo and Oliveira 2013, eqs. 11, 12) and orthogonality (eqs. 14, 15)
+"Indexed comp/p1-i1" comp p1 i1 = iden
+"Indexed comp/p2-i2" comp p2 i2 = iden
+"Indexed comp/p1-i2" comp p1 i2 = zeros
+"Indexed comp/p2-i1" comp p2 i1 = zeros
+
+-- Cancellation (Macedo and Oliveira 2013, eqs. 28, 29)
+"Indexed comp/p1-fork" forall a b. comp p1 (fork a b) = a
+"Indexed comp/p2-fork" forall a b. comp p2 (fork a b) = b
+"Indexed comp/join-i1" forall a b. comp (join a b) i1 = a
+"Indexed comp/join-i2" forall a b. comp (join a b) i2 = b
+  #-}
 
 -- Transposition
 
 -- | Matrix transposition.
 tr :: Matrix e a b -> Matrix e b a
 tr (M m) = M (I.tr m)
+{-# NOINLINE [1] tr #-}
 
 -- Element-wise
 
@@ -518,6 +570,7 @@ infixl 6 .+.
 -- | Element-wise matrix addition.
 (.+.) :: (Num e) => Matrix e a b -> Matrix e a b -> Matrix e a b
 (.+.) (M a) (M b) = M (a I..+. b)
+{-# NOINLINE [1] (.+.) #-}
 
 infixl 6 .-.
 
@@ -530,6 +583,7 @@ infixl 7 .*.
 -- | Element-wise matrix multiplication (Hadamard product).
 (.*.) :: (Num e) => Matrix e a b -> Matrix e a b -> Matrix e a b
 (.*.) (M a) (M b) = M (a I..*. b)
+{-# NOINLINE [1] (.*.) #-}
 
 infixl 7 .|
 
@@ -558,18 +612,22 @@ Macedo and Oliveira (2013, eq. 23). Pairs are projected by 'fstM' instead.
 -}
 p1 :: forall e a b. (Num e, MatIndex a, MatIndex b) => Matrix e (Either a b) a
 p1 = M (withDims @a @b I.p1)
+{-# NOINLINE [1] p1 #-}
 
 -- | Projects the 'Right' block of rows, @[0|id]@.
 p2 :: forall e a b. (Num e, MatIndex a, MatIndex b) => Matrix e (Either a b) b
 p2 = M (withDims @a @b I.p2)
+{-# NOINLINE [1] p2 #-}
 
 -- | Injects into the 'Left' block, @[id/0]@; the transpose of 'p1'.
 i1 :: forall e a b. (Num e, MatIndex a, MatIndex b) => Matrix e a (Either a b)
 i1 = M (withDims @a @b I.i1)
+{-# NOINLINE [1] i1 #-}
 
 -- | Injects into the 'Right' block, @[0/id]@.
 i2 :: forall e a b. (Num e, MatIndex a, MatIndex b) => Matrix e b (Either a b)
 i2 = M (withDims @a @b I.i2)
+{-# NOINLINE [1] i2 #-}
 
 infixl 5 -|-
 

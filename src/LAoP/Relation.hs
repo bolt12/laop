@@ -144,7 +144,8 @@ import qualified LAoP.Matrix.Internal as I
 import           Prelude              hiding (id, (.))
 
 {- | Relation data type: a t'Boolean' matrix from "LAoP.Matrix.Indexed". Since
-t'Boolean' is a semiring, relational composition is matrix composition.
+t'Boolean' is a semiring, relational composition is matrix composition, and the
+Indexed rewrite rules apply to relations.
 -}
 newtype Relation a b = R (IX.Matrix Boolean a b)
   deriving (Show, Eq, Ord, NFData) via (IX.Matrix Boolean a b)

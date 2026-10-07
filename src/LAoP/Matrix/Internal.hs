@@ -23,6 +23,27 @@ splits the result with the fusion laws until each block is a single element
 ('rowsWithColumns'), and computes each element as the 'dot' product of a row
 and a column. Every element is the same sum, grouped the same way, as with the
 laws read as a program, so the results are equal bit for bit.
+
+= Rewrite rules #rules#
+
+Optimised builds apply these laws of Macedo and Oliveira (2013) wherever a
+program states their left-hand side:
+
+@
+comp m iden == m                comp iden m == m
+tr (tr m) == m                  tr iden == iden
+m .+. zeros == m                zeros .+. m == m
+m .*. ones == m                 ones .*. m == m
+m .*. zeros == zeros            zeros .*. m == zeros
+comp p1 i1 == iden              comp p2 i2 == iden            -- eqs. 11, 12
+comp p1 i2 == zeros             comp p2 i1 == zeros           -- eqs. 14, 15
+comp p1 (fork a b) == a         comp p2 (fork a b) == b       -- eq. 29
+comp (join a b) i1 == a         comp (join a b) i2 == b       -- eq. 28
+@
+
+The rules assume exact arithmetic: if a matrix holds @NaN@ or an infinity, an
+optimised build can return a different result from an unoptimised one, because
+a skipped product by zero would have propagated it.
 -}
 module LAoP.Matrix.Internal (
   -- | Matrix dimensions are tracked by the 'Dim' kind (@U@ for unit,

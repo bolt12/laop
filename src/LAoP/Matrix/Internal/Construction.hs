@@ -51,6 +51,7 @@ one = One
 -}
 join :: Matrix e a rows -> Matrix e b rows -> Matrix e (a :+: b) rows
 join = Join
+{-# NOINLINE [1] join #-}
 
 {- | Stacks @a@ above @b@: the split @[a/b]@ of Macedo and Oliveira (2013,
 eq. 17). Fork algebra uses "fork" for pairing, which here is
@@ -58,18 +59,25 @@ eq. 17). Fork algebra uses "fork" for pairing, which here is
 -}
 fork :: Matrix e cols a -> Matrix e cols b -> Matrix e cols (a :+: b)
 fork = Fork
+{-# NOINLINE [1] fork #-}
 
 infixl 3 |||
 
--- | Matrix @Join@ constructor. An alias of 'join'.
+{- | Matrix @Join@ constructor. An alias of 'join', inlined early so the
+rewrite rules written against 'join' see through it.
+-}
 (|||) :: Matrix e a rows -> Matrix e b rows -> Matrix e (a :+: b) rows
 (|||) = join
+{-# INLINE (|||) #-}
 
 infixl 2 ===
 
--- | Matrix @Fork@ constructor. An alias of 'fork'.
+{- | Matrix @Fork@ constructor. An alias of 'fork', inlined early so the
+rewrite rules written against 'fork' see through it.
+-}
 (===) :: Matrix e cols a -> Matrix e cols b -> Matrix e cols (a :+: b)
 (===) = fork
+{-# INLINE (===) #-}
 
 -- Construction from index functions
 
@@ -128,10 +136,12 @@ relayout sc sr m =
 -- | Identity matrix.
 iden :: forall e d. (Num e, KnownDim d) => Matrix e d d
 iden = generate (\c r -> bool 0 1 (c == r))
+{-# NOINLINE [1] iden #-}
 
 -- | The zero matrix. A matrix wholly filled with zeros.
 zeros :: (Num e, KnownDim cols, KnownDim rows) => Matrix e cols rows
 zeros = generate (\_ _ -> 0)
+{-# NOINLINE [1] zeros #-}
 
 {- | The ones matrix. A matrix wholly filled with ones.
 
@@ -139,6 +149,7 @@ zeros = generate (\_ _ -> 0)
 -}
 ones :: (Num e, KnownDim cols, KnownDim rows) => Matrix e cols rows
 ones = generate (\_ _ -> 1)
+{-# NOINLINE [1] ones #-}
 
 -- | The constant matrix constructor. A matrix wholly filled with a given value.
 constant :: (KnownDim cols, KnownDim rows) => e -> Matrix e cols rows
@@ -188,3 +199,10 @@ tr :: Matrix e cols rows -> Matrix e rows cols
 tr (One e)    = One e
 tr (Join a b) = Fork (tr a) (tr b)
 tr (Fork a b) = Join (tr a) (tr b)
+{-# NOINLINE [1] tr #-}
+
+{-# RULES
+-- Transpose: involution and constants
+"tr/involution" forall m. tr (tr m) = m
+"tr/iden"   tr iden = iden
+  #-}

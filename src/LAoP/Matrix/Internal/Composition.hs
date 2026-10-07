@@ -22,6 +22,7 @@ module LAoP.Matrix.Internal.Composition (
 ) where
 
 import           LAoP.Matrix.Internal.Boolean        (Boolean)
+import           LAoP.Matrix.Internal.Construction   (iden)
 import           LAoP.Matrix.Internal.Dim
 import           LAoP.Matrix.Internal.Representation (Matrix (..), colShape,
                                                       rowShape, splitFork,
@@ -60,12 +61,20 @@ element type, or when called from code that is polymorphic in the element
 type, it runs a generic version that allocates a boxed partial sum for every
 multiply-add and is about four times slower. Specialise the calling code (a
 @SPECIALISE@ or @INLINABLE@ pragma) to reach the fast one.
+
+Optimised builds rewrite some compositions away with the rewrite rules listed in
+"LAoP.Matrix.Internal#rules" (@comp m iden@ becomes @m@, @comp p1 (fork a b)@
+becomes @a@, and so on). The rules assume exact arithmetic: if a matrix holds
+@NaN@ or an infinity, the result can differ from an unoptimised build, because
+the skipped products by zero would have propagated it.
 -}
 comp :: (Num e) => Matrix e cr rows -> Matrix e cols cr -> Matrix e cols rows
 comp a b = rowsWithColumns dot (rowMajor a) (columnMajor b)
-{-# SPECIALISE comp :: Matrix Double cr rows -> Matrix Double cols cr -> Matrix Double cols rows #-}
-{-# SPECIALISE comp :: Matrix Int cr rows -> Matrix Int cols cr -> Matrix Int cols rows #-}
-{-# SPECIALISE comp :: Matrix Boolean cr rows -> Matrix Boolean cols cr -> Matrix Boolean cols rows #-}
+{-# NOINLINE comp #-}
+-- Phase [0], after the rewrite rules on 'comp' have had their chance.
+{-# SPECIALISE [0] comp :: Matrix Double cr rows -> Matrix Double cols cr -> Matrix Double cols rows #-}
+{-# SPECIALISE [0] comp :: Matrix Int cr rows -> Matrix Int cols cr -> Matrix Int cols rows #-}
+{-# SPECIALISE [0] comp :: Matrix Boolean cr rows -> Matrix Boolean cols cr -> Matrix Boolean cols rows #-}
 
 {- | @rowsWithColumns f a b@ is the matrix whose element in row @i@ and column
 @j@ is @f@ applied to row @i@ of @a@ and column @j@ of @b@. 'comp' is
@@ -170,3 +179,9 @@ columnMajor m = go (colShape m) m
     go (SPlus _ left right) x = case splitJoin x of
       (xLeft, xRight) -> Join (go left  xLeft)
                               (go right xRight)
+
+{-# RULES
+-- Category: identity
+"comp/iden-right" forall m. comp m iden = m
+"comp/iden-left"  forall m. comp iden m = m
+  #-}

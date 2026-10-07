@@ -24,7 +24,8 @@ module LAoP.Matrix.Internal.Biproduct (
 ) where
 
 import           LAoP.Matrix.Internal.Composition    (comp)
-import           LAoP.Matrix.Internal.Construction   (iden, tr, zeros)
+import           LAoP.Matrix.Internal.Construction   (fork, iden, join, tr,
+                                                      zeros)
 import           LAoP.Matrix.Internal.Dim
 import           LAoP.Matrix.Internal.Elementwise    ((.+.))
 import           LAoP.Matrix.Internal.Representation
@@ -37,20 +38,24 @@ import           LAoP.Matrix.Internal.Representation
 -}
 p1 :: forall e m n. (Num e, KnownDim m, KnownDim n) => Matrix e (m :+: n) m
 p1 = Join iden zeros
+{-# NOINLINE [1] p1 #-}
 
 -- | Second biproduct projection, @[0|id]@.
 p2 :: forall e m n. (Num e, KnownDim m, KnownDim n) => Matrix e (m :+: n) n
 p2 = Join zeros iden
+{-# NOINLINE [1] p2 #-}
 
 -- Injections
 
 -- | First biproduct injection, @[id/0]@, the transpose of 'p1'.
 i1 :: forall e m n. (Num e, KnownDim m, KnownDim n) => Matrix e m (m :+: n)
 i1 = tr p1
+{-# NOINLINE [1] i1 #-}
 
 -- | Second biproduct injection, @[0/id]@.
 i2 :: forall e m n. (Num e, KnownDim m, KnownDim n) => Matrix e n (m :+: n)
 i2 = tr p2
+{-# NOINLINE [1] i2 #-}
 
 -- Direct sum
 
@@ -118,3 +123,17 @@ branch ::
   Matrix e b c ->
   Matrix e cols c
 branch x l r = comp (Join l r) x
+
+{-# RULES
+-- Biproduct (Macedo and Oliveira 2013, eqs. 11, 12) and orthogonality (eqs. 14, 15)
+"comp/p1-i1" comp p1 i1 = iden
+"comp/p2-i2" comp p2 i2 = iden
+"comp/p1-i2" comp p1 i2 = zeros
+"comp/p2-i1" comp p2 i1 = zeros
+
+-- Cancellation (Macedo and Oliveira 2013, eqs. 28, 29)
+"comp/p1-fork" forall a b. comp p1 (fork a b) = a
+"comp/p2-fork" forall a b. comp p2 (fork a b) = b
+"comp/join-i1" forall a b. comp (join a b) i1 = a
+"comp/join-i2" forall a b. comp (join a b) i2 = b
+  #-}
