@@ -28,11 +28,11 @@ module LAoP.Utils.Internal (
 where
 
 import Control.DeepSeq
+import Data.Bits (bit, testBit, (.|.))
 import Data.Coerce
 import Data.Kind
-import Data.List
-import Data.Maybe
 import Data.Proxy
+import GHC.Enum (boundedEnumFrom, boundedEnumFromThen)
 import GHC.Generics
 import GHC.TypeLits hiding (Natural)
 import Prelude hiding (id, (.))
@@ -151,42 +151,41 @@ instance
   fromEnum (Left a) = fromEnum a
   fromEnum (Right b) = fromEnum (maxBound :: a) + fromEnum b + 1
 
-{- | Powerset data type.
+{- | A subset of a finite type, represented by the list of its members.
 
-This data type is a newtype wrapper around '[]'. This exists in order to
-implement an 'Enum' and 'Bounded' instance that cannot be harmful for the outside.
+Order and duplicates in the list carry no meaning: '==' compares the subsets,
+so @L [True, False] == L [False, True, True]@. 'Show' and 'Read' keep the list
+as written. The 'Enum' instance numbers subsets by a bitmask in which the first
+value of the element type is the most significant bit. For a two-value type
+@{a0, a1}@ the order is @L []@, @L [a1]@, @L [a0]@, @L [a0, a1]@.
 -}
 newtype BoundedList a = L [a]
-  deriving (Eq, Show, Read)
+  deriving (Show, Read)
 
-powerset :: [a] -> [[a]]
-powerset [] = [[]]
-powerset (x : xs) = powerset xs ++ [x : ps | ps <- powerset xs]
+-- | Subset equality: the same members, in any order and with any repetition.
+instance (Eq a) => Eq (BoundedList a) where
+  L xs == L ys = all (`elem` ys) xs && all (`elem` xs) ys
 
-instance
-  ( Enum a
-  , Bounded a
-  ) =>
-  Bounded (BoundedList a)
-  where
+instance (Enum a, Bounded a) => Bounded (BoundedList a) where
   minBound = L []
   maxBound = L [minBound .. maxBound]
 
-instance
-  ( Bounded a
-  , Enum a
-  , Eq a
-  ) =>
-  Enum (BoundedList a)
-  where
-  toEnum i =
-    let as = [minBound .. maxBound]
-     in L (powerset as !! i)
+instance (Bounded a, Enum a) => Enum (BoundedList a) where
+  toEnum i
+    | 0 <= i && i < bit n = L [x | (j, x) <- zip [0 ..] universe, testBit i (n - 1 - j)]
+    | otherwise =
+        error ("BoundedList.toEnum: " ++ show i ++ " is outside [0, " ++ show (bit n :: Int) ++ ")")
+    where
+      universe = [minBound .. maxBound] :: [a]
+      n = length universe
 
-  fromEnum (L []) = 0
-  fromEnum (L x) =
-    let as = [minBound .. maxBound]
-     in fromMaybe (error "Does not exist") $ elemIndex x (powerset as)
+  fromEnum (L xs) = foldl' (.|.) 0 [bit (n - 1 - (fromEnum x - lo)) | x <- xs]
+    where
+      n = length ([minBound .. maxBound] :: [a])
+      lo = fromEnum (minBound :: a)
+
+  enumFrom = boundedEnumFrom
+  enumFromThen = boundedEnumFromThen
 
 infixr 9 .
 
