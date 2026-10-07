@@ -47,8 +47,7 @@ common common-options
     -Wno-duplicate-exports
 
   -- Needed because ghc considers exporting f and f' the same name
-  default-language: Haskell2010
-  default-extensions: ImportQualifiedPost
+  default-language: GHC2024
 
 library
   import: common-options
@@ -83,8 +82,6 @@ test-suite laop-test
     -optc-O3
     -optc-ffast-math
 
-  default-extensions: ImportQualifiedPost
-
 benchmark laop-benchmark
   import: common-options
   type: exitcode-stdio-1.0
@@ -104,5 +101,3 @@ benchmark laop-benchmark
     -fexcess-precision
     -optc-O3
     -optc-ffast-math
-
-  default-extensions: ImportQualifiedPost
