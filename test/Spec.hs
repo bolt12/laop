@@ -7,6 +7,7 @@ import           Test.Dist.Properties
 import           Test.Index.Properties
 import           Test.Matrix.Composition
 import           Test.Matrix.Properties
+import           Test.Matrix.Reference
 import           Test.Nat.Properties
 import           Test.Relation.Properties
 import           Test.Tasty
@@ -17,6 +18,7 @@ main =
   defaultMain $
     testGroup "LAoP"
       [ matrixPropertyTests
+      , matrixReferenceTests
       , relationPropertyTests
       , distPropertyTests
       , indexPropertyTests
