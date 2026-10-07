@@ -188,9 +188,16 @@ instance
     let as = [minBound .. maxBound]
      in fromMaybe (error "Does not exist") $ elemIndex x (powerset as)
 
--- | Constrained category instance
-class Category k where
-  type Object k o :: Constraint
+infixr 9 .
+
+{- | A category whose objects can be constrained. For matrices 'Object' says
+which types can index a dimension; for functions there is no constraint.
+
+@.@ is right-associative, like 'Prelude..', so a chain @f . g . v@ applied to a
+vector @v@ multiplies matrix by vector twice rather than first forming @f . g@.
+-}
+class Category (k :: j -> j -> Type) where
+  type Object k (o :: j) :: Constraint
   type Object k o = ()
   id :: (Object k a) => k a a
   (.) :: k b c -> k a b -> k a c
