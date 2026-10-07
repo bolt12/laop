@@ -19,7 +19,7 @@ extra-doc-files:
   CHANGELOG.md
   README.md
 
-tested-with: ghc ==8.10.7 || ==9.2.8
+tested-with: ghc ==9.10.3
 
 source-repository head
   type: git
@@ -27,7 +27,7 @@ source-repository head
 
 common common-options
   build-depends:
-    base >=4.12.0.0 && <5,
+    base >=4.20 && <5,
     deepseq,
 
   ghc-options:

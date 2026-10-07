@@ -13,8 +13,6 @@ jobs:
       matrix:
         cabal: ["3.0"]
         ghc:
-          - "ghc927"
-          - "ghc96"
           - "ghc910"
 
     steps:
