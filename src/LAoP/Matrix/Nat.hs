@@ -1,342 +1,419 @@
-{-# LANGUAGE AllowAmbiguousTypes #-}
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DerivingVia #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE AllowAmbiguousTypes  #-}
+{-# LANGUAGE ConstraintKinds      #-}
+{-# LANGUAGE DerivingVia          #-}
+{-# LANGUAGE NoStarIsType         #-}
+{-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE NoStarIsType #-}
-
------------------------------------------------------------------------------
-
------------------------------------------------------------------------------
 
 {- |
 Module     : LAoP.Matrix.Nat
-Copyright  : (c) Armando Santos 2019-2020
+Copyright  : (c) Armando Santos 2019-2026
 Maintainer : armandoifsantos@gmail.com
 Stability  : experimental
 
-The LAoP discipline generalises relations and functions treating them as
-Boolean matrices and in turn consider these as arrows.
+Matrices indexed by type-level natural numbers, for code that thinks in sizes
+rather than in index types. This module wraps 'LAoP.Matrix.Internal.Matrix' as
+"LAoP.Matrix.Indexed" does, with type-level naturals for the dimensions. A @'Matrix' e c r@ has @c@ columns and @r@ rows, and every
+dimension constraint is 'Dimension', a 'KnownNat' of at least 1.
 
-__LAoP__ is a library for algebraic (inductive) construction and manipulation of matrices
-in Haskell. See <https://github.com/bolt12/master-thesis my Msc Thesis> for the
-motivation behind the library, the underlying theory, and implementation details.
-
-This module offers a newtype wrapper around 'Matrix.Type.Matrix' that
-uses type level naturals instead of standard data types for the matrices
-dimensions.
+Internally a dimension @n@ is the balanced tree @'I.FromNat' n@, split at
+@n \`div\` 2@. Block operations ('join', 'fork', the projections and injections,
+'kr', '><') accept any sizes, and lay their result out along that tree. When
+the blocks already line up with it, that costs O(size of the trees) on top of
+the operation itself; otherwise it costs O(size of the matrix), so building a
+matrix by repeatedly joining single columns is quadratic.
 -}
 module LAoP.Matrix.Nat (
-  -- | LAoP (Linear Algebra of Programming) Inductive Matrix definition.
-  --
-  --         LAoP generalises relations and functions treating them as
-  --         Boolean matrices and in turn consider these as arrows.
-  --         This library offers many of the combinators mentioned in the work of
-  --         Macedo (2012) and Oliveira (2012).
-  --
-  --         This definition is a wrapper around 'Matrix.Type' but
-  --         dimensions are type level Naturals. Type inference might not
-  --         be as desired.
-  --
-  --         There exists two type families that make it easier to write
-  --         matrix dimensions: 'FromNat' and 'Count'. This approach
-  --         leads to a very straightforward implementation
-  --         of LAoP combinators.
-
-  -- * Type safe matrix representation
+  -- * Matrix type
   Matrix (..),
 
-  -- * Constraint type synonyms
-  Countable,
-  CountableDims,
-  CountableN,
-  CountableNz,
-  CountableDimsN,
-  FLN,
-  FLNz,
-  Liftable,
-  TrivialE,
-  TrivialP,
+  -- * Dimension constraint
+  Dimension,
+  AtLeastOne,
+  I.FromNat,
 
   -- * Primitives
   one,
   join,
   fork,
 
-  -- * Auxiliary type families
-  I.FromNat,
-  I.Count,
-  I.Normalize,
+  -- * Block decomposition
+  splitJoin,
+  splitFork,
 
-  -- * Matrix construction and conversion
-  I.FL,
+  -- * Construction
   fromLists,
   toLists,
   toList,
+  scalar,
   matrixBuilder',
-  row,
+  fromF,
+  point,
   col,
+  row,
   zeros,
   ones,
   bang,
   constant,
 
-  -- * Misc
-
-  -- ** Get dimensions
-  columns,
-  rows,
-
-  -- ** Matrix Transposition
+  -- * Composition and transposition
+  iden,
+  comp,
   tr,
 
-  -- ** Scalar multiplication/division of matrices
+  -- * Element-wise operations
+  (.+.),
+  (.-.),
+  (.*.),
+  zipWithM,
+  emap,
+
+  -- * Scalar operations
   (.|),
   (./),
 
-  -- ** Selective operator
-  select,
-
-  -- ** McCarthy's Conditional
-  cond,
-
-  -- ** Matrix "abiding"
-  abideJF,
-  abideFJ,
-
-  -- ** Zip Matrices
-  zipWithM,
-
-  -- * Biproduct approach
-
-  -- ** Fork
+  -- * Biproduct
   (===),
-
-  -- *** Projections
+  (|||),
   p1,
   p2,
-
-  -- ** Join
-  (|||),
-
-  -- *** Injections
   i1,
   i2,
 
-  -- ** Bifunctors
+  -- * Bifunctors
   (-|-),
   (><),
 
-  -- ** Applicative matrix combinators
-
-  -- | Note that given the restrictions imposed it is not possible to
-  -- implement the standard type classes present in standard Haskell.
-  -- *** Matrix pairing projections
+  -- * Pairing
   fstM,
   sndM,
-
-  -- *** Matrix pairing
   kr,
 
-  -- * Matrix composition and lifting
+  -- * Selective and conditional
+  select,
+  branch,
+  cond,
 
-  -- ** Arrow matrix combinators
+  -- * Matrix "abiding"
+  abideJF,
+  abideFJ,
 
-  -- | Note that given the restrictions imposed it is not possible to
-  -- implement the standard type classes present in standard Haskell.
-  iden,
-  comp,
-  fromF',
-  fromF,
+  -- * Dimensions
+  columns,
+  rows,
 
-  -- * Matrix printing
+  -- * Pretty printing
   pretty,
   prettyPrint,
-)
-where
+) where
 
-import Control.DeepSeq
-import Data.List (sort)
-import Data.Proxy (Proxy)
-import GHC.TypeLits
-import LAoP.Matrix.Internal qualified as I
+import           Control.DeepSeq
+import           Data.Array               (Array, listArray, (!))
+import           Data.Kind                (Constraint)
+import           Data.Proxy               (Proxy (..))
+import           GHC.Stack                (HasCallStack)
+import           GHC.TypeLits
+import           LAoP.Category            (Category (..))
+import qualified LAoP.Matrix.Internal     as I
+import           LAoP.Matrix.Internal.Dim (natSize, unsafeSFromNat)
+import           Prelude                  hiding (id, (.))
 
+-- | Matrix with @cols@ columns and @rows@ rows.
 newtype Matrix e (cols :: Nat) (rows :: Nat) = M (I.Matrix e (I.FromNat cols) (I.FromNat rows))
-  deriving (Show, Num, Eq, Ord, NFData) via (I.Matrix e (I.FromNat cols) (I.FromNat rows))
+  deriving (Eq, Ord, NFData) via (I.Matrix e (I.FromNat cols) (I.FromNat rows))
 
--- | Constraint type synonyms to keep the type signatures less convoluted
-type Countable a = KnownNat (I.Count a)
+-- | Shows a matrix as the 'fromLists' call that builds it, whatever its layout.
+instance (Show e) => Show (Matrix e cols rows) where
+  showsPrec d m = showParen (d > 10) (showString "fromLists " . showsPrec 11 (toLists m))
 
-type CountableDims a b = (Countable a, Countable b)
-type CountableN a = KnownNat (I.Count (I.FromNat a))
-type CountableNz a = KnownNat (I.Count (I.Normalize a))
-type CountableDimsN a b = (CountableN a, CountableN b)
-type FLN e a b = I.FL (I.FromNat a) (I.FromNat b)
-type FLNz e a b = I.FL (I.Normalize a) (I.Normalize b)
-type Liftable e a b = (Bounded a, Bounded b, Enum a, Enum b, Eq b, Num e, Ord e)
-type TrivialE a b = I.FromNat (a + b) ~ Either (I.FromNat a) (I.FromNat b)
-type TrivialP a b = I.FromNat (a * b) ~ I.FromNat (I.Count (I.FromNat a) * I.Count (I.FromNat b))
+-- | Matrices form a category whose objects are the known naturals.
+instance (Num e) => Category (Matrix e) where
+  type Object (Matrix e) n = Dimension n
+  id = iden
+  (.) = comp
+
+-- Dimensions
+
+{- | A dimension of a matrix: a known natural of at least 1. A 0 is rejected
+when the program is type checked:
+
+@
+iden \@Double \@0   -- LAoP.Matrix.Nat: the dimension 0 must be at least 1
+@
+
+Polymorphic code carries the constraint as it would carry 'KnownNat'.
+-}
+type Dimension n = (KnownNat n, AtLeastOne n)
+
+{- | The check behind 'Dimension': no constraint for a natural of at least 1,
+a type error for 0.
+-}
+type family AtLeastOne (n :: Nat) :: Constraint where
+  AtLeastOne 0 = TypeError ('Text "LAoP.Matrix.Nat: the dimension 0 must be at least 1")
+  AtLeastOne _ = ()
+
+-- Dimension witnesses
+
+natInt :: forall n. (KnownNat n) => Int
+natInt = natSize (natVal (Proxy @n))
+
+-- Bridges a 'KnownNat' to the 'I.KnownDim' of its dimension tree.
+withNat :: forall n r. (KnownNat n) => ((I.KnownDim (I.FromNat n)) => r) -> r
+withNat = I.withKnownDim (I.sFromNat @n)
+
+withNats :: forall a b r. (KnownNat a, KnownNat b) => ((I.KnownDim (I.FromNat a), I.KnownDim (I.FromNat b)) => r) -> r
+withNats k = withNat @a (withNat @b k)
+
+-- The tree of @a + b@, computed from the two summands (no KnownNat (a + b)).
+sFromNatSum :: forall a b. (KnownNat a, KnownNat b) => I.SDim (I.FromNat (a + b))
+sFromNatSum = unsafeSFromNat @(a + b) (natSize (natVal (Proxy @a) + natVal (Proxy @b)))
+
+-- The tree of @a * b@, computed from the two factors.
+sFromNatProd :: forall a b. (KnownNat a, KnownNat b) => I.SDim (I.FromNat (a * b))
+sFromNatProd = unsafeSFromNat @(a * b) (natSize (natVal (Proxy @a) * natVal (Proxy @b)))
+
+-- The tree of @a + b@ as the sum of the two summands' trees.
+sSplit :: forall a b. (KnownNat a, KnownNat b) => I.SDim (I.FromNat a I.:+: I.FromNat b)
+sSplit = I.sPlus (I.sFromNat @a) (I.sFromNat @b)
 
 -- Primitives
 
+-- | The 1x1 matrix holding one element.
 one :: e -> Matrix e 1 1
 one = M . I.One
 
+{- | Places two matrices with the same rows side by side (the @Join@ block
+constructor, the junc @[a|b]@ of Macedo and Oliveira 2013).
+-}
 join ::
-  (TrivialE a b) =>
+  forall e a b rows.
+  (Dimension a, Dimension b) =>
   Matrix e a rows ->
   Matrix e b rows ->
   Matrix e (a + b) rows
-join (M a) (M b) = M (I.Join a b)
+join (M x) (M y) = M (I.relayout (sFromNatSum @a @b) (I.rowShape x) (I.Join x y))
 
 infixl 3 |||
+
+-- | Operator form of 'join'.
 (|||) ::
-  (TrivialE a b) =>
+  (Dimension a, Dimension b) =>
   Matrix e a rows ->
   Matrix e b rows ->
   Matrix e (a + b) rows
 (|||) = join
 
+{- | Stacks two matrices with the same columns one above the other (the
+@Fork@ block constructor, the split @[a/b]@ of Macedo and Oliveira 2013).
+-}
 fork ::
-  (TrivialE a b) =>
+  forall e cols a b.
+  (Dimension a, Dimension b) =>
   Matrix e cols a ->
   Matrix e cols b ->
   Matrix e cols (a + b)
-fork (M a) (M b) = M (I.Fork a b)
+fork (M x) (M y) = M (I.relayout (I.colShape x) (sFromNatSum @a @b) (I.Fork x y))
 
 infixl 2 ===
+
+-- | Operator form of 'fork'.
 (===) ::
-  (TrivialE a b) =>
+  (Dimension a, Dimension b) =>
   Matrix e cols a ->
   Matrix e cols b ->
   Matrix e cols (a + b)
 (===) = fork
 
+-- Block decomposition
+
+{- | Takes the first @a@ columns and the remaining @b@, undoing 'join'. The
+matrix is first laid out as @a@ columns beside @b@ columns, which is free when
+that split is where its tree already splits and O(size of the matrix)
+otherwise.
+
+For example, @m@ below has 3 columns and 2 rows ('fromLists' takes one list
+per row):
+
+@
+1 2 3
+4 5 6
+@
+
+The type applications choose where to cut, after the first column or after the
+second, and 'toLists' shows each block row by row. The tree of 3 is @1 + 2@, so
+the first cut is free and the second lays the matrix out again:
+
+>>> let m = fromLists [[1, 2, 3], [4, 5, 6]] :: Matrix Int 3 2
+>>> let (l, r) = splitJoin @Int @1 @2 m
+>>> (toLists l, toLists r)
+([[1],[4]],[[2,3],[5,6]])
+>>> let (l', r') = splitJoin @Int @2 @1 m
+>>> (toLists l', toLists r')
+([[1,2],[4,5]],[[3],[6]])
+-}
+splitJoin ::
+  forall e a b rows.
+  (Dimension a, Dimension b) =>
+  Matrix e (a + b) rows ->
+  (Matrix e a rows, Matrix e b rows)
+splitJoin (M m) =
+  let (x, y) = I.splitJoin (I.relayout (sSplit @a @b) (I.rowShape m) m)
+   in (M x, M y)
+
+{- | Takes the first @a@ rows and the remaining @b@, undoing 'fork', at the
+same cost as 'splitJoin'. For example, cutting the 3 rows of
+
+@
+1 2
+3 4
+5 6
+@
+
+after the first row:
+
+>>> let m = fromLists [[1, 2], [3, 4], [5, 6]] :: Matrix Int 2 3
+>>> let (t, b) = splitFork @Int @2 @1 @2 m
+>>> (toLists t, toLists b)
+([[1,2]],[[3,4],[5,6]])
+-}
+splitFork ::
+  forall e cols a b.
+  (Dimension a, Dimension b) =>
+  Matrix e cols (a + b) ->
+  (Matrix e cols a, Matrix e cols b)
+splitFork (M m) =
+  let (x, y) = I.splitFork (I.relayout (I.colShape m) (sSplit @a @b) m)
+   in (M x, M y)
+
 -- Construction
 
-fromLists :: (FLN e cols rows) => [[e]] -> Matrix e cols rows
-fromLists = M . I.fromLists
+{- | Builds a matrix from a list of rows. Throws a runtime error unless there
+is exactly one list per row and every row has exactly one element per column.
+-}
+fromLists ::
+  forall e cols rows.
+  (HasCallStack, Dimension cols, Dimension rows) =>
+  [[e]] -> Matrix e cols rows
+fromLists ls = M (withNats @cols @rows (I.fromLists ls))
 
-{- | Matrix builder function. Constructs a matrix provided with
-a construction function that operates with indices.
+{- | Builds a matrix from a function of the zero-based @(row, column)@
+position.
 -}
 matrixBuilder' ::
-  (FLN e cols rows, CountableN cols, CountableN rows) =>
+  forall e cols rows.
+  (Dimension cols, Dimension rows) =>
   ((Int, Int) -> e) ->
   Matrix e cols rows
-matrixBuilder' = M . I.matrixBuilder'
+matrixBuilder' f = M (I.generateS (I.sFromNat @cols) (I.sFromNat @rows) (\c r -> f (r, c)))
 
-col :: (I.FL () (I.FromNat rows)) => [e] -> Matrix e 1 rows
-col = M . I.col
-
-row :: (I.FL (I.FromNat cols) ()) => [e] -> Matrix e cols 1
-row = M . I.row
-
-fromF' ::
-  ( Liftable e a b
-  , CountableN cols
-  , CountableN rows
-  , FLN e rows cols
-  ) =>
-  (a -> b) ->
-  Matrix e cols rows
-fromF' = M . I.fromF'
-
+{- | Lifts a function on zero-based indices to a matrix: column @c@ has a 1 in
+row @f c@ and 0 elsewhere. The function is applied once per column; results
+outside @[0, rows)@ give an all-zero column.
+-}
 fromF ::
-  forall e a b.
-  ( Liftable e a b
-  , KnownNat (I.Count a)
-  , KnownNat (I.Count b)
-  , I.FL (I.FromNat (I.Count b)) (I.FromNat (I.Count a))
-  ) =>
-  (a -> b) ->
-  Matrix e (I.Count a) (I.Count b)
-fromF f =
-  let minA = minBound @a
-      maxA = maxBound @a
-      minB = minBound @b
-      maxB = maxBound @b
-      ccols = fromInteger $ natVal (undefined :: Proxy (I.Count a))
-      rrows = fromInteger $ natVal (undefined :: Proxy (I.Count b))
-      elementsA = take ccols [minA .. maxA]
-      elementsB = take rrows [minB .. maxB]
-      combinations = (,) <$> elementsA <*> elementsB
-      combAp =
-        map snd
-          . sort
-          . map
-            ( \(a, b) ->
-                if f a == b
-                  then ((fromEnum a, fromEnum b), 1)
-                  else ((fromEnum a, fromEnum b), 0)
-            )
-          $ combinations
-      mList = buildList combAp rrows
-   in tr $ fromLists mList
+  forall e cols rows.
+  (Num e, Dimension cols, Dimension rows) =>
+  (Int -> Int) ->
+  Matrix e cols rows
+fromF f = matrixBuilder' (\(r, c) -> if target ! c == r then 1 else 0)
   where
-    buildList [] _ = []
-    buildList l r = take r l : buildList (drop r l) r
+    n = natInt @cols
+    target = listArray (0, n - 1) (map f [0 .. n - 1]) :: Array Int Int
 
--- Conversion
+-- | Column vector with a 1 at the given zero-based row.
+point :: forall e rows. (Num e, Dimension rows) => Int -> Matrix e 1 rows
+point i = matrixBuilder' (\(r, _) -> if r == i then 1 else 0)
 
+-- | Converts a matrix to a list of rows.
 toLists :: Matrix e cols rows -> [[e]]
 toLists (M m) = I.toLists m
 
+-- | The element of a 1x1 matrix.
+scalar :: Matrix e 1 1 -> e
+scalar (M (I.One e)) = e
+
+-- | Converts a matrix to its elements in row-major order.
 toList :: Matrix e cols rows -> [e]
 toList (M m) = I.toList m
 
--- Zeros Matrix
+-- | Column vector from a list with one element per row.
+col ::
+  forall e rows.
+  (HasCallStack, Dimension rows) =>
+  [e] -> Matrix e 1 rows
+col l = M (withNat @rows (I.col l))
 
+-- | Row vector from a list with one element per column.
+row ::
+  forall e cols.
+  (HasCallStack, Dimension cols) =>
+  [e] -> Matrix e cols 1
+row l = M (withNat @cols (I.row l))
+
+-- | The zero matrix.
 zeros ::
-  (Num e, FLN e cols rows, CountableN cols, CountableN rows) =>
+  forall e cols rows.
+  (Num e, Dimension cols, Dimension rows) =>
   Matrix e cols rows
-zeros = M I.zeros
+zeros = M (withNats @cols @rows I.zeros)
 
--- Ones Matrix
-
+-- | The matrix filled with ones, also known as T (top).
 ones ::
-  (Num e, FLN e cols rows, CountableN cols, CountableN rows) =>
+  forall e cols rows.
+  (Num e, Dimension cols, Dimension rows) =>
   Matrix e cols rows
-ones = M I.ones
+ones = M (withNats @cols @rows I.ones)
 
--- Const Matrix
-
+-- | A matrix filled with one value.
 constant ::
-  (FLN e cols rows, CountableN cols, CountableN rows) =>
-  e ->
-  Matrix e cols rows
-constant = M . I.constant
+  forall e cols rows.
+  (Dimension cols, Dimension rows) =>
+  e -> Matrix e cols rows
+constant e = M (withNats @cols @rows (I.constant e))
 
--- Bang Matrix
-
+-- | The row vector of ones.
 bang ::
   forall e cols.
-  (Num e, Enum e, I.FL (I.FromNat cols) (), CountableN cols) =>
+  (Num e, Dimension cols) =>
   Matrix e cols 1
-bang = M I.bang
+bang = M (withNat @cols I.bang)
 
--- iden Matrix
-
+-- | The identity matrix.
 iden ::
-  (Num e, FLN e cols cols, CountableN cols) =>
+  forall e cols.
+  (Num e, Dimension cols) =>
   Matrix e cols cols
-iden = M I.iden
+iden = M (withNat @cols I.iden)
 
--- Matrix composition (MMM)
+-- Composition
 
+-- | Matrix multiplication, read right to left: @comp a b@ applies @b@ first.
+-- It is 'LAoP.Matrix.Internal.comp', whose documentation describes how the
+-- product is computed.
 comp :: (Num e) => Matrix e cr rows -> Matrix e cols cr -> Matrix e cols rows
 comp (M a) (M b) = M (I.comp a b)
 
--- Scalar multiplication of matrices
+-- Element-wise
+
+infixl 6 .+.
+
+-- | Element-wise addition.
+(.+.) :: (Num e) => Matrix e cols rows -> Matrix e cols rows -> Matrix e cols rows
+(.+.) (M a) (M b) = M (a I..+. b)
+
+infixl 6 .-.
+
+-- | Element-wise subtraction.
+(.-.) :: (Num e) => Matrix e cols rows -> Matrix e cols rows -> Matrix e cols rows
+(.-.) (M a) (M b) = M (a I..-. b)
+
+infixl 7 .*.
+
+-- | Element-wise multiplication (Hadamard product).
+(.*.) :: (Num e) => Matrix e cols rows -> Matrix e cols rows -> Matrix e cols rows
+(.*.) (M a) (M b) = M (a I..*. b)
+
+-- Scalar
 
 infixl 7 .|
 
@@ -344,198 +421,180 @@ infixl 7 .|
 (.|) :: (Num e) => e -> Matrix e cols rows -> Matrix e cols rows
 (.|) e (M m) = M (e I..| m)
 
--- Scalar division of matrices
-
 infixl 7 ./
 
--- | Scalar multiplication of matrices.
+-- | Scalar division of matrices.
 (./) :: (Fractional e) => Matrix e cols rows -> e -> Matrix e cols rows
 (./) (M m) e = M (m I../ e)
 
-p1 ::
-  ( Num e
-  , CountableDimsN n m
-  , FLN e n m
-  , FLN e m m
-  , TrivialE m n
-  ) =>
-  Matrix e (m + n) m
-p1 = M I.p1
-
-p2 ::
-  ( Num e
-  , CountableDimsN n m
-  , FLN e m n
-  , FLN e n n
-  , TrivialE m n
-  ) =>
-  Matrix e (m + n) n
-p2 = M I.p2
-
--- Injections
-
-i1 ::
-  ( Num e
-  , CountableDimsN n rows
-  , FLN e n rows
-  , FLN e rows rows
-  , TrivialE rows n
-  ) =>
-  Matrix e rows (rows + n)
-i1 = tr p1
-
-i2 ::
-  ( Num e
-  , CountableDimsN rows m
-  , FLN e m rows
-  , FLN e rows rows
-  , TrivialE m rows
-  ) =>
-  Matrix e rows (m + rows)
-i2 = tr p2
-
--- Dimensions
-
-rows :: (CountableN rows) => Matrix e cols rows -> Int
-rows (M m) = I.rows m
-
-columns :: (CountableN cols) => Matrix e cols rows -> Int
-columns (M m) = I.columns m
-
-infixl 5 -|-
-
--- | Coproduct Bifunctor (Direct sum)
-(-|-) ::
-  ( Num e
-  , CountableDimsN j k
-  , FLN e k k
-  , FLN e j k
-  , FLN e k j
-  , FLN e j j
-  , TrivialE n m
-  , TrivialE k j
-  ) =>
-  Matrix e n k ->
-  Matrix e m j ->
-  Matrix e (n + m) (k + j)
-(-|-) (M a) (M b) = M ((I.-|-) a b)
-
--- | Khatri Rao Product first projection
-fstM ::
-  forall e m k.
-  ( Num e
-  , CountableDimsN m k
-  , CountableN (m * k)
-  , FLN e (m * k) m
-  , TrivialP m k
-  ) =>
-  Matrix e (m * k) m
-fstM = M (I.fstM @e @(I.FromNat m) @(I.FromNat k))
-
--- | Khatri Rao Product second projection
-sndM ::
-  forall e m k.
-  ( Num e
-  , CountableDimsN k m
-  , FLN e (m * k) k
-  , CountableN (m * k)
-  , TrivialP m k
-  ) =>
-  Matrix e (m * k) k
-sndM = M (I.sndM @e @(I.FromNat m) @(I.FromNat k))
-
--- | Khatri Rao Product
-kr ::
-  forall e cols a b.
-  ( Num e
-  , CountableDimsN a b
-  , CountableN (a * b)
-  , FLN e (a * b) a
-  , FLN e (a * b) b
-  , TrivialP a b
-  ) =>
-  Matrix e cols a ->
-  Matrix e cols b ->
-  Matrix e cols (a * b)
-kr a b =
-  let fstM' = fstM @e @a @b
-      sndM' = sndM @e @a @b
-   in comp (tr fstM') a * comp (tr sndM') b
-
--- | Product Bifunctor (Kronecker)
-infixl 4 ><
-
-(><) ::
-  forall e m p n q.
-  ( Num e
-  , CountableDimsN m n
-  , CountableDimsN p q
-  , CountableDimsN (m * n) (p * q)
-  , FLN e (m * n) m
-  , FLN e (m * n) n
-  , FLN e (p * q) p
-  , FLN e (p * q) q
-  , TrivialP m n
-  , TrivialP p q
-  ) =>
-  Matrix e m p ->
-  Matrix e n q ->
-  Matrix e (m * n) (p * q)
-(><) a b =
-  let fstM' = fstM @e @m @n
-      sndM' = sndM @e @m @n
-   in kr (comp a fstM') (comp b sndM')
-
--- | Matrix abide Join Fork
-abideJF :: Matrix e cols rows -> Matrix e cols rows
-abideJF (M m) = M (I.abideJF m)
-
--- | Matrix abide Fork Join
-abideFJ :: Matrix e cols rows -> Matrix e cols rows
-abideFJ (M m) = M (I.abideFJ m)
+-- Transposition
 
 -- | Matrix transposition
 tr :: Matrix e cols rows -> Matrix e rows cols
 tr (M m) = M (I.tr m)
 
--- Selective 'select' operator
+-- Biproduct
+
+-- | Projection onto the first @m@ rows of an @m + n@ vector.
+p1 ::
+  forall e m n.
+  (Num e, Dimension m, Dimension n) =>
+  Matrix e (m + n) m
+p1 = M (I.relayout (sFromNatSum @m @n) (I.sFromNat @m) (withNats @m @n (I.p1 @e @(I.FromNat m) @(I.FromNat n))))
+
+-- | Projection onto the last @n@ rows of an @m + n@ vector.
+p2 ::
+  forall e m n.
+  (Num e, Dimension m, Dimension n) =>
+  Matrix e (m + n) n
+p2 = M (I.relayout (sFromNatSum @m @n) (I.sFromNat @n) (withNats @m @n (I.p2 @e @(I.FromNat m) @(I.FromNat n))))
+
+-- | Injection of an @m@ vector into the first rows of an @m + n@ vector.
+i1 ::
+  forall e m n.
+  (Num e, Dimension m, Dimension n) =>
+  Matrix e m (m + n)
+i1 = tr (p1 @e @m @n)
+
+-- | Injection of an @n@ vector into the last rows of an @m + n@ vector.
+i2 ::
+  forall e m n.
+  (Num e, Dimension m, Dimension n) =>
+  Matrix e n (m + n)
+i2 = tr (p2 @e @m @n)
+
+infixl 5 -|-
+
+-- | Direct sum: the block-diagonal matrix with @a@ above-left and @b@ below-right.
+(-|-) ::
+  forall e n k m j.
+  (Num e, Dimension n, Dimension m, Dimension k, Dimension j) =>
+  Matrix e n k ->
+  Matrix e m j ->
+  Matrix e (n + m) (k + j)
+(-|-) (M a) (M b) = M (I.relayout (sFromNatSum @n @m) (sFromNatSum @k @j) (a I.-|- b))
+
+-- Khatri-Rao
+
+-- | Khatri-Rao first projection: maps pair @(i, j)@ to @i@.
+fstM ::
+  forall e m k.
+  (Num e, Dimension m, Dimension k) =>
+  Matrix e (m * k) m
+fstM = M (I.relayout (sFromNatProd @m @k) (I.sFromNat @m) (withNats @m @k (I.fstM @e @(I.FromNat m) @(I.FromNat k))))
+
+-- | Khatri-Rao second projection: maps pair @(i, j)@ to @j@.
+sndM ::
+  forall e m k.
+  (Num e, Dimension m, Dimension k) =>
+  Matrix e (m * k) k
+sndM = M (I.relayout (sFromNatProd @m @k) (I.sFromNat @k) (withNats @m @k (I.sndM @e @(I.FromNat m) @(I.FromNat k))))
+
+{- | Khatri-Rao product (matrix pairing): row @(i, j)@ of the result is row @i@
+of the first matrix times row @j@ of the second, element by element.
+-}
+kr ::
+  forall e cols a b.
+  (Num e, Dimension a, Dimension b) =>
+  Matrix e cols a ->
+  Matrix e cols b ->
+  Matrix e cols (a * b)
+kr (M a) (M b) = M (I.relayout (I.colShape a) (sFromNatProd @a @b) (I.kr a b))
+
+infixl 4 ><
+
+{- | Kronecker product. It is @infixl 4@, looser than @.+.@ and @.*.@, so
+@a >< b .+. c@ is @a >< (b .+. c)@.
+-}
+(><) ::
+  forall e m p n q.
+  (Num e, Dimension m, Dimension n, Dimension p, Dimension q) =>
+  Matrix e m p ->
+  Matrix e n q ->
+  Matrix e (m * n) (p * q)
+(><) (M a) (M b) = M (I.relayout (sFromNatProd @m @n) (sFromNatProd @p @q) (a I.>< b))
+
+-- Selective
+
+{- | Selective functors @select@: the first @a@ rows of the input go through
+the matrix, the last @b@ rows pass through unchanged, and the two are added.
+-}
 select ::
-  ( Num e
-  , FLN e rows1 rows1
-  , CountableN rows1
-  , I.FromNat rows2 ~ I.FromNat rows1
-  , I.FromNat cols1 ~ I.FromNat cols2
-  , I.FromNat rows3 ~ Either (I.FromNat cols3) (I.FromNat rows1)
-  ) =>
-  Matrix e cols1 rows3 ->
-  Matrix e cols3 rows1 ->
-  Matrix e cols2 rows2
-select (M m) (M y) = M (I.select m y)
+  forall e cols a b.
+  (Num e, Dimension a, Dimension b) =>
+  Matrix e cols (a + b) ->
+  Matrix e a b ->
+  Matrix e cols b
+select (M m) (M y) = M (I.select (I.relayout (I.colShape m) (sSplit @a @b) m) y)
 
--- McCarthy's Conditional
+{- | Selective functors @branch@: the first @a@ rows of the input go through the
+first matrix, the last @b@ rows through the second, and the results are added.
+-}
+branch ::
+  forall e cols a b c.
+  (Num e, Dimension a, Dimension b) =>
+  Matrix e cols (a + b) ->
+  Matrix e a c ->
+  Matrix e b c ->
+  Matrix e cols c
+branch (M m) (M l) (M r) = M (I.branch (I.relayout (I.colShape m) (sSplit @a @b) m) l r)
 
+{- | McCarthy's conditional: column @c@ of the result is column @c@ of the
+first matrix when @p c@ holds (zero-based) and of the second one otherwise.
+-}
 cond ::
-  ( I.FromNat (I.Count (I.FromNat cols)) ~ I.FromNat cols
-  , CountableN cols
-  , I.FL () (I.FromNat cols)
-  , I.FL (I.FromNat cols) ()
-  , FLN e cols cols
-  , Liftable e a Bool
-  ) =>
-  (a -> Bool) ->
+  forall e cols rows.
+  (Dimension cols) =>
+  (Int -> Bool) ->
   Matrix e cols rows ->
   Matrix e cols rows ->
   Matrix e cols rows
-cond p (M a) (M b) = M (I.cond p a b)
+cond p (M f) (M g) =
+  let n = natInt @cols
+      takeFirst = listArray (0, n - 1) (map p [0 .. n - 1]) :: Array Int Bool
+      choice = I.generateS (I.colShape f) (I.rowShape f) (\c _ -> takeFirst ! c)
+      pick s x y = if s then x else y
+   in M (I.zipWithM ($) (I.zipWithM pick choice f) g)
 
--- Pretty print
+-- Abide
 
-pretty :: (CountableDimsN cols rows, Show e) => Matrix e cols rows -> String
-pretty (M m) = I.pretty m
+{- | Lays the matrix out again by the junc/split exchange ("abide") law of
+Macedo and Oliveira (2013, eq. 30): @join (fork a c) (fork b d)@ becomes
+@fork (join a b) (join c d)@. The elements do not change.
+-}
+abideJF :: Matrix e cols rows -> Matrix e cols rows
+abideJF (M m) = M (I.abideJF m)
 
-prettyPrint :: (CountableDimsN cols rows, Show e) => Matrix e cols rows -> IO ()
-prettyPrint (M m) = I.prettyPrint m
+-- | 'abideJF' in the opposite direction, from a fork of joins to a join of forks.
+abideFJ :: Matrix e cols rows -> Matrix e cols rows
+abideFJ (M m) = M (I.abideFJ m)
+
+-- Dimensions
+
+-- | Number of columns.
+columns :: forall e cols rows. (Dimension cols) => Matrix e cols rows -> Int
+columns _ = natInt @cols
+
+-- | Number of rows.
+rows :: forall e cols rows. (Dimension rows) => Matrix e cols rows -> Int
+rows _ = natInt @rows
+
+-- Zip
 
 -- | Zip two matrices with a given binary function
 zipWithM :: (e -> f -> g) -> Matrix e cols rows -> Matrix f cols rows -> Matrix g cols rows
 zipWithM f (M a) (M b) = M (I.zipWithM f a b)
+
+-- | Applies a function to every element.
+emap :: (e -> f) -> Matrix e cols rows -> Matrix f cols rows
+emap f (M m) = M (I.emap f m)
+
+-- Pretty printing
+
+-- | Renders a matrix as a boxed grid.
+pretty :: (Show e) => Matrix e cols rows -> String
+pretty (M m) = I.pretty m
+
+-- | Prints 'pretty' to standard output.
+prettyPrint :: (Show e) => Matrix e cols rows -> IO ()
+prettyPrint (M m) = I.prettyPrint m
