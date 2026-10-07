@@ -28,7 +28,6 @@ source-repository head
 common common-options
   build-depends: base >=4.20 && <5
   ghc-options:
-    -- -Wno-duplicate-exports: ghc considers exporting f and f' the same name
     -Wall
     -Wno-unticked-promoted-constructors
     -Wcompat
@@ -40,8 +39,6 @@ common common-options
     -Wunused-packages
     -fhide-source-paths
     -Wmissing-export-lists
-    -Wno-compat-unqualified-imports
-    -Wno-duplicate-exports
 
   default-language: GHC2024
 
@@ -53,7 +50,10 @@ common executable-options
 library
   import: common-options
   hs-source-dirs: src
-  build-depends: deepseq >=1.5 && <1.6
+  build-depends:
+    array >=0.5.7 && <0.6,
+    deepseq >=1.5 && <1.6,
+
   exposed-modules:
     LAoP.Category
     LAoP.Dist
@@ -68,7 +68,14 @@ library
     LAoP.Utils
     LAoP.Utils.Internal
 
-  other-modules: LAoP.Matrix.Internal.Dim
+  other-modules:
+    LAoP.Matrix.Internal.Biproduct
+    LAoP.Matrix.Internal.Composition
+    LAoP.Matrix.Internal.Construction
+    LAoP.Matrix.Internal.Dim
+    LAoP.Matrix.Internal.Elementwise
+    LAoP.Matrix.Internal.Kronecker
+    LAoP.Matrix.Internal.Representation
 
 test-suite laop-test
   import: common-options, executable-options
