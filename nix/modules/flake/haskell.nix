@@ -13,7 +13,10 @@
     }:
     let
       ghcDefault = "ghc910";
-      ghcVersions = [ ghcDefault ];
+      ghcVersions = [
+        ghcDefault
+        "ghc912"
+      ];
     in
     {
       # Our only Haskell project. You can have multiple projects, but this template
@@ -54,7 +57,7 @@
         settings = {
           laop = {
             stan = false;
-            # haddock = false;
+            haddock = true;
           };
           /*
             aeson = {
