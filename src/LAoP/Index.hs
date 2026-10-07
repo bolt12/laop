@@ -14,6 +14,8 @@ Two index types for matrices, beyond enumerations, 'Either' and pairs.
   range throws a runtime error.
 * @'BoundedList' a@ is a subset of a finite type @a@, which indexes powersets,
   the codomain of 'LAoP.Relation.pt'.
+
+Their @MatIndex@ instances are in "LAoP.Matrix.Indexed".
 -}
 module LAoP.Index (
   -- * 'Ranged' data type

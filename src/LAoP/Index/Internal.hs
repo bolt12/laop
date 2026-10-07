@@ -216,8 +216,9 @@ instance
 
 Order and duplicates in the list carry no meaning: '==' compares the subsets,
 so @L [True, False] == L [False, True, True]@. 'Show' and 'Read' keep the list
-as written. The 'Enum' instance numbers subsets by a bitmask in which the first
-value of the element type is the most significant bit. For a two-value type
+as written. The 'Enum' instance (and the @MatIndex@ instance in
+"LAoP.Matrix.Indexed") number subsets by a bitmask in which the first value of
+the element type is the most significant bit. For a two-value type
 @{a0, a1}@ the order is @L []@, @L [a1]@, @L [a0]@, @L [a0, a1]@.
 -}
 newtype BoundedList a = L [a]

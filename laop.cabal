@@ -60,6 +60,7 @@ library
     LAoP.Dist.Internal
     LAoP.Index
     LAoP.Index.Internal
+    LAoP.Matrix.Indexed
     LAoP.Matrix.Internal
     LAoP.Matrix.Nat
     LAoP.Matrix.Type
