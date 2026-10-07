@@ -10,7 +10,6 @@
         config.pre-commit.devShell # See ./nix/modules/pre-commit.nix
       ];
       packages = with pkgs; [
-        just
         nixd
         ghciwatch
       ];

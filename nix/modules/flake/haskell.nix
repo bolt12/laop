@@ -3,10 +3,20 @@
   imports = [
     inputs.haskell-flake.flakeModule
   ];
-  perSystem = { self', lib, config, pkgs, ... }:
+  perSystem =
+    {
+      self',
+      lib,
+      config,
+      pkgs,
+      ...
+    }:
     let
       ghcDefault = "ghc910";
-      ghcVersions = [ "ghc927" "ghc96" ghcDefault ];
+      ghcVersions = [
+        ghcDefault
+        "ghc912"
+      ];
     in
     {
       # Our only Haskell project. You can have multiple projects, but this template
@@ -18,26 +28,29 @@
 
         # To avoid unnecessary rebuilds, we filter projectRoot:
         # https://community.flake.parts/haskell-flake/local#rebuild
-        projectRoot = builtins.toString (lib.fileset.toSource {
-          inherit root;
-          fileset = lib.fileset.unions [
-            (root + /src)
-            (root + /benchmark)
-            (root + /test)
-            (root + /laop.cabal)
-            (root + /LICENSE)
-            (root + /README.md)
-            (root + /CHANGELOG.md)
-          ];
-        });
+        projectRoot = builtins.toString (
+          lib.fileset.toSource {
+            inherit root;
+            fileset = lib.fileset.unions [
+              (root + /src)
+              (root + /benchmark)
+              (root + /test)
+              (root + /laop.cabal)
+              (root + /LICENSE)
+              (root + /README.md)
+              (root + /CHANGELOG.md)
+              (root + /docs)
+            ];
+          }
+        );
 
         # Packages to add on top of `basePackages`
         packages = {
           # Add source or Hackage overrides here
           # (Local packages are added automatically)
           /*
-        aeson.source = "1.5.0.0" # Hackage version
-        shower.source = inputs.shower; # Flake input
+            aeson.source = "1.5.0.0" # Hackage version
+            shower.source = inputs.shower; # Flake input
           */
         };
 
@@ -45,23 +58,25 @@
         settings = {
           laop = {
             stan = false;
-            # haddock = false;
+            # Compile (but do not run) the benchmark so CI catches bit-rot. Only
+            # on the default compiler: its dependencies (hmatrix, criterion,
+            # linear) come from the binary cache there.
+            benchmark = ghc == ghcDefault;
+            haddock = true;
           };
           /*
-        aeson = {
-          check = false;
-        };
+            aeson = {
+              check = false;
+            };
           */
         };
 
         # Development shell configuration
         devShell = {
           hlsCheck.enable = false;
-          mkShellArgs = {
-            shellHook = ''
-              export SHELL=/run/current-system/sw/bin/bash
-            '';
-          };
+          # Brings hmatrix (linked against nixpkgs BLAS/LAPACK), criterion and
+          # the other benchmark dependencies into the shell's package database.
+          benchmark = true;
           tools = hp: {
             # needed to get on a GHC910 dev env
             hlint = null;
@@ -69,11 +84,13 @@
         };
 
         # What should haskell-flake add to flake outputs?
-        autoWire = [ "packages" "apps" "checks" ]; # Wire all but the devShell
+        autoWire = [
+          "packages"
+          "checks"
+        ]; # Wire all but the devShell
       });
 
-      # Default package & app.
+      # Default package.
       packages.default = self'.packages."${ghcDefault}-laop";
-      apps.default = self'.apps."${ghcDefault}-laop";
     };
 }

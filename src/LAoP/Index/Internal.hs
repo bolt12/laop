@@ -1,0 +1,226 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE PatternSynonyms     #-}
+{-# LANGUAGE RoleAnnotations     #-}
+{-# OPTIONS_HADDOCK not-home #-}
+
+{- |
+Module     : LAoP.Index.Internal
+Copyright  : (c) Armando Santos 2019-2026
+Maintainer : armandoifsantos@gmail.com
+Stability  : experimental
+
+"LAoP.Index" with the raw 'Ranged' constructor, which skips the range check,
+and the deprecated aliases of laop 0.2.
+-}
+module LAoP.Index.Internal (
+  -- * 'Ranged' data type
+  Ranged (UnsafeRanged),
+  pattern Rng,
+  mkRanged,
+  mkRangedMaybe,
+
+  -- * Coerce auxiliary functions to help promote 'Int' typed functions to
+  -- 'Ranged' typed functions.
+  coerceRanged,
+  coerceRanged2,
+  coerceRanged3,
+
+  -- * 'BoundedList' data type
+  BoundedList (..),
+
+  -- * Deprecated aliases
+  Natural,
+  reifyToNatural,
+  coerceNat,
+  coerceNat2,
+  coerceNat3,
+)
+where
+
+import           Control.DeepSeq
+import           Data.Bits       (bit, testBit, (.|.))
+import           Data.Coerce
+import           Data.Proxy
+import           GHC.Enum        (boundedEnumFrom, boundedEnumFromThen)
+import           GHC.Read        (expectP, parens)
+import           GHC.Stack       (HasCallStack)
+import           GHC.TypeLits    hiding (Natural)
+import           Text.Read       (Lexeme (Ident), Read (..), ReadPrec, pfail,
+                                  prec, step)
+
+{- | Wrapper around 'Int's that have a restrictive semantic associated.
+A value of type @'Ranged' n m@ can only be instantiated with some 'Int'
+@i@ where @n <= i <= m@.
+
+Build values with 'mkRanged', numeric literals or 'toEnum'; read them with the
+'Rng' pattern. The raw constructor is not exported from "LAoP.Index", and the
+nominal roles stop 'coerce' from moving a value into other bounds.
+-}
+newtype Ranged (start :: Nat) (end :: Nat) = UnsafeRanged Int
+  deriving (Eq, Ord, NFData)
+
+type role Ranged nominal nominal
+
+-- | Matches a 'Ranged' value and exposes its 'Int'. Matching only.
+pattern Rng :: Int -> Ranged n m
+pattern Rng i <- UnsafeRanged i
+
+{-# COMPLETE Rng #-}
+
+instance Show (Ranged n m) where
+  showsPrec d (UnsafeRanged i) = showParen (d > 10) (showString "Rng " . showsPrec 11 i)
+
+-- | Reads what 'show' prints, failing on values outside the range.
+instance (KnownNat n, KnownNat m) => Read (Ranged n m) where
+  readPrec = parens . prec 10 $ do
+    expectP (Ident "Rng")
+    i <- step (readPrec :: ReadPrec Integer)
+    if inRange @n @m i then pure (UnsafeRanged (fromInteger i)) else pfail
+
+inRange :: forall n m. (KnownNat n, KnownNat m) => Integer -> Bool
+inRange i = natVal (Proxy @n) <= i && i <= natVal (Proxy @m)
+
+outOfRange :: forall n m a. (HasCallStack, KnownNat n, KnownNat m) => String -> Integer -> a
+outOfRange what i =
+  error $
+    what
+      ++ ": "
+      ++ show i
+      ++ " is outside ["
+      ++ show (natVal (Proxy @n))
+      ++ ", "
+      ++ show (natVal (Proxy @m))
+      ++ "]"
+
+{- | Throws a runtime error if a result falls outside the range. The arithmetic
+is done on 'Integer', so a result is never wrapped around into the range.
+-}
+instance (KnownNat n, KnownNat m) => Num (Ranged n m) where
+  (Rng a) + (Rng b) = checked "Ranged.+" (toInteger a + toInteger b)
+  (Rng a) - (Rng b) = checked "Ranged.-" (toInteger a - toInteger b)
+  (Rng a) * (Rng b) = checked "Ranged.*" (toInteger a * toInteger b)
+  abs (Rng a) = checked "Ranged.abs" (abs (toInteger a))
+  signum (Rng a) = checked "Ranged.signum" (signum (toInteger a))
+  fromInteger = checked "Ranged.fromInteger"
+
+-- The value of a range, or an error naming the operation that left it.
+checked :: forall n m. (HasCallStack, KnownNat n, KnownNat m) => String -> Integer -> Ranged n m
+checked what i
+  | inRange @n @m i = UnsafeRanged (fromInteger i)
+  | otherwise = outOfRange @n @m what i
+
+{- | Ranged constructor function. Throws a runtime error if the 'Int' value
+is greater than @m@ or lower than @n@ in the @'Ranged' n m@ type.
+-}
+mkRanged :: forall n m. (HasCallStack, KnownNat n, KnownNat m) => Int -> Ranged n m
+mkRanged i
+  | inRange @n @m (toInteger i) = UnsafeRanged i
+  | otherwise = outOfRange @n @m "mkRanged" (toInteger i)
+
+-- | 'mkRanged' without the error: 'Nothing' when the value is outside the range.
+mkRangedMaybe :: forall n m. (KnownNat n, KnownNat m) => Int -> Maybe (Ranged n m)
+mkRangedMaybe i
+  | inRange @n @m (toInteger i) = Just (UnsafeRanged i)
+  | otherwise = Nothing
+
+{- | Promotes binary 'Int' functions to 'Ranged' binary functions. Throws a
+runtime error if the result falls outside the result range.
+-}
+coerceRanged ::
+  (HasCallStack, KnownNat c, KnownNat c') =>
+  (Int -> Int -> Int) ->
+  (Ranged a a' -> Ranged b b' -> Ranged c c')
+coerceRanged f (Rng x) (Rng y) = mkRanged (f x y)
+
+{- | Promotes ternary (binary) 'Int' functions to 'Ranged' functions. Throws a
+runtime error if the result falls outside the result range.
+-}
+coerceRanged2 ::
+  (HasCallStack, KnownNat d, KnownNat d') =>
+  ((Int, Int) -> Int -> Int) ->
+  ((Ranged a a', Ranged b b') -> Ranged c c' -> Ranged d d')
+coerceRanged2 f (Rng x, Rng y) (Rng z) = mkRanged (f (x, y) z)
+
+-- | Promotes binary 'Int' functions to 'Ranged' functions with polymorphic result.
+coerceRanged3 :: (Int -> Int -> a) -> (Ranged b b' -> Ranged c c' -> a)
+coerceRanged3 = coerce
+
+instance (KnownNat n, KnownNat m) => Bounded (Ranged n m) where
+  minBound = UnsafeRanged (fromInteger (natVal (Proxy :: Proxy n)))
+  maxBound = UnsafeRanged (fromInteger (natVal (Proxy :: Proxy m)))
+
+{- | Enumerates the range from 0: @'toEnum' 0 == 'minBound'@. @[x ..]@ and
+@[x, y ..]@ stop at the bounds.
+-}
+instance (KnownNat n, KnownNat m) => Enum (Ranged n m) where
+  toEnum i =
+    let start = fromInteger (natVal (Proxy :: Proxy n))
+     in mkRanged (start + i)
+
+  fromEnum (Rng val) = val - fromInteger (natVal (Proxy :: Proxy n))
+
+  enumFrom = boundedEnumFrom
+  enumFromThen = boundedEnumFromThen
+
+{- | A subset of a finite type, represented by the list of its members.
+
+Order and duplicates in the list carry no meaning: '==' compares the subsets,
+so @L [True, False] == L [False, True, True]@. 'Show' and 'Read' keep the list
+as written. The 'Enum' instance (and the @MatIndex@ instance in
+"LAoP.Matrix.Indexed") number subsets by a bitmask in which the first value of
+the element type is the most significant bit. For a two-value type
+@{a0, a1}@ the order is @L []@, @L [a1]@, @L [a0]@, @L [a0, a1]@.
+-}
+newtype BoundedList a = L [a]
+  deriving (Show, Read)
+
+-- | Subset equality: the same members, in any order and with any repetition.
+instance (Eq a) => Eq (BoundedList a) where
+  L xs == L ys = all (`elem` ys) xs && all (`elem` xs) ys
+
+instance (Enum a, Bounded a) => Bounded (BoundedList a) where
+  minBound = L []
+  maxBound = L [minBound .. maxBound]
+
+instance (Bounded a, Enum a) => Enum (BoundedList a) where
+  toEnum i
+    | 0 <= i && i < bit n = L [x | (j, x) <- zip [0 ..] universe, testBit i (n - 1 - j)]
+    | otherwise =
+        error ("BoundedList.toEnum: " ++ show i ++ " is outside [0, " ++ show (bit n :: Int) ++ ")")
+    where
+      universe = [minBound .. maxBound] :: [a]
+      n = length universe
+
+  fromEnum (L xs) = foldl' (.|.) 0 [bit (n - 1 - (fromEnum x - lo)) | x <- xs]
+    where
+      n = length ([minBound .. maxBound] :: [a])
+      lo = fromEnum (minBound :: a)
+
+  enumFrom = boundedEnumFrom
+  enumFromThen = boundedEnumFromThen
+
+-- Deprecated aliases
+
+-- | Deprecated alias of 'Ranged'.
+type Natural = Ranged
+{-# DEPRECATED Natural "Use Ranged instead" #-}
+
+-- | Deprecated alias of 'mkRanged'.
+reifyToNatural :: forall n m. (HasCallStack, KnownNat n, KnownNat m) => Int -> Ranged n m
+reifyToNatural = mkRanged
+{-# DEPRECATED reifyToNatural "Use mkRanged instead" #-}
+
+-- | Deprecated alias of 'coerceRanged'.
+coerceNat :: (HasCallStack, KnownNat c, KnownNat c') => (Int -> Int -> Int) -> (Ranged a a' -> Ranged b b' -> Ranged c c')
+coerceNat = coerceRanged
+{-# DEPRECATED coerceNat "Use coerceRanged instead" #-}
+
+-- | Deprecated alias of 'coerceRanged2'.
+coerceNat2 :: (HasCallStack, KnownNat d, KnownNat d') => ((Int, Int) -> Int -> Int) -> ((Ranged a a', Ranged b b') -> Ranged c c' -> Ranged d d')
+coerceNat2 = coerceRanged2
+{-# DEPRECATED coerceNat2 "Use coerceRanged2 instead" #-}
+
+-- | Deprecated alias of 'coerceRanged3'.
+coerceNat3 :: (Int -> Int -> a) -> (Ranged b b' -> Ranged c c' -> a)
+coerceNat3 = coerceRanged3
+{-# DEPRECATED coerceNat3 "Use coerceRanged3 instead" #-}

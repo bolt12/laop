@@ -4,222 +4,118 @@
 [![GitHub CI](https://github.com/bolt12/laop/workflows/CI/badge.svg)](https://github.com/bolt12/laop/actions)
 [![Hackage](https://img.shields.io/hackage/v/laop.svg?logo=haskell)](https://hackage.haskell.org/package/laop)
 
-The LAoP discipline generalises relations and functions treating them as
-Boolean matrices and in turn consider these as arrows.
+laop is the Linear Algebra of Programming of
+[Macedo and Oliveira (2013)](https://arxiv.org/abs/1312.4818) as a Haskell
+library. A matrix is a typed arrow from its columns to its rows, built from
+blocks: a single element, two matrices side by side, or two matrices one above
+the other. Functions are the matrices with a single 1 in each column, relations
+are the Boolean matrices, and probabilistic functions are the matrices whose
+columns are distributions, so one algebra covers all three.
 
-__LAoP__ is a library for algebraic (inductive) construction and manipulation of matrices
-in Haskell. See [my Msc Thesis](https://github.com/bolt12/master-thesis) for the
-motivation behind the library, the underlying theory, and implementation details.
+The functional pearl
+[Type Your Matrices for Great Good](https://github.com/bolt12/tymfgg-pearl)
+([ACM](https://dl.acm.org/doi/abs/10.1145/3406088.3409019)) describes the design,
+and the [master's thesis](https://github.com/bolt12/master-thesis) behind it the
+theory.
 
-This module offers many of the combinators mentioned in the work of
-[Macedo (2012)](https://repositorium.sdum.uminho.pt/handle/1822/22894) and [Oliveira (2012)](https://pdfs.semanticscholar.org/ccf5/27fa9179081223bffe8067edd81948644fc0.pdf).
+## Why matrices built from blocks
 
-See the package in hackage [here](https://hackage.haskell.org/package/laop-0.1.1.0)
+- Matrices are correct by construction. Dimensions are types, so blocks of
+  mismatched sizes cannot be put together: a matrix that type-checks is
+  well-formed, and the operations on it are total.
+- Algorithms are laws. Each operation is written block by block, after the
+  laws of the algebra: fusion, cancellation, the exchange law. The test suite
+  checks the laws, and rewrite rules apply some of them at compile time.
+- Products are parallel by construction. The blocks of a product do not depend
+  on each other, so `parComp` computes them on several cores, with the same
+  result bit for bit.
+- It is fast enough to use. The product follows the same laws as the paper
+  but in the order that does the least work: a 500 by 500 product of `Double`s
+  takes 0.34 s on one core and 0.05 s on 16. A library of unboxed arrays such
+  as hmatrix is still 85 to 120 times faster on one core; laop trades that for
+  the block structure.
 
-A Functional Pearl has been written and can be regarded as the [reference document](https://github.com/bolt12/tymfgg-pearl) ([ACM link](https://dl.acm.org/doi/abs/10.1145/3406088.3409019)) for this library.
+## Coming from the paper
 
-## Features
+The matrices, combinators and laws of the paper are here under their own
+names: the junc `[A|B]` is `join`, the split `[A/B]` is `fork`, the
+projections and injections are `p1`, `p2`, `i1` and `i2`, and composition is
+`comp`, or `.`. The `LAoP.Guide` module has the full table. Since the pearl and
+laop 0.2, the design is the same, and these changed:
 
-This library offers 3 main matrix programming modules:
+- Dimensions are trees of the kind `Dim = U | Dim :+: Dim`, where 0.2 used
+  `Either` and `()` types.
+- Three interfaces wrap the same matrix: your own index types, type-level
+  naturals, and relations.
+- The product applies the same laws in another order, and is about four times
+  faster than in 0.2 with the same results bit for bit.
+  [docs/composition.md](https://github.com/bolt12/laop/blob/master/docs/composition.md) derives it from the laws, one step
+  at a time.
+- `parComp` computes the product on several cores;
+  [docs/parallelism.md](https://github.com/bolt12/laop/blob/master/docs/parallelism.md) has the measurements.
+- Relations are matrices over the Boolean semiring, and distributions are
+  checked when they are built.
 
-- One in which matrices are typed with type level natural numbers;
-- One in which matrices are typed with arbitrary generic data types;
-- One in which matrices are regarded as relations, i.e. boolean matrices;
-
-There's also an experimental module that uses matrices to represent probability
-distributions.
-
-The most interesting feature is that matrices are represented as an inductive data type.
-Given this formulation, matrix algorithms can be expressed in a much more elegant and
-calculational style than the traditional vector of vectors representation. This data type
-guarantees that a matrix will always have valid dimensions. It can also express block matrix
-computations naturally, which leads to total, efficient and statically typed manipulation
-and transformation functions.
-
-Like matrix multiplication, other common operations, such as matrix transposition, benefit from a block-oriented structure that leads to a simple and natural divide-and-conquer algorithmic solution. Performance wise, this means that without much effort we can obtain optimal cache-oblivious algorithms.
-
-Given this, this new matrix formulation compared to other libraries:
-
-- Is more compositional and polymorphic and does not have partial matrix manipulation functions (hence less chances for usage errors);
-- Our implementation of matrices enables simple manipulation of submatrices, making it particularly suitable for formal verification and equation reasoning, using the mathematical framework defined by the linear algebra of programming. Furthermore, the data type constructors ensure that the matrices of this kind are sound, i.e. malformed matrices with incorrect dimensions of the sort, can not be constructed.
-
-## Known issues
-
-Unfortunately, due to the use of type-level programming features, this approach sometimes requires type dimensions to be constrainted, in some way, impossible to write idiomatic Arrow instances, for example. Type inference isn't perfect, when it comes to infer the types of matrices which dimensions are computed using type level naturals multiplication, the compiler needs type annotations in order to succeed. And not all kinds of programs can be modeled using matrices, namely programs that deal with arbitrary infinite data types such as lists or integers (although there are some workarounds).
-
-## Notes
-
-This is still a work in progress, any feedback is welcome!
+The [changelog](https://github.com/bolt12/laop/blob/master/CHANGELOG.md) lists every change and how to upgrade from 0.2.
 
 ## Example
 
-```Haskell
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE DataKinds #-}
+```haskell
+module Main (main) where
 
-module Main where
+import           GHC.Generics        (Generic)
+import           LAoP.Category
+import           LAoP.Index
+import           LAoP.Matrix.Indexed
+import qualified LAoP.Relation       as R
+import           Prelude             hiding (id, (.))
 
-import Matrix.Type
-import Utils
-import Dist
-import GHC.TypeLits
-import Data.Coerce
-import GHC.Generics
-import Control.Category hiding (id)
-import Prelude hiding ((.))
-
--- Monty Hall Problem
+-- A function is a matrix, and a distribution is a column.
 data Outcome = Win | Lose
-    deriving (Bounded, Enum, Eq, Show, Generic)
+  deriving (Eq, Show, Generic)
+
+instance MatIndex Outcome
 
 switch :: Outcome -> Outcome
-switch Win = Lose
+switch Win  = Lose
 switch Lose = Win
 
 firstChoice :: Matrix Double () Outcome
-firstChoice = col [1/3, 2/3]
+firstChoice = col [1 / 3, 2 / 3]
 
-secondChoice :: Matrix Double Outcome Outcome
-secondChoice = fromF' switch 
+-- Two independent dice are a pair, made with the Khatri-Rao product.
+type Face = Ranged 1 6
 
--- Dice sum
+die :: Matrix Double () Face
+die = col (replicate 6 (1 / 6))
 
-type SS = Natural 1 6 -- Sample Space
+sumOfDice :: Matrix Double () (Ranged 2 12)
+sumOfDice = fromF (uncurry (coerceRanged (+))) . kr die die
 
-sumSS :: SS -> SS -> Natural 2 12
-sumSS = coerceNat (+)
+-- A relation is a Boolean matrix, and composes like one.
+data Being = Fox | Goose | Beans
+  deriving (Eq, Show, Generic)
 
-sumSSM = fromF' (uncurry sumSS)
+instance MatIndex Being
 
-condition :: (Int, Int) -> Int -> Int
-condition (fst, snd) thrd = if fst == snd
-                               then fst * 3
-                               else fst + snd + thrd
-
-conditionSS :: (SS, SS) -> SS -> Natural 3 18
-conditionSS = coerceNat2 condition
-
-conditionalThrows = fromF' (uncurry conditionSS) . khatri (khatri die die) die
-
-die :: Matrix Double () SS
-die = col $ map (const (1/6)) [nat @1 @6 1 .. nat 6]
-
--- Sprinkler
-
-rain :: Matrix Double () Bool
-rain = col [0.8, 0.2]
-
-sprinkler :: Matrix Double Bool Bool
-sprinkler = fromLists [[0.6, 0.99], [0.4, 0.01]]
-
-grass :: Matrix Double (Bool, Bool) Bool
-grass = fromLists [[1, 0.2, 0.1, 0.01], [0, 0.8, 0.9, 0.99]]
-
-state :: Matrix Double () (Bool, (Bool, Bool))
-state = khatri grass identity . khatri sprinkler identity . rain
-
-grass_wet :: Matrix Double (Bool, (Bool, Bool)) One
-grass_wet = row [0,1] . kp1
-
-rainning :: Matrix Double (Bool, (Bool, Bool)) One
-rainning = row [0,1] . kp2 . kp2 
-
--- Alcuin Puzzle
-
-data Being = Farmer | Fox | Goose | Beans
-  deriving (Bounded, Enum, Eq, Show, Generic)
-
-data Bank = LeftB | RightB
-  deriving (Bounded, Enum, Eq, Show, Generic)
-
-eats :: Being -> Being -> Bool
-eats Fox Goose   = True
-eats Goose Beans = True
-eats _ _         = False
-
-eatsR :: R.Relation Being Being
-eatsR = R.toRel eats
-
-cross :: Bank -> Bank
-cross LeftB = RightB
-cross RightB = LeftB
-
-crossR :: R.Relation Bank Bank
-crossR = R.fromF' cross
-
--- | Initial state, everyone in the left bank
-locationLeft :: Being -> Bank
-locationLeft _ = LeftB
-
-locationLeftR :: R.Relation Being Bank
-locationLeftR = R.fromF' locationLeft
-
--- | Initial state, everyone in the right bank
-locationRight :: Being -> Bank
-locationRight _ = RightB
-
-locationRightR :: R.Relation Being Bank
-locationRightR = R.fromF' locationRight
-
--- Properties
-
--- Being at the same bank
-sameBank :: R.Relation Being Bank -> R.Relation Being Being
-sameBank = R.ker 
-
--- Risk of somebody eating somebody else
-canEat :: R.Relation Being Bank -> R.Relation Being Being
-canEat w = sameBank w `R.intersection` eatsR
-
--- "Starvation" property.
-inv :: R.Relation Being Bank -> Bool
-inv w = (w `R.comp` canEat w) `R.sse` (w `R.comp` farmer)
-  where
-    farmer :: R.Relation Being Being
-    farmer = R.fromF' (const Farmer)
-
--- Arbitrary state
-bankState :: Being -> Bank -> Bool
-bankState Farmer LeftB = True
-bankState Fox LeftB = True
-bankState Goose RightB = True
-bankState Beans RightB = True
-bankState _ _ = False
-
-bankStateR :: R.Relation Being Bank
-bankStateR = R.toRel bankState
-
--- Main
+eats :: R.Relation Being Being
+eats = R.toRel (\a b -> (a, b) `elem` [(Fox, Goose), (Goose, Beans)])
 
 main :: IO ()
 main = do
-    putStrLn "Monty Hall Problem solution:"
-    prettyPrint (secondChoice . firstChoice)
-    putStrLn "\n Sum of dices probability:"
-    prettyPrint (sumSSM `comp` khatri die die)
-    putStrLn "\n Conditional dice throw:"
-    prettyPrint conditionalThrows
-    putStrLn "\n Checking that the last result is indeed a distribution: "
-    prettyPrint (bang . sumSSM . khatri die die)
-    putStrLn "\n Probability of grass being wet:"
-    prettyPrint (grass_wet . state)
-    putStrLn "\n Probability of rain:"
-    prettyPrint (rainning . state)
-    putStrLn "\n Is the arbitrary state a valid state? (Alcuin Puzzle)"
-    print (inv bankStateR)
+  prettyPrint (fromF switch . firstChoice)
+  prettyPrint sumOfDice
+  print (R.pt (eats . eats) Fox)
 ```
 
-```Shell
-Monty Hall Problem solution:
+It prints the odds of winning by switching in the Monty Hall problem, the
+distribution of the sum of two dice, and what a fox eats through what it eats:
+
+```
 ┌                    ┐
 │ 0.6666666666666666 │
 │ 0.3333333333333333 │
 └                    ┘
-
- Sum of dices probability:
 ┌                       ┐
 │ 2.7777777777777776e-2 │
 │  5.555555555555555e-2 │
@@ -233,42 +129,43 @@ Monty Hall Problem solution:
 │  5.555555555555555e-2 │
 │ 2.7777777777777776e-2 │
 └                       ┘
-
- Conditional dice throw:
-┌                       ┐
-│ 2.7777777777777776e-2 │
-│  9.259259259259259e-3 │
-│ 1.8518518518518517e-2 │
-│  6.481481481481481e-2 │
-│  5.555555555555555e-2 │
-│  8.333333333333333e-2 │
-│   0.12962962962962962 │
-│    0.1111111111111111 │
-│    0.1111111111111111 │
-│   0.12962962962962962 │
-│  8.333333333333333e-2 │
-│  5.555555555555555e-2 │
-│  6.481481481481481e-2 │
-│ 1.8518518518518517e-2 │
-│  9.259259259259259e-3 │
-│ 2.7777777777777776e-2 │
-└                       ┘
-
- Checking that the last result is indeed a distribution: 
-┌     ┐
-│ 1.0 │
-└     ┘
-
- Probability of grass being wet:
-┌                    ┐
-│ 0.4483800000000001 │
-└                    ┘
-
- Probability of rain:
-┌     ┐
-│ 0.2 │
-└     ┘
-
-Is the arbitrary state a valid state? (Alcuin Puzzle)
-False
+L [Beans]
 ```
+
+Hide Prelude's `id` and `.` to use the ones of `LAoP.Category`, which compose
+matrices as they compose functions. A longer example, with a Bayesian network
+and the Alcuin puzzle, is in [test/Examples/Readme.hs](https://github.com/bolt12/laop/blob/master/test/Examples/Readme.hs),
+which the test suite runs.
+
+## Modules
+
+- `LAoP.Matrix.Indexed`: matrices indexed by your own types. An enumeration
+  with a `Generic` instance needs only an empty `MatIndex` instance. Start
+  here.
+- `LAoP.Matrix.Nat`: matrices indexed by type-level natural numbers.
+- `LAoP.Relation`: relations as Boolean matrices, with the combinators of the
+  Algebra of Programming.
+- `LAoP.Dist`: probability distributions as column vectors.
+- `LAoP.Category` and `LAoP.Index`: the shared `id` and `.`, and the index
+  types `Ranged` and `BoundedList`.
+- `LAoP.Matrix.Internal`: the matrix type and the composition kernel, for new
+  block algorithms.
+- `LAoP.Guide`: the paper notation, the design decisions, and the references.
+
+## Known issues
+
+- Requires GHC 9.10 or later.
+- The `Category` instances carry an object constraint (`MatIndex` or
+  `Dimension`), so the `Category` and `Arrow` classes from `base` cannot be
+  used.
+- In polymorphic `LAoP.Matrix.Nat` code GHC does not derive `Dimension (a + b)`
+  from `Dimension a` and `Dimension b`; add it to the context.
+- A few functions check at run time and throw on bad input: the list-based
+  constructors (`fromLists`, `col`, `row`), `Ranged` construction and
+  arithmetic, and the distributions built from probabilities or weights
+  (`choose`, `fromFreqs`, `shape`).
+- The rewrite rules assume exact arithmetic. With `NaN` or infinities in a
+  matrix, an optimised build can return a different result from an
+  unoptimised one.
+- Programs over infinite types, such as lists or integers, do not fit in a
+  matrix without a bounded encoding (`Ranged`, `BoundedList`).
