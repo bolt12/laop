@@ -57,6 +57,8 @@ until each block of the result is a single element ('rowsWithColumns'). Divide
 and conquer then only ever meets a row and a column, whose product is a number
 ('dot'). Each element is the same sum, grouped the same way, as with the four
 clauses, so the results are equal bit for bit.
+<https://github.com/bolt12/laop/blob/master/docs/composition.md docs/composition.md>
+derives this definition one step at a time.
 
 An @r@ by @k@ matrix times a @k@ by @c@ one costs O(r * k * c) time and
 allocates only the result and the two laid-out operands. How the result nests

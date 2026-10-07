@@ -32,7 +32,8 @@ eight. On one capability `parComp` is the sequential product.
 row of `a` and a column of `b` come apart in constant time. Then it splits the
 result in two, along its longer side, and recurses until each block is a
 single element: the dot product of a row of `a` and a column of `b`, summed
-along the tree of the dimension they share.
+along the tree of the dimension they share. [composition.md](composition.md)
+derives this algorithm from the laws of the algebra.
 
 The two halves of a split do not depend on each other. `parCompWith d`
 evaluates the first `d` levels of splits in parallel, both in the product and
