@@ -1,6 +1,6 @@
 cabal-version: 3.0
 name: laop
-version: 0.2.0.0
+version: 0.3.0.0
 synopsis: Typed matrices built from blocks, after the Linear Algebra of Programming
 description:
   The Linear Algebra of Programming of Macedo and Oliveira as a Haskell
@@ -17,7 +17,7 @@ license: MIT
 license-file: LICENSE
 author: Armando Santos
 maintainer: Armando Santos <armandoifsantos@gmail.com>
-copyright: 2023 Armando Santos
+copyright: 2019-2026 Armando Santos
 category: Data
 build-type: Simple
 extra-doc-files:
