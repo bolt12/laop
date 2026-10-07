@@ -57,6 +57,10 @@
         settings = {
           laop = {
             stan = false;
+            # Compile (but do not run) the benchmark so CI catches bit-rot. Only
+            # on the default compiler: its dependencies (hmatrix, criterion,
+            # linear) come from the binary cache there.
+            benchmark = ghc == ghcDefault;
             haddock = true;
           };
           /*
@@ -69,6 +73,9 @@
         # Development shell configuration
         devShell = {
           hlsCheck.enable = false;
+          # Brings hmatrix (linked against nixpkgs BLAS/LAPACK), criterion and
+          # the other benchmark dependencies into the shell's package database.
+          benchmark = true;
           tools = hp: {
             # needed to get on a GHC910 dev env
             hlint = null;

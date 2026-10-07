@@ -115,7 +115,10 @@ benchmark laop-benchmark
   hs-source-dirs: benchmark
   main-is: Main.hs
   build-depends:
-    QuickCheck,
-    criterion,
-    deepseq,
+    QuickCheck >=2.15 && <2.19,
+    criterion >=1.6 && <1.7,
+    hmatrix >=0.20 && <0.23,
     laop,
+    linear >=1.22 && <1.24,
+    matrix >=0.3.6 && <0.4,
+    vector >=0.13 && <0.14,
