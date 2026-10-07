@@ -15,18 +15,24 @@ Matrix composition, as one recursion over the blocks of the result
 -}
 module LAoP.Matrix.Internal.Composition (
   comp,
+  parComp,
+  parCompWith,
   rowsWithColumns,
   rowMajor,
   columnMajor,
   dot,
 ) where
 
+import           Control.Parallel                    (par, pseq)
+import           Data.Bits                           (countLeadingZeros,
+                                                      finiteBitSize)
+import           GHC.Conc                            (numCapabilities)
 import           LAoP.Matrix.Internal.Boolean        (Boolean)
 import           LAoP.Matrix.Internal.Construction   (iden)
 import           LAoP.Matrix.Internal.Dim
 import           LAoP.Matrix.Internal.Representation (Matrix (..), colShape,
-                                                      rowShape, splitFork,
-                                                      splitJoin)
+                                                      columns', rowShape, rows',
+                                                      splitFork, splitJoin)
 {- | Matrix composition: @comp a b@ is the product @a . b@, the matrix that
 applies @b@ and then @a@. Each element of the result is a row of @a@ times a
 column of @b@: the sum, over the dimension they share, of the products of
@@ -179,6 +185,107 @@ columnMajor m = go (colShape m) m
     go (SPlus _ left right) x = case splitJoin x of
       (xLeft, xRight) -> Join (go left  xLeft)
                               (go right xRight)
+
+{- | 'comp' on several cores, equal to it bit for bit:
+
+@
+result = parComp a b          -- depth chosen from the core count and the size
+tuned  = parCompWith 6 a b    -- at most 6 levels of parallel splits
+@
+
+The depth grows with the number of capabilities, @ceiling (logBase 2 n) + 2@
+levels for @n@ of them, so that there are about four blocks per core for the
+scheduler to balance. It is lower for small products, so that no spark gets
+fewer than about 2^15 multiply-adds, and 0 (no sparks) on a single
+capability. The count is read once, when the program starts; a program that
+changes it with 'GHC.Conc.setNumCapabilities' should pass a depth to
+'parCompWith'.
+
+Compile with @-threaded@ and run with @+RTS -N@. Products of a few hundred rows
+gain from a smaller allocation area, @+RTS -A1m@, with which idle cores pick up
+the work sooner; large ones gain a few percent from @-A64m@.
+-}
+parComp :: forall e cr rows cols. (Num e) => Matrix e cr rows -> Matrix e cols cr -> Matrix e cols rows
+parComp a b = parCompWith (defaultDepth (rows' a) (columns' a) (columns' b)) a b
+{-# INLINE parComp #-}
+
+-- The depth 'parComp' uses for an r by k matrix times a k by c one.
+defaultDepth :: Int -> Int -> Int -> Int
+defaultDepth r k c
+  | numCapabilities <= 1 = 0
+  | otherwise = max 0 (min (ceilLog2 numCapabilities + 2) (log2 r + log2 k + log2 c - grain))
+  where
+    grain = 15
+    log2 n = finiteBitSize n - 1 - countLeadingZeros n
+    ceilLog2 n = log2 (n - 1) + 1
+
+{- | 'comp' with the two halves of each of the first @depth@ splits of the
+result computed in parallel, and the first @depth@ levels of laying the
+operands out as well: GHC sparks one half and evaluates the other on the
+current thread. That makes at most @3 * (2^depth - 1) + 1@ sparks, fewer when
+the dimension trees are not that deep. A depth of 0 or less is 'comp'.
+
+Every depth gives the same result as 'comp', bit for bit. Only the result is
+split, never the dimension the product sums over, so each element is still the
+same 'dot' of the same row and column, and no partial sums are added at the
+end. The rewrite rules match 'comp' only, so 'parCompWith' always computes.
+
+A spark evaluates its block to weak head normal form. The fields of the matrix
+type are strict, so that evaluates every element of the block to its own weak
+head normal form, which for 'Double', 'Int' and t'Boolean' is the whole value.
+With an element type whose weak head normal form leaves work undone (a lazy
+pair, say), that work happens later, on whichever thread uses the element.
+
+The parallel levels repeat the recursion of 'rowsWithColumns' rather than
+sharing it: a single recursion that chose at each level between parallel and
+sequential halves would allocate a suspended computation for both halves of
+every block, sequential ones included.
+-}
+parCompWith ::
+  forall e cr rows cols.
+  (Num e) =>
+  Int ->
+  Matrix e cr rows ->
+  Matrix e cols cr ->
+  Matrix e cols rows
+parCompWith depth a b
+  | depth <= 0 = comp a b
+  | otherwise  =
+      inParallel
+        (go depth (colShape b) (rowShape a))
+        (rowMajorPar depth (rowShape a) a)
+        (columnMajorPar depth (colShape b) b)
+  where
+    go :: Int -> SDim c -> SDim r -> Matrix e cr r -> Matrix e c cr -> Matrix e c r
+    go d cols rows x y
+      | d <= 0 = rowsWithColumns dot x y
+      | otherwise = case splitLongerSide cols rows of
+          NoSplit                 -> One (dot x y)
+          SplitRows top bottom    -> case splitFork x of
+            (xTop, xBottom) -> inParallel Fork (go (d - 1) cols top    xTop    y)
+                                               (go (d - 1) cols bottom xBottom y)
+          SplitColumns left right -> case splitJoin y of
+            (yLeft, yRight) -> inParallel Join (go (d - 1) left  rows x yLeft)
+                                               (go (d - 1) right rows x yRight)
+    rowMajorPar :: Int -> SDim r -> Matrix e c r -> Matrix e c r
+    rowMajorPar d (SPlus _ top bottom) m | d > 0 = case splitFork m of
+      (mTop, mBottom) -> inParallel Fork (rowMajorPar (d - 1) top    mTop)
+                                         (rowMajorPar (d - 1) bottom mBottom)
+    rowMajorPar _ _ m = rowMajor m
+    columnMajorPar :: Int -> SDim c -> Matrix e c r -> Matrix e c r
+    columnMajorPar d (SPlus _ left right) m | d > 0 = case splitJoin m of
+      (mLeft, mRight) -> inParallel Join (columnMajorPar (d - 1) left  mLeft)
+                                         (columnMajorPar (d - 1) right mRight)
+    columnMajorPar _ _ m = columnMajor m
+{-# SPECIALISE parCompWith :: Int -> Matrix Double cr rows -> Matrix Double cols cr -> Matrix Double cols rows #-}
+{-# SPECIALISE parCompWith :: Int -> Matrix Int cr rows -> Matrix Int cols cr -> Matrix Int cols rows #-}
+{-# SPECIALISE parCompWith :: Int -> Matrix Boolean cr rows -> Matrix Boolean cols cr -> Matrix Boolean cols rows #-}
+
+-- Applies k to its two arguments after computing them at the same time: the
+-- right one in a spark, the left one on this thread.
+inParallel :: (x -> y -> z) -> x -> y -> z
+inParallel k l r = r `par` (l `pseq` k l r)
+{-# INLINE inParallel #-}
 
 {-# RULES
 -- Category: identity

@@ -65,6 +65,8 @@ module LAoP.Matrix.Indexed (
   -- * Composition and transposition
   iden,
   comp,
+  parComp,
+  parCompWith,
   tr,
 
   -- * Element-wise operations
@@ -124,6 +126,7 @@ module LAoP.Matrix.Indexed (
 import           Control.DeepSeq
 import           Data.Array               (Array, listArray, (!))
 import           Data.Bits                (bit, testBit, (.|.))
+import           Data.Coerce              (coerce)
 import           Data.Kind                (Type)
 import           Data.Proxy               (Proxy (..))
 import           GHC.Generics             (Generic (..), K1, M1, U1 (..), V1,
@@ -523,6 +526,20 @@ zero would have propagated it.
 comp :: (Num e) => Matrix e b c -> Matrix e a b -> Matrix e a c
 comp (M a) (M b) = M (I.comp a b)
 {-# NOINLINE [1] comp #-}
+
+-- The parallel wrappers are coercions with no arguments of their own, so they
+-- inline even when partially applied and reach the specialisations of
+-- 'I.parCompWith' at every call site.
+
+-- | 'comp' on several cores, equal to it bit for bit. See 'I.parComp' for how the depth is chosen.
+parComp :: forall e b c a. (Num e) => Matrix e b c -> Matrix e a b -> Matrix e a c
+parComp = coerce (I.parComp @e @(DimOf b) @(DimOf c) @(DimOf a))
+{-# INLINE parComp #-}
+
+-- | 'comp' with at most @depth@ levels of parallel splits. See 'I.parCompWith'.
+parCompWith :: forall e b c a. (Num e) => Int -> Matrix e b c -> Matrix e a b -> Matrix e a c
+parCompWith = coerce (I.parCompWith @e @(DimOf b) @(DimOf c) @(DimOf a))
+{-# INLINE parCompWith #-}
 
 {-# RULES
 -- Category: identity

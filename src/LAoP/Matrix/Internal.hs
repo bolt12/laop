@@ -22,7 +22,8 @@ It lays the operands out with the exchange law ('rowMajor', 'columnMajor'),
 splits the result with the fusion laws until each block is a single element
 ('rowsWithColumns'), and computes each element as the 'dot' product of a row
 and a column. Every element is the same sum, grouped the same way, as with the
-laws read as a program, so the results are equal bit for bit.
+laws read as a program, so the results are equal bit for bit. 'parComp'
+computes the same product on several cores.
 
 = Rewrite rules #rules#
 
@@ -108,6 +109,8 @@ module LAoP.Matrix.Internal (
 
   -- * Composition and transposition
   comp,
+  parComp,
+  parCompWith,
   tr,
 
   -- ** The composition kernel

@@ -59,6 +59,8 @@ module LAoP.Matrix.Nat (
   -- * Composition and transposition
   iden,
   comp,
+  parComp,
+  parCompWith,
   tr,
 
   -- * Element-wise operations
@@ -109,6 +111,7 @@ module LAoP.Matrix.Nat (
 
 import           Control.DeepSeq
 import           Data.Array               (Array, listArray, (!))
+import           Data.Coerce              (coerce)
 import           Data.Kind                (Constraint)
 import           Data.Proxy               (Proxy (..))
 import           GHC.Stack                (HasCallStack)
@@ -392,6 +395,16 @@ iden = M (withNat @cols I.iden)
 -- product is computed.
 comp :: (Num e) => Matrix e cr rows -> Matrix e cols cr -> Matrix e cols rows
 comp (M a) (M b) = M (I.comp a b)
+
+-- | 'comp' on several cores, equal to it bit for bit. See 'I.parComp' for how the depth is chosen.
+parComp :: forall e cr rows cols. (Num e) => Matrix e cr rows -> Matrix e cols cr -> Matrix e cols rows
+parComp = coerce (I.parComp @e @(I.FromNat cr) @(I.FromNat rows) @(I.FromNat cols))
+{-# INLINE parComp #-}
+
+-- | 'comp' with at most @depth@ levels of parallel splits. See 'I.parCompWith'.
+parCompWith :: forall e cr rows cols. (Num e) => Int -> Matrix e cr rows -> Matrix e cols cr -> Matrix e cols rows
+parCompWith = coerce (I.parCompWith @e @(I.FromNat cr) @(I.FromNat rows) @(I.FromNat cols))
+{-# INLINE parCompWith #-}
 
 -- Element-wise
 

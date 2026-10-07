@@ -123,6 +123,8 @@ module LAoP.Relation (
   -- * Composition and lifting
   iden,
   comp,
+  parComp,
+  parCompWith,
 
   -- * Relational application
   pointAp,
@@ -145,7 +147,7 @@ import           Prelude              hiding (id, (.))
 
 {- | Relation data type: a t'Boolean' matrix from "LAoP.Matrix.Indexed". Since
 t'Boolean' is a semiring, relational composition is matrix composition, and the
-Indexed rewrite rules apply to relations.
+Indexed rewrite rules and 'parComp' apply to relations.
 -}
 newtype Relation a b = R (IX.Matrix Boolean a b)
   deriving (Show, Eq, Ord, NFData) via (IX.Matrix Boolean a b)
@@ -344,6 +346,14 @@ r \`.` (s \`.` p) = (r \`.` s) \`.` p
 -}
 comp :: Relation b c -> Relation a b -> Relation a c
 comp (R a) (R b) = R (IX.comp a b)
+
+-- | Relational composition on several cores, equal to 'comp'.
+parComp :: Relation b c -> Relation a b -> Relation a c
+parComp (R a) (R b) = R (IX.parComp a b)
+
+-- | Relational composition with at most @depth@ levels of parallel splits.
+parCompWith :: Int -> Relation b c -> Relation a b -> Relation a c
+parCompWith d (R a) (R b) = R (IX.parCompWith d a b)
 
 -- Division
 
