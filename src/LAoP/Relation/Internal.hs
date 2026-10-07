@@ -530,7 +530,7 @@ overriddenBy ::
   Relation a b ->
   Relation a b ->
   Relation a b
-overriddenBy r s = s `union` r `intersection` divR zeros (conv s)
+overriddenBy r s = s `union` (r `intersection` divR zeros (conv s))
 
 {- | Relational application.
 
