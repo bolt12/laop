@@ -777,9 +777,11 @@ linearOrder r = connected r && partialOrder r
 equivalence :: (CountableN a, FLN a a) => Relation a a -> Bool
 equivalence r = symmetric r && preorder r
 
--- | A 'Relation' @r@ is a partial-equivalence 'iff' @'partialOrder' r && 'equivalence' r@
-partialEquivalence :: (CountableN a, FLN a a) => Relation a a -> Bool
-partialEquivalence r = partialOrder r && equivalence r
+{- | A 'Relation' @r@ is a partial equivalence 'iff' @'symmetric' r && 'transitive' r@,
+that is, an equivalence on the part of @a@ it is defined on.
+-}
+partialEquivalence :: Relation a a -> Bool
+partialEquivalence r = symmetric r && transitive r
 
 {- | A 'Relation' @r@ is 'difunctional' or regular wherever
 @r `.` 'conv' r `.` r == r@
