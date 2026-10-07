@@ -1,30 +1,28 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DerivingVia #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE ConstraintKinds     #-}
+{-# LANGUAGE DerivingVia         #-}
+{-# LANGUAGE TypeFamilies        #-}
 
+{- |
+Module     : LAoP.Dist.Internal
+Copyright  : (c) Armando Santos 2019-2026
+Maintainer : armandoifsantos@gmail.com
+Stability  : experimental
+
+Probability distributions represented as column vectors whose entries are
+non-negative and sum to 1, and probabilistic functions as column-stochastic
+matrices, whose columns are such vectors (Oliveira 2012).
+
+This module exports the 'D' constructor, which "LAoP.Dist" hides: a vector
+given to it is trusted to be a distribution.
+-}
 module LAoP.Dist.Internal (
   Dist (..),
   Prob,
-  Countable,
-  CountableN,
-  CountableDimsN,
-  FLN,
-  Liftable,
-  TrivialP,
   fmapD,
   unitD,
   multD,
   selectD,
-  branchD,
-  ifD,
   returnD,
   bindD,
   (??),
@@ -34,184 +32,178 @@ module LAoP.Dist.Internal (
   uniform,
   negExp,
   normal,
+  fromFreqs,
   toValues,
+  toMatrix,
   prettyDist,
   prettyPrintDist,
-)
-where
+) where
 
-import Control.DeepSeq
-import Data.Bool
-import Data.List (sortBy)
-import Data.Proxy
-import GHC.TypeLits
-import LAoP.Matrix.Internal qualified as I
-import LAoP.Matrix.Type hiding (Countable, CountableDims, CountableDimsN, CountableN, FLN, Liftable, TrivialP)
-import LAoP.Category
-import Prelude hiding (id, (.))
+import           Control.DeepSeq
+import           Data.Array           (accumArray, (!))
+import           Data.List            (sortBy)
+import           Data.List.NonEmpty   (NonEmpty (..))
+import qualified Data.List.NonEmpty   as NE
+import           GHC.Stack            (HasCallStack)
+import qualified LAoP.Matrix.Indexed  as IX
+import qualified LAoP.Matrix.Internal as I
 
--- | Type synonym for probability value
+-- | Probability values.
 type Prob = Double
 
-{- | Type synonym for column vector matrices. This represents a probability
-distribution.
+{- | A probability distribution over @a@: a column vector from
+"LAoP.Matrix.Indexed" whose entries are non-negative and sum to 1.
+
+"LAoP.Dist" exports the type without its constructor, so every distribution
+comes from the functions below. The constructor 'D' skips that check: a vector
+given to it directly is trusted to be a distribution.
 -}
-newtype Dist a = D (Matrix Prob () a)
-  deriving (Show, Num, Eq, Ord, NFData) via (Matrix Prob () a)
+newtype Dist a = D (IX.Matrix Prob () a)
+  deriving (Eq, Ord, NFData) via (IX.Matrix Prob () a)
 
--- | Constraint type synonyms to keep the type signatures less convoluted
-type Countable a = KnownNat (I.Count a)
+-- | Shows a distribution as the 'fromFreqs' call that builds it.
+instance (IX.MatIndex a, Show a) => Show (Dist a) where
+  showsPrec d dist = showParen (d > 10) (showString "fromFreqs " . showsPrec 11 (toValues dist))
 
-type CountableN a = KnownNat (I.Count (I.Normalize a))
-type CountableDimsN a b = (CountableN a, CountableN b)
-type FLN a b = I.FL (I.Normalize a) (I.Normalize b)
-type Liftable a b = (Bounded a, Bounded b, Enum a, Enum b, Eq b, Num Prob, Ord Prob)
-type TrivialP a b = Normalize (a, b) ~ Normalize (Normalize a, Normalize b)
+-- | The column vector of a distribution.
+toMatrix :: Dist a -> IX.Matrix Prob () a
+toMatrix (D m) = m
 
--- | Functor instance
+{- | Functor instance. A function is a matrix, so mapping it over a
+distribution is a product:
+
+@
+'fmapD' f d == 'D' ('IX.comp' ('IX.fromF' f) ('toMatrix' d))
+@
+
+The result is built directly: every outcome goes through @f@, and the
+probabilities of the outcomes that land on the same value add up. That takes
+time proportional to the number of values of @a@ plus that of @b@. The product
+takes time proportional to the two numbers multiplied.
+-}
 fmapD ::
-  ( Liftable a b
-  , CountableDimsN a b
-  , FLN b a
-  ) =>
+  forall a b.
+  (IX.MatIndex a, IX.MatIndex b) =>
   (a -> b) ->
   Dist a ->
   Dist b
-fmapD f (D m) = D (fromF' f `comp` m)
+fmapD f d = collect [(f x, p) | (x, p) <- toValues d]
 
--- | Applicative/Monoidal instance 'unit' function
+-- Adds up the weights given for each outcome, in list order, and gives every
+-- other outcome 0. The result is a distribution when the weights sum to 1.
+collect :: forall a. (IX.MatIndex a) => [(a, Prob)] -> Dist a
+collect xs = D (IX.matrixBuilder' (\(r, _) -> weights ! r))
+  where
+    weights = accumArray (+) 0 (0, IX.cardinality @a - 1) [(IX.toOrd x, p) | (x, p) <- xs]
+
+-- | Applicative/Monoidal instance @unit@ function
 unitD :: Dist ()
-unitD = D (one 1)
+unitD = D (IX.one 1)
 
--- | Applicative/Monoidal instance 'mult' function
+-- | Applicative/Monoidal instance @mult@ function
 multD ::
-  ( CountableDimsN a b
-  , CountableN (a, b)
-  , FLN (a, b) a
-  , FLN (a, b) b
-  , TrivialP a b
-  ) =>
   Dist a ->
   Dist b ->
   Dist (a, b)
-multD (D a) (D b) = D (kr a b)
+multD (D a) (D b) = D (IX.kr a b)
 
--- | Selective instance function
-selectD ::
-  ( FLN b b
-  , CountableN b
-  ) =>
-  Dist (Either a b) ->
-  Matrix Prob a b ->
-  Dist b
-selectD (D d) m = D (selectM d m)
-
-{- | Chooses which of the two given effectful
-functions to apply to a given argument;
+{- | Selective instance function. The matrix must be column-stochastic
+(non-negative entries, every column summing to 1) for the result to be a
+distribution.
 -}
-branchD ::
-  ( CountableDimsN a b
-  , CountableDimsN c (Either b c)
-  , FLN c b
-  , FLN a b
-  , FLN a a
-  , FLN b b
-  , FLN c c
-  , FLN b a
-  , FLN b c
-  , FLN (Either b c) b
-  , FLN (Either b c) c
-  ) =>
+selectD ::
   Dist (Either a b) ->
-  Matrix Prob a c ->
-  Matrix Prob b c ->
-  Dist c
-branchD x l r = f x `selectD` g l `selectD` r
-  where
-    f (D m) = D (fork (tr i1) (i1 `comp` tr i2) `comp` m)
-    g m = i2 `comp` m
-
--- | Branch on a Boolean value, skipping unnecessary computations.
-ifD ::
-  ( CountableDimsN a (Either () a)
-  , FLN a a
-  , FLN a ()
-  , FLN () a
-  , FLN (Either () a) a
-  ) =>
-  Dist Bool ->
-  Dist a ->
-  Dist a ->
-  Dist a
-ifD x (D t) (D e) = branchD x' t e
-  where
-    x' = bool (Right ()) (Left ()) `fmapD` x
+  IX.Matrix Prob a b ->
+  Dist b
+selectD (D d) m = D (IX.select d m)
 
 -- | Monad instance 'return' function
-returnD :: forall a. (Enum a, FLN () a, Countable a) => a -> Dist a
-returnD a = D (col l)
-  where
-    i = fromInteger $ natVal (Proxy :: Proxy (Count a))
-    x = fromEnum a
-    l = take x [0, 0 ..] ++ [1] ++ take (i - x - 1) [0, 0 ..]
+returnD ::
+  (IX.MatIndex a) =>
+  a ->
+  Dist a
+returnD = D . IX.point
 
--- | Monad instance '(>>=)' function
-bindD :: Dist a -> Matrix Prob a b -> Dist b
-bindD (D d) m = D (m `comp` d)
+{- | Monad instance '(>>=)' function. The continuation is a matrix whose column
+@x@ is the distribution to continue with from @x@, so it has to be
+column-stochastic (no negative entries, and @bang . m == bang@) for the result
+to be a distribution.
+-}
+bindD ::
+  Dist a ->
+  IX.Matrix Prob a b ->
+  Dist b
+bindD (D d) m = D (m `IX.comp` d)
 
 -- | Extract probabilities given an Event.
 (??) ::
-  ( Enum a
-  , Countable a
-  ) =>
+  (IX.MatIndex a) =>
   (a -> Bool) ->
   Dist a ->
   Prob
-(??) p d =
-  let l = toValues d
-      x = filter (p . fst) l
-   in sum . map snd $ x
+(??) p d = sum [q | (x, q) <- toValues d, p x]
 
--- Distribution Construction
+-- Distribution construction
 
--- | Constructs a Bernoulli distribution
-choose :: (FLN () a) => Prob -> Dist a
-choose prob = D (col [prob, 1 - prob])
+{- | Constructs a Bernoulli distribution over a two-valued type. The given
+probability goes to the value numbered 0 (@False@ for 'Bool'), the rest to the
+value numbered 1. Throws a runtime error if the probability is outside
+@[0, 1]@.
+-}
+choose :: (HasCallStack, IX.DimOf a ~ (I.U I.:+: I.U)) => Prob -> Dist a
+choose prob
+  | prob >= 0 && prob <= 1 = D (IX.M (I.Fork (I.One prob) (I.One (1 - prob))))
+  | otherwise = error ("LAoP.Dist.choose: probability " ++ show prob ++ " is outside [0, 1]")
 
--- | Creates a distribution given a shape function
-shape :: (FLN () a) => (Prob -> Prob) -> [a] -> Dist a
-shape _ [] = error "Probability.shape: empty list"
+{- | Creates a distribution over the given outcomes, weighting them by a shape
+function sampled at evenly spaced points of @[0, 1]@. A single outcome gets
+all the mass. Throws a runtime error when the shape function is negative at
+one of the points, or zero at all of them (see 'fromFreqs').
+-}
+shape :: (HasCallStack, IX.MatIndex a) => (Prob -> Prob) -> NonEmpty a -> Dist a
+shape _ (x :| []) = returnD x
 shape f xs =
   let incr = 1 / fromIntegral (length xs - 1)
       ps = map f (iterate (+ incr) 0)
-   in fromFreqs (zip xs ps)
+   in fromFreqs (zip (NE.toList xs) ps)
 
 -- | Constructs a Linear distribution
-linear :: (FLN () a) => [a] -> Dist a
+linear :: (IX.MatIndex a) => NonEmpty a -> Dist a
 linear = shape id
 
 -- | Constructs an Uniform distribution
-uniform :: (FLN () a) => [a] -> Dist a
+uniform :: (IX.MatIndex a) => NonEmpty a -> Dist a
 uniform = shape (const 1)
 
--- | Constructs an Negative Exponential distribution
-negExp :: (FLN () a) => [a] -> Dist a
+-- | Constructs a Negative Exponential distribution
+negExp :: (IX.MatIndex a) => NonEmpty a -> Dist a
 negExp = shape (\x -> exp (-x))
 
--- | Constructs an Normal distribution
-normal :: (FLN () a) => [a] -> Dist a
+-- | Constructs a Normal distribution
+normal :: (IX.MatIndex a) => NonEmpty a -> Dist a
 normal = shape (normalCurve 0.5 0.5)
 
--- | Transforms a 'Dist' into a list of pairs.
-toValues :: forall a. (Enum a, Countable a) => Dist a -> [(a, Prob)]
-toValues (D d) =
-  let rrows = fromInteger (natVal (Proxy :: Proxy (Count a)))
-      probs = toList d
-      res = zip (map toEnum [0 .. rrows]) probs
-   in res
+{- | Builds a distribution from non-negative weights, normalising them so they
+sum to 1. Weights given for the same outcome more than once are added up, and
+outcomes that are not listed get probability 0. Throws a runtime error if a
+weight is negative (or @NaN@), or if the weights do not have a positive sum.
+-}
+fromFreqs :: forall a. (HasCallStack, IX.MatIndex a) => [(a, Prob)] -> Dist a
+fromFreqs xs
+  | (w : _) <- [p | (_, p) <- xs, not (p >= 0)] =
+      error ("LAoP.Dist.fromFreqs: weight " ++ show w ++ " is not >= 0")
+  | total <= 0 = error "LAoP.Dist.fromFreqs: the weights must have a positive sum"
+  | otherwise = D (IX.emap (/ total) weights)
+  where
+    D weights = collect xs
+    total = sum [p | (_, p) <- xs]
 
--- | Pretty a distribution
-prettyDist :: forall a. (Show a, Enum a, Countable a) => Dist a -> String
+-- | Transforms a 'Dist' into a list of pairs.
+toValues :: forall a. (IX.MatIndex a) => Dist a -> [(a, Prob)]
+toValues (D d) = zip (map IX.fromOrd [0 .. IX.cardinality @a - 1]) (IX.toList d)
+
+-- | Pretty print a distribution, most likely outcome first.
+prettyDist :: forall a. (Show a, IX.MatIndex a) => Dist a -> String
 prettyDist d =
   let values = sortBy (\(_, pp1) (_, pp2) -> compare pp2 pp1) (toValues @a d)
       w = maximum (map (length . show . fst) values)
@@ -220,20 +212,15 @@ prettyDist d =
         values
   where
     showProb p = show (p * 100) ++ "%"
-    showR _ x = show x ++ " "
+    showR w x = let s = show x in s ++ replicate (w - length s) ' '
 
--- | Pretty Print a distribution
-prettyPrintDist :: forall a. (Show a, Enum a, Countable a) => Dist a -> IO ()
+-- | Pretty print a distribution to @stdout@
+prettyPrintDist :: forall a. (Show a, IX.MatIndex a) => Dist a -> IO ()
 prettyPrintDist = putStrLn . prettyDist @a
 
--- Auxiliary functions
-
-fromFreqs :: (FLN () a) => [(a, Prob)] -> Dist a
-fromFreqs xs = D (col (map (\(_, p) -> p / q) xs))
-  where
-    q = sum $ map snd xs
+-- Auxiliary
 
 normalCurve :: Prob -> Prob -> Prob -> Prob
 normalCurve mean dev x =
   let u = (x - mean) / dev
-   in exp (-1 / 2 * u ^ (2 :: Int)) / sqrt (2 * pi)
+   in exp (-(u ^ (2 :: Int)) / 2) / sqrt (2 * pi)
