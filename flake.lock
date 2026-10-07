@@ -20,21 +20,6 @@
         "type": "github"
       }
     },
-    "fourmolu-nix": {
-      "locked": {
-        "lastModified": 1707266073,
-        "narHash": "sha256-tCFzZQJicDdYjnuJiNK4hiiRAH7c2wQzMhOCdUMbVKE=",
-        "owner": "jedimahdi",
-        "repo": "fourmolu-nix",
-        "rev": "717f5a91b0d7b97b1be7ecc3a0fd42d37ffe1c9b",
-        "type": "github"
-      },
-      "original": {
-        "owner": "jedimahdi",
-        "repo": "fourmolu-nix",
-        "type": "github"
-      }
-    },
     "git-hooks-nix": {
       "flake": false,
       "locked": {
@@ -100,7 +85,6 @@
     "root": {
       "inputs": {
         "flake-parts": "flake-parts",
-        "fourmolu-nix": "fourmolu-nix",
         "git-hooks-nix": "git-hooks-nix",
         "haskell-flake": "haskell-flake",
         "nixos-unified": "nixos-unified",
