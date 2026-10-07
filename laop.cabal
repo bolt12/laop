@@ -85,16 +85,26 @@ test-suite laop-test
   import: common-options, executable-options
   type: exitcode-stdio-1.0
   hs-source-dirs: test
+  -- Every core, so that the parallel tests run their sparks.
+  ghc-options: -with-rtsopts=-N
   other-modules:
     Examples.Quantum
     Examples.Readme
     Examples.Spreadsheets
+    Test.Dist.Properties
+    Test.Generators
+    Test.Index.Properties
+    Test.Matrix.Properties
+    Test.Nat.Properties
+    Test.Relation.Properties
 
   main-is: Spec.hs
   build-depends:
+    QuickCheck >=2.15 && <2.19,
     laop,
     tasty >=1.5 && <1.6,
     tasty-hunit >=0.10 && <0.11,
+    tasty-quickcheck >=0.11 && <0.12,
 
 benchmark laop-benchmark
   import: common-options, executable-options
