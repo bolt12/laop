@@ -204,6 +204,9 @@ changes it with 'GHC.Conc.setNumCapabilities' should pass a depth to
 Compile with @-threaded@ and run with @+RTS -N@. Products of a few hundred rows
 gain from a smaller allocation area, @+RTS -A1m@, with which idle cores pick up
 the work sooner; large ones gain a few percent from @-A64m@.
+<https://github.com/bolt12/laop/blob/master/docs/parallelism.md docs/parallelism.md>
+has the measured speedups, the effect of the depth and of the runtime system's
+settings, and how to reproduce them.
 -}
 parComp :: forall e cr rows cols. (Num e) => Matrix e cr rows -> Matrix e cols cr -> Matrix e cols rows
 parComp a b = parCompWith (defaultDepth (rows' a) (columns' a) (columns' b)) a b

@@ -18,6 +18,7 @@ build-type: Simple
 extra-doc-files:
   CHANGELOG.md
   README.md
+  docs/parallelism.md
 
 tested-with: ghc ==9.10.3 || ==9.12.3
 
@@ -122,3 +123,16 @@ benchmark laop-benchmark
     linear >=1.22 && <1.24,
     matrix >=0.3.6 && <0.4,
     vector >=0.13 && <0.14,
+
+-- Parallel composition, one configuration per run, with the runtime system's
+-- statistics for each product. docs/parallelism.md uses it.
+benchmark laop-parallel
+  import: common-options, executable-options
+  type: exitcode-stdio-1.0
+  hs-source-dirs: benchmark
+  main-is: Parallel.hs
+  ghc-options: -with-rtsopts=-T
+  build-depends:
+    deepseq >=1.5 && <1.6,
+    laop,
+    parallel >=3.2 && <3.4,
