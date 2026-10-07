@@ -71,11 +71,13 @@ library
 
   other-modules:
     LAoP.Matrix.Internal.Biproduct
+    LAoP.Matrix.Internal.Boolean
     LAoP.Matrix.Internal.Composition
     LAoP.Matrix.Internal.Construction
     LAoP.Matrix.Internal.Dim
     LAoP.Matrix.Internal.Elementwise
     LAoP.Matrix.Internal.Kronecker
+    LAoP.Matrix.Internal.Relational
     LAoP.Matrix.Internal.Representation
 
 test-suite laop-test

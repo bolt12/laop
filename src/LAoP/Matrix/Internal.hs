@@ -141,15 +141,27 @@ module LAoP.Matrix.Internal (
   rows,
   rows',
 
+  -- * Boolean matrices
+  Boolean (..),
+  Relation,
+  toBool,
+  fromBool,
+  negateM,
+  divR,
+  divL,
+  divS,
+
   -- * Pretty printing
   pretty,
   prettyPrint,
 ) where
 
 import           LAoP.Matrix.Internal.Biproduct
+import           LAoP.Matrix.Internal.Boolean
 import           LAoP.Matrix.Internal.Composition
 import           LAoP.Matrix.Internal.Construction
 import           LAoP.Matrix.Internal.Dim
 import           LAoP.Matrix.Internal.Elementwise
 import           LAoP.Matrix.Internal.Kronecker
+import           LAoP.Matrix.Internal.Relational
 import           LAoP.Matrix.Internal.Representation

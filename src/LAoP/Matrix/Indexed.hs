@@ -108,6 +108,10 @@ module LAoP.Matrix.Indexed (
   abideJF,
   abideFJ,
 
+  -- * Relations
+  I.Boolean (..),
+  toRel,
+
   -- * Dimensions
   columns,
   rows,
@@ -432,6 +436,14 @@ fromF f = generateM (\c r -> if target ! c == r then 1 else 0)
     -- f is applied once per column, not once per cell.
     n = cardinality @a
     target = listArray (0, n - 1) [toOrd (f (fromOrd c)) | c <- [0 .. n - 1]] :: Array Int Int
+
+-- | Lifts relation functions to Boolean Matrix
+toRel ::
+  forall a b.
+  (MatIndex a, MatIndex b) =>
+  (a -> b -> Bool) ->
+  Matrix I.Boolean a b
+toRel f = generateM (\c r -> I.fromBool (f (fromOrd c) (fromOrd r)))
 
 {- | Bifunctor equivalent function: relabels the columns of a matrix through
 @f@ and its rows through @g@.

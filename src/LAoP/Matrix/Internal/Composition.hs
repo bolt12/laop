@@ -21,6 +21,7 @@ module LAoP.Matrix.Internal.Composition (
   dot,
 ) where
 
+import           LAoP.Matrix.Internal.Boolean        (Boolean)
 import           LAoP.Matrix.Internal.Dim
 import           LAoP.Matrix.Internal.Representation (Matrix (..), colShape,
                                                       rowShape, splitFork,
@@ -54,9 +55,9 @@ An @r@ by @k@ matrix times a @k@ by @c@ one costs O(r * k * c) time and
 allocates only the result and the two laid-out operands. How the result nests
 its 'Join' and 'Fork' nodes is unspecified.
 
-'comp' is specialised for 'Double' and 'Int' elements. At another element
-type, or when called from code that is polymorphic in the element type, it
-runs a generic version that allocates a boxed partial sum for every
+'comp' is specialised for 'Double', 'Int' and t'Boolean' elements. At another
+element type, or when called from code that is polymorphic in the element
+type, it runs a generic version that allocates a boxed partial sum for every
 multiply-add and is about four times slower. Specialise the calling code (a
 @SPECIALISE@ or @INLINABLE@ pragma) to reach the fast one.
 -}
@@ -64,10 +65,11 @@ comp :: (Num e) => Matrix e cr rows -> Matrix e cols cr -> Matrix e cols rows
 comp a b = rowsWithColumns dot (rowMajor a) (columnMajor b)
 {-# SPECIALISE comp :: Matrix Double cr rows -> Matrix Double cols cr -> Matrix Double cols rows #-}
 {-# SPECIALISE comp :: Matrix Int cr rows -> Matrix Int cols cr -> Matrix Int cols rows #-}
+{-# SPECIALISE comp :: Matrix Boolean cr rows -> Matrix Boolean cols cr -> Matrix Boolean cols rows #-}
 
 {- | @rowsWithColumns f a b@ is the matrix whose element in row @i@ and column
 @j@ is @f@ applied to row @i@ of @a@ and column @j@ of @b@. 'comp' is
-@rowsWithColumns 'dot'@.
+@rowsWithColumns 'dot'@, and relational division uses it with implication.
 
 It builds the result block by block with the fusion laws of Macedo and
 Oliveira (2013, eqs. 26 and 27), halving the longer side of each block until
@@ -141,6 +143,7 @@ dot (One x)      (One y)      = x * y
 dot (Join x1 x2) (Fork y1 y2) = dot x1 y1 + dot x2 y2
 {-# SPECIALISE dot :: Matrix Double cr U -> Matrix Double U cr -> Double #-}
 {-# SPECIALISE dot :: Matrix Int cr U -> Matrix Int U cr -> Int #-}
+{-# SPECIALISE dot :: Matrix Boolean cr U -> Matrix Boolean U cr -> Boolean #-}
 
 {- | Lays a matrix out row-major, with every 'Fork' above every 'Join', so that
 its rows come apart in constant time. The matrix is the same, by the exchange
