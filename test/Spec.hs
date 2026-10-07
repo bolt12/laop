@@ -5,6 +5,7 @@ import qualified Examples.Readme          as RD
 import qualified Examples.Spreadsheets    as SS
 import           Test.Dist.Properties
 import           Test.Index.Properties
+import           Test.Matrix.Composition
 import           Test.Matrix.Properties
 import           Test.Nat.Properties
 import           Test.Relation.Properties
@@ -20,6 +21,7 @@ main =
       , distPropertyTests
       , indexPropertyTests
       , natPropertyTests
+      , compositionTests
       , testGroup "Examples"
           [ testGroup "README" (map check RD.checks)
           , testGroup "Quantum" (map check QU.checks)
