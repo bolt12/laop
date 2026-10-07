@@ -399,12 +399,12 @@ fromF = M . I.fromF
 
 -- | Lifts relation functions to Boolean Matrix
 toRel ::
-  ( Liftable (Natural 0 1) a b
+  ( Liftable (Ranged 0 1) a b
   , CountableDims a b
   , FLN b a
   ) =>
   (a -> b -> Bool) ->
-  Matrix (Natural 0 1) a b
+  Matrix (Ranged 0 1) a b
 toRel = M . I.toRel
 
 -- Conversion

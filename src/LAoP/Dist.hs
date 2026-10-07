@@ -28,7 +28,7 @@ module LAoP.Dist (
   -- problems with it. Import 'Matrix.Nat' or 'Matrix.Type'
   -- to access LAoP matrix combinators and then all you have
   -- to do is to define your sample space, either by creating a new data
-  -- type or by abstracting it out via 'Natural'.
+  -- type or by abstracting it out via 'Ranged'.
   --
   -- Write manipulation functions and promote them to matrices via
   -- 'fromF' or 'fromF'' and you're good to go!

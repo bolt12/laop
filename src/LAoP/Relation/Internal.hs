@@ -189,11 +189,11 @@ import LAoP.Utils.Internal
 import Prelude hiding (id, (.))
 
 -- | Boolean type synonym for working with boolean matrices
-type Boolean = Natural 0 1
+type Boolean = Ranged 0 1
 
 -- | Relation data type.
 newtype Relation a b = R (I.Matrix Boolean (I.Normalize a) (I.Normalize b))
-  deriving (Show, Eq, Ord, NFData) via (I.Matrix (Natural 1 1) (I.Normalize a) (I.Normalize b))
+  deriving (Show, Eq, Ord, NFData) via (I.Matrix (Ranged 1 1) (I.Normalize a) (I.Normalize b))
 
 deriving instance (Read (I.Matrix Boolean (I.Normalize a) (I.Normalize b))) => Read (Relation a b)
 
@@ -369,7 +369,7 @@ toList (R m) = I.toList m
 -- | Converts a well typed 'Relation' to 'Bool'.
 toBool :: Relation One One -> Bool
 toBool r = case toList r of
-  [Nat 0] -> False
+  [Rng 0] -> False
   _ -> True
 
 {- | Power transpose.
@@ -417,7 +417,7 @@ with elements of type @b@.
 zeros ::
   (FLN a b, CountableDimsN a b) =>
   Relation a b
-zeros = relationBuilder' (const (reifyToNatural 0))
+zeros = relationBuilder' (const (mkRanged 0))
 
 -- Ones Matrix
 
@@ -433,7 +433,7 @@ with every element of type @b@.
 ones ::
   (FLN a b, CountableDimsN a b) =>
   Relation a b
-ones = relationBuilder' (const (reifyToNatural 1))
+ones = relationBuilder' (const (mkRanged 1))
 
 -- Bang Matrix
 
@@ -465,7 +465,7 @@ point = fromF . const
 -}
 iden ::
   (FLN a a, CountableN a) => Relation a a
-iden = relationBuilder' (bool (reifyToNatural 0) (reifyToNatural 1) . uncurry (==))
+iden = relationBuilder' (bool (mkRanged 0) (mkRanged 1) . uncurry (==))
 
 {- | Relational composition
 

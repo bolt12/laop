@@ -203,7 +203,7 @@ deriving instance (Show e) => Show (Matrix e cols rows)
 'Generic' instance.
 -}
 type family Count (d :: Type) :: Nat where
-  Count (Natural n m) = (m - n) + 1
+  Count (Ranged n m) = (m - n) + 1
   Count (BoundedList a) = (^) 2 (Count a)
   Count (Either a b) = (+) (Count a) (Count b)
   Count (a, b) = (*) (Count a) (Count b)
@@ -896,7 +896,7 @@ zipWithM f x@(Join _ _) y@(Fork _ _) = zipWithM f (abideJF x) y
 
 -- Relational operators functions
 
-type Boolean = Natural 0 1
+type Boolean = Ranged 0 1
 type Relation a b = Matrix Boolean a b
 
 -- | Helper conversion function
@@ -907,13 +907,13 @@ toBool n
   | otherwise = error "toBool: argument out of range"
 
 -- | Helper conversion function
-fromBool :: Bool -> Natural 0 1
-fromBool True = reifyToNatural 1
-fromBool False = reifyToNatural 0
+fromBool :: Bool -> Ranged 0 1
+fromBool True = mkRanged 1
+fromBool False = mkRanged 0
 
 -- | Relational negation
 negateM :: Relation cols rows -> Relation cols rows
-negateM (One (Nat p)) = One (Nat (negate p))
+negateM (One (UnsafeRanged p)) = One (UnsafeRanged (negate p))
 negateM (Join a b) = Join (negateM a) (negateM b)
 negateM (Fork a b) = Fork (negateM a) (negateM b)
 
@@ -935,7 +935,7 @@ andM x@(Join _ _) y@(Fork _ _) = andM (abideJF x) y
 
 -- | Relational subtraction
 subM :: Relation cols rows -> Relation cols rows -> Relation cols rows
-subM (One a) (One b) = if a - b < reifyToNatural 0 then One (reifyToNatural 0) else One (a - b)
+subM (One a) (One b) = if a - b < mkRanged 0 then One (mkRanged 0) else One (a - b)
 subM (Join a b) (Join c d) = Join (subM a c) (subM b d)
 subM (Fork a b) (Fork c d) = Fork (subM a c) (subM b d)
 subM x@(Fork _ _) y@(Join _ _) = subM x (abideJF y)
@@ -1021,8 +1021,8 @@ toRel f =
           . map
             ( \(a, b) ->
                 if uncurry f (a, b)
-                  then ((fromEnum a, fromEnum b), reifyToNatural 1)
-                  else ((fromEnum a, fromEnum b), reifyToNatural 0)
+                  then ((fromEnum a, fromEnum b), mkRanged 1)
+                  else ((fromEnum a, fromEnum b), mkRanged 0)
             )
           $ combinations
       mList = buildList combAp rrows
