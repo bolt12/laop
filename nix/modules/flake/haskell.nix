@@ -69,11 +69,6 @@
         # Development shell configuration
         devShell = {
           hlsCheck.enable = false;
-          mkShellArgs = {
-            shellHook = ''
-              export SHELL=/run/current-system/sw/bin/bash
-            '';
-          };
           tools = hp: {
             # needed to get on a GHC910 dev env
             hlint = null;
