@@ -68,6 +68,8 @@ library
     LAoP.Utils
     LAoP.Utils.Internal
 
+  other-modules: LAoP.Matrix.Internal.Dim
+
 test-suite laop-test
   import: common-options, executable-options
   type: exitcode-stdio-1.0
