@@ -1,10 +1,15 @@
 cabal-version: 3.0
 name: laop
 version: 0.2.0.0
-synopsis: Matrix programming library
+synopsis: Typed matrices built from blocks, after the Linear Algebra of Programming
 description:
-  Matrix programming library that uses a type-safe inductive definition
-  inspired by the Linear Algebra of Programming
+  The Linear Algebra of Programming of Macedo and Oliveira as a Haskell
+  library: matrices are typed arrows built inductively from blocks, so
+  that ill-formed matrices are type errors and algorithms follow the laws
+  of the algebra. Relations are Boolean matrices and probabilistic
+  functions column-stochastic ones. Products are computed block by block,
+  on one core or several. Start with "LAoP.Guide" and
+  "LAoP.Matrix.Indexed".
 
 homepage: https://github.com/bolt12/laop
 bug-reports: https://github.com/bolt12/laop/issues

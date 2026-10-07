@@ -1,5 +1,5 @@
 {
-  description = "Nix template for Haskell projects";
+  description = "laop: Linear Algebra of Programming matrix library";
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
     flake-parts.url = "github:hercules-ci/flake-parts";
