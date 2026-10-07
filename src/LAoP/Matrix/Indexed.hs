@@ -19,7 +19,7 @@ type with a 'MatIndex' instance can index a dimension: an enumeration with a
 pairs and the types of "LAoP.Index" have one.
 
 The functions here wrap those of "LAoP.Matrix.Internal", where the matrix type
-and the algorithms are.
+and the algorithms are; "LAoP.Guide" relates them to the papers.
 -}
 module LAoP.Matrix.Indexed (
   -- * Matrix type

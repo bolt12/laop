@@ -9,7 +9,7 @@ blocks: a single element ('One'), two matrices side by side ('Join', the junc
 of Macedo and Oliveira 2013), or two matrices one above the other ('Fork', the
 split). Its dimensions are trees of the kind 'Dim', so blocks of mismatched
 sizes cannot be put together. "LAoP.Matrix.Indexed" and "LAoP.Matrix.Nat" wrap
-this type with friendlier indices.
+this type with friendlier indices, and "LAoP.Guide" relates it to the papers.
 
 Import this module to write new block algorithms, or to work with dimension
 trees directly. Its API may change between minor versions.

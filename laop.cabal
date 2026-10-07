@@ -61,6 +61,7 @@ library
     LAoP.Category
     LAoP.Dist
     LAoP.Dist.Internal
+    LAoP.Guide
     LAoP.Index
     LAoP.Index.Internal
     LAoP.Matrix.Indexed
