@@ -13,6 +13,16 @@ this type with friendlier indices.
 
 Import this module to write new block algorithms, or to work with dimension
 trees directly. Its API may change between minor versions.
+
+= How composition is computed
+
+Four laws of the papers specify 'comp', and laop 0.2 ran them as its
+definition. 'comp' applies the same laws in the order that does the least work.
+It lays the operands out with the exchange law ('rowMajor', 'columnMajor'),
+splits the result with the fusion laws until each block is a single element
+('rowsWithColumns'), and computes each element as the 'dot' product of a row
+and a column. Every element is the same sum, grouped the same way, as with the
+laws read as a program, so the results are equal bit for bit.
 -}
 module LAoP.Matrix.Internal (
   -- | Matrix dimensions are tracked by the 'Dim' kind (@U@ for unit,
@@ -78,6 +88,12 @@ module LAoP.Matrix.Internal (
   -- * Composition and transposition
   comp,
   tr,
+
+  -- ** The composition kernel
+  rowsWithColumns,
+  rowMajor,
+  columnMajor,
+  dot,
 
   -- * Element-wise operations
   (.+.),

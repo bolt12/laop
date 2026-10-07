@@ -104,7 +104,7 @@ splitJoin (Join left right)  = (left, right)
 splitJoin (Fork top bottom) =
   let (topLeft, topRight)       = splitJoin top
       (bottomLeft, bottomRight) = splitJoin bottom
-   in (Fork topLeft bottomLeft, Fork topRight bottomRight)
+   in strictPair (Fork topLeft bottomLeft) (Fork topRight bottomRight)
 
 {- | The row counterpart of 'splitJoin': it returns the top and bottom blocks,
 equal to @(comp p1 m, comp p2 m)@ (Macedo and Oliveira 2013, eq. 29). A 'Fork' splits in O(1), and a
@@ -135,7 +135,13 @@ splitFork (Fork top bottom)  = (top, bottom)
 splitFork (Join left right) =
   let (leftTop, leftBottom)   = splitFork left
       (rightTop, rightBottom) = splitFork right
-   in (Join leftTop rightTop, Join leftBottom rightBottom)
+   in strictPair (Join leftTop rightTop) (Join leftBottom rightBottom)
+
+-- Both halves of a split, built at once rather than left as suspended
+-- computations for whoever looks at them first.
+strictPair :: a -> b -> (a, b)
+strictPair !a !b = (a, b)
+{-# INLINE strictPair #-}
 
 {- | Lexicographic order on the elements in row-major order. It is a total
 order consistent with '=='. For element-wise inclusion of relations use
