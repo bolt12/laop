@@ -1,7 +1,6 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE PatternSynonyms     #-}
 {-# LANGUAGE RoleAnnotations     #-}
-{-# OPTIONS_GHC -Wno-orphans #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
 {- |
@@ -162,55 +161,6 @@ instance (KnownNat n, KnownNat m) => Enum (Ranged n m) where
 
   enumFrom = boundedEnumFrom
   enumFromThen = boundedEnumFromThen
-
-{- | Optimized 'Enum' instance for tuples that comply with the given
-constraints.
--}
-instance
-  ( Enum a
-  , Enum b
-  , Bounded b
-  ) =>
-  Enum (a, b)
-  where
-  toEnum i =
-    let (listB :: [b]) = [minBound .. maxBound]
-        lengthB = length listB
-        fstI = div i lengthB
-        sndI = mod i lengthB
-     in (toEnum fstI, toEnum sndI)
-
-  fromEnum (a, b) =
-    let (listB :: [b]) = [minBound .. maxBound]
-        lengthB = length listB
-        fstI = fromEnum a
-        sndI = fromEnum b
-     in fstI * lengthB + sndI
-
-instance
-  ( Bounded a
-  , Bounded b
-  ) =>
-  Bounded (Either a b)
-  where
-  minBound = Left (minBound :: a)
-  maxBound = Right (maxBound :: b)
-
-instance
-  ( Enum a
-  , Bounded a
-  , Enum b
-  , Bounded b
-  ) =>
-  Enum (Either a b)
-  where
-  toEnum i =
-    let la = fmap Left ([minBound .. maxBound] :: [a])
-        lb = fmap Right ([minBound .. maxBound] :: [b])
-     in (la ++ lb) !! i
-
-  fromEnum (Left a)  = fromEnum a
-  fromEnum (Right b) = fromEnum (maxBound :: a) + fromEnum b + 1
 
 {- | A subset of a finite type, represented by the list of its members.
 
