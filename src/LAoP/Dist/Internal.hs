@@ -47,7 +47,7 @@ import Data.Proxy
 import GHC.TypeLits
 import LAoP.Matrix.Internal qualified as I
 import LAoP.Matrix.Type hiding (Countable, CountableDims, CountableDimsN, CountableN, FLN, Liftable, TrivialP)
-import LAoP.Utils
+import LAoP.Category
 import Prelude hiding (id, (.))
 
 -- | Type synonym for probability value

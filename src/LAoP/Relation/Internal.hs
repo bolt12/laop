@@ -185,7 +185,8 @@ import Control.DeepSeq
 import Data.Bool
 import GHC.TypeLits hiding (Natural)
 import LAoP.Matrix.Internal qualified as I
-import LAoP.Utils.Internal
+import LAoP.Category
+import LAoP.Index.Internal
 import Prelude hiding (id, (.))
 
 -- | Boolean type synonym for working with boolean matrices

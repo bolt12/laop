@@ -186,7 +186,8 @@ import Data.Proxy
 import Data.Type.Equality
 import GHC.Generics
 import GHC.TypeLits hiding (Natural)
-import LAoP.Utils.Internal
+import LAoP.Category
+import LAoP.Index.Internal
 import Prelude hiding (id, (.))
 
 -- | LAoP (Linear Algebra of Programming) Inductive Matrix definition.

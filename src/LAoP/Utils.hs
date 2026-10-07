@@ -1,26 +1,19 @@
 {-# LANGUAGE PatternSynonyms #-}
+{-# OPTIONS_HADDOCK not-home #-}
 
 {- |
 Module     : LAoP.Utils
 Copyright  : (c) Armando Santos 2019-2026
 Maintainer : armandoifsantos@gmail.com
-Stability  : experimental
+Stability  : deprecated
 
-__LAoP__ is a library for algebraic (inductive) construction and manipulation of matrices
-in Haskell. See <https://github.com/bolt12/master-thesis my Msc Thesis> for the
-motivation behind the library, the underlying theory, and implementation details.
-
-This module provides the 'Ranged' data type.
-The semantic associated with this data type is that
-it's meant to be a restricted 'Int' value.
+The module of laop 0.2 that held 'Ranged', 'BoundedList' and 'Category'. They
+now live in "LAoP.Index" and "LAoP.Category", and this module re-exports them
+with the deprecated aliases, so 0.2 imports keep working.
 -}
-module LAoP.Utils (
-  -- | Utility module that provides the 'Ranged' data type.
-  -- The semantic associated with this data type is that
-  -- it's meant to be a restricted 'Int' value. For example
-  -- the type @Ranged 1 6@ can only be instantiated with @mkRanged \@1 \@6 n@
-  -- where @1 <= n <= 6@.
-
+module LAoP.Utils
+  {-# DEPRECATED "Import LAoP.Index and LAoP.Category instead" #-}
+  (
   -- * 'Ranged' data type
   Ranged,
   pattern Rng,
@@ -48,4 +41,9 @@ module LAoP.Utils (
 )
 where
 
-import           LAoP.Utils.Internal
+import           LAoP.Category       (Category (..))
+import           LAoP.Index.Internal (BoundedList (..), Natural, Ranged,
+                                      coerceNat, coerceNat2, coerceNat3,
+                                      coerceRanged, coerceRanged2,
+                                      coerceRanged3, mkRanged, mkRangedMaybe,
+                                      pattern Rng, reifyToNatural)

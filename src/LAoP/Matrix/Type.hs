@@ -193,7 +193,8 @@ import Data.Proxy
 import Data.Void
 import GHC.TypeLits hiding (Natural)
 import LAoP.Matrix.Internal qualified as I
-import LAoP.Utils
+import LAoP.Category
+import LAoP.Index
 import Prelude hiding (id, (.))
 
 newtype Matrix e (cols :: Type) (rows :: Type) = M (I.Matrix e (I.Normalize cols) (I.Normalize rows))
